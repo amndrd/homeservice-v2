@@ -355,74 +355,312 @@ def chip(name, x, y, size, rnd):
 
 
 # ------------------------------------------------------------- l'arbre
-def tapered(name, p0, p1, r0, r1, material, sides=7):
-    """tronçon conique de p0 à p1"""
-    me = bpy.data.meshes.new(name)
-    bm = bmesh.new()
-    bmesh.ops.create_cone(bm, cap_ends=True, segments=sides, radius1=r0, radius2=r1, depth=1.0)
-    bmesh.ops.translate(bm, vec=(0, 0, 0.5), verts=bm.verts)
-    bm.to_mesh(me)
-    bm.free()
-    o = link(name, me, [material])
-    d = Vector(p1) - Vector(p0)
-    o.location = p0
-    o.rotation_mode = "QUATERNION"
-    o.rotation_quaternion = d.to_track_quat("Z", "Y")
-    o.scale = (1, 1, d.length)
-    return flat(o)
+# Grand arbre « pleureur » d'après la référence (pixel art d'un glycine/cerisier) : tronc torsadé fait de brins qui
+# s'enroulent, penché en S, au pied évasé ; racines en arches qui courent sur le gazon et replongent ; quelques
+# branches maîtresses qui s'ouvrent en parasol, une branche nue qui dépasse ; houppier large et asymétrique fait de
+# grappes : un dôme bosselé en chou-fleur, dont le bas s'égoutte en longues mèches pendantes. Chaque grappe est
+# éclairée comme une sphère (clair en haut à gauche, sombre en bas), avec un cœur sombre entre les grappes.
+TREE_XY = (0.2, 0.45)        # pied de l'arbre
+TRUNK_H = 1.9                # hauteur de la fourche au-dessus du sol
+CROWN_R = 3.15               # demi-largeur du houppier
+LIGHT = Vector((-0.55, -0.35, 0.76)).normalized()   # lumière peinte des grappes (haut, gauche, vers nous)
 
 
-def blob(name, loc, r, material, rnd, sub=2, squash=0.85):
-    """touffe de feuillage low poly : icosphère cabossée"""
-    me = bpy.data.meshes.new(name)
-    bm = bmesh.new()
-    bmesh.ops.create_icosphere(bm, subdivisions=sub, radius=r)
-    off = Vector((rnd.uniform(0, 50), rnd.uniform(0, 50), 0))
-    for v in bm.verts:
-        v.co *= 1 + 0.16 * noise.noise(v.co * 2.2 + off)
-        v.co.z *= squash
-    bm.to_mesh(me)
-    bm.free()
-    return flat(link(name, me, [material], loc))
+def curve_tube(name, pts, radii, material, res=10, smooth=True):
+    """tube le long d'une polyligne, rayon variable point par point (tronc, brins, branches, racines)"""
+    cu = bpy.data.curves.new(name, "CURVE")
+    cu.dimensions = "3D"
+    cu.bevel_depth = 1.0
+    cu.bevel_resolution = 3
+    cu.use_fill_caps = True
+    cu.use_map_taper = False
+    sp = cu.splines.new("NURBS")
+    sp.points.add(len(pts) - 1)
+    for p_, (v, r) in zip(sp.points, zip(pts, radii)):
+        p_.co = (v.x, v.y, v.z, 1)
+        p_.radius = r
+    sp.order_u = 4
+    sp.use_endpoint_u = True
+    sp.resolution_u = res
+    o = bpy.data.objects.new(name, cu)
+    o.data.materials.append(material)
+    COLL.objects.link(o)
+    return o
+
+
+def bark_mat():
+    """écorce : veines qui suivent le bois (bandes ondulées), deux bruns proches, creux plus sombres"""
+    m = bpy.data.materials.new("Écorce")
+    m.use_nodes = True
+    nt = m.node_tree
+    b = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    b.inputs["Roughness"].default_value = 0.85
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    wv = nt.nodes.new("ShaderNodeTexWave")
+    wv.wave_type = "BANDS"
+    wv.bands_direction = "Y"                       # UV de la courbe : y fait le tour du brin → veines en long
+    wv.inputs["Scale"].default_value = 3.0
+    wv.inputs["Distortion"].default_value = 3
+    wv.inputs["Detail"].default_value = 3
+    wv.inputs["Detail Scale"].default_value = 1.5
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    e = ramp.color_ramp.elements
+    e[0].position, e[0].color = 0.2, (*srgb("#5e3c25"), 1)
+    e[1].position, e[1].color = 0.8, (*srgb("#a8743f"), 1)
+    mid = e.new(0.5)
+    mid.color = (*srgb("#86562f"), 1)
+    ao = nt.nodes.new("ShaderNodeAmbientOcclusion")    # creux entre les brins
+    ao.inputs["Distance"].default_value = 0.25
+    mp = nt.nodes.new("ShaderNodeMapping")
+    mp.inputs["Scale"].default_value = (12, 1, 1)
+    nt.links.new(tc.outputs["UV"], mp.inputs["Vector"])
+    nt.links.new(mp.outputs["Vector"], wv.inputs["Vector"])
+    nt.links.new(wv.outputs["Fac"], ramp.inputs["Fac"])
+    nt.links.new(ramp.outputs["Color"], ao.inputs["Color"])
+    nt.links.new(ao.outputs["Color"], b.inputs["Base Color"])
+    m.diffuse_color = (*srgb("#86562f"), 1)
+    return m
+
+
+def foliage_mat(name, shades):
+    """feuillage peint : la couleur suit une lumière fictive sur la sphère de la grappe (position par rapport à
+    l'origine de l'objet, qui est le centre de la grappe), en quelques teintes franches, comme la référence"""
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    b = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    b.inputs["Roughness"].default_value = 0.9
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    nrm = nt.nodes.new("ShaderNodeVectorMath")
+    nrm.operation = "NORMALIZE"
+    dot = nt.nodes.new("ShaderNodeVectorMath")
+    dot.operation = "DOT_PRODUCT"
+    dot.inputs[1].default_value = LIGHT
+    mix = nt.nodes.new("ShaderNodeMath")                  # mêlé à la vraie normale : les bosses restent lisibles
+    mix.operation = "MULTIPLY_ADD"
+    mix.inputs[1].default_value = 0.6
+    mix.inputs[2].default_value = 0.34
+    dn = nt.nodes.new("ShaderNodeVectorMath")
+    dn.operation = "DOT_PRODUCT"
+    dn.inputs[1].default_value = LIGHT
+    avg = nt.nodes.new("ShaderNodeMix")
+    avg.data_type = "FLOAT"
+    avg.inputs["Factor"].default_value = 0.35
+    nz = nt.nodes.new("ShaderNodeTexNoise")
+    nz.inputs["Scale"].default_value = 9
+    add = nt.nodes.new("ShaderNodeMath")
+    add.operation = "MULTIPLY_ADD"
+    add.inputs[1].default_value = 0.12
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    ramp.color_ramp.interpolation = "EASE"
+    e = ramp.color_ramp.elements
+    stops = [(0.15, shades[0]), (0.45, shades[1]), (0.72, shades[2]), (0.95, shades[3])]
+    e[0].position, e[0].color = stops[0][0], (*srgb(stops[0][1]), 1)
+    e[1].position, e[1].color = stops[-1][0], (*srgb(stops[-1][1]), 1)
+    for pos, col in stops[1:-1]:
+        el = e.new(pos)
+        el.color = (*srgb(col), 1)
+    L = nt.links
+    L.new(tc.outputs["Object"], nrm.inputs[0])
+    L.new(nrm.outputs["Vector"], dot.inputs[0])
+    L.new(tc.outputs["Normal"], dn.inputs[0])
+    L.new(dot.outputs["Value"], avg.inputs["A"])
+    L.new(dn.outputs["Value"], avg.inputs["B"])
+    L.new(avg.outputs["Result"], mix.inputs[0])
+    L.new(tc.outputs["Object"], nz.inputs["Vector"])
+    L.new(nz.outputs["Fac"], add.inputs[0])
+    L.new(mix.outputs["Value"], add.inputs[2])
+    L.new(add.outputs["Value"], ramp.inputs["Fac"])
+    # occlusion : les creux entre bosses et entre grappes s'assombrissent, comme les ombres franches de la référence
+    ao = nt.nodes.new("ShaderNodeAmbientOcclusion")
+    ao.inputs["Distance"].default_value = 0.55
+    ao.samples = 12
+    L.new(ramp.outputs["Color"], ao.inputs["Color"])
+    L.new(ao.outputs["Color"], b.inputs["Base Color"])
+    m.diffuse_color = (*srgb(shades[2]), 1)
+    return m
+
+
+def meta_to_mesh(name, elements, material, loc, res=0.045, grain=0.0):
+    """grappe en métaballes (sphères et ellipsoïdes qui fusionnent), convertie en maillage, origine au centre"""
+    mb = bpy.data.metaballs.new(name)
+    mb.resolution = res
+    mb.render_resolution = res
+    mb.threshold = 0.6
+    for kind, co, r, size in elements:
+        e = mb.elements.new(type=kind)
+        e.co = co
+        e.radius = r
+        if kind == "ELLIPSOID":
+            e.size_x, e.size_y, e.size_z = size
+            e.stiffness = 3.0
+    o = bpy.data.objects.new(name + " (méta)", mb)
+    COLL.objects.link(o)
+    o.location = loc
+    dg = bpy.context.evaluated_depsgraph_get()
+    me = bpy.data.meshes.new_from_object(o.evaluated_get(dg))
+    bpy.data.objects.remove(o)
+    out = bpy.data.objects.new(name, me)
+    out.location = loc
+    me.materials.append(material)
+    for p_ in me.polygons:
+        p_.use_smooth = True
+    COLL.objects.link(out)
+    if grain:                                         # grain de feuilles : relief fin sur toute la surface
+        tex = bpy.data.textures.get("Grain feuillu") or bpy.data.textures.new("Grain feuillu", "CLOUDS")
+        tex.noise_scale = 0.07
+        tex.noise_depth = 1
+        dm = out.modifiers.new("Grain", "DISPLACE")
+        dm.texture = tex
+        dm.strength = grain
+        dm.mid_level = 0.5
+        dm.texture_coords = "GLOBAL"
+    return out
+
+
+def clump(name, c, size, material, rnd, drip=1.0):
+    """grappe : dôme bosselé (chou-fleur) + corps, et des mèches qui pendent sous le bord"""
+    el = []
+    for _ in range(int(14 + size * 10)):                  # grosses bosses du dessus
+        u = rnd.uniform(0, 2 * math.pi)
+        v = rnd.uniform(0.05, 1.0) * math.pi / 2
+        d = Vector((math.cos(u) * math.cos(v), math.sin(u) * math.cos(v) * 0.85, math.sin(v) * 0.75)) * size * 0.62
+        el.append(("BALL", d, size * rnd.uniform(0.26, 0.38), None))
+    for _ in range(int(26 + size * 20)):                  # petites bosses : le grain feuillu du chou-fleur
+        u = rnd.uniform(0, 2 * math.pi)
+        v = rnd.uniform(0.0, 1.0) * math.pi / 2
+        d = Vector((math.cos(u) * math.cos(v), math.sin(u) * math.cos(v) * 0.85, math.sin(v) * 0.8)) * size * 0.78
+        el.append(("BALL", d, size * rnd.uniform(0.14, 0.2), None))
+    for _ in range(5):                                    # corps
+        d = Vector((rnd.uniform(-0.4, 0.4), rnd.uniform(-0.3, 0.3), rnd.uniform(-0.25, 0.1))) * size
+        el.append(("BALL", d, size * 0.42, None))
+    n = int((10 + size * 10) * drip)                      # mèches : sur le pourtour bas, plus longues devant
+    for i in range(n):
+        u = 2 * math.pi * (i + rnd.uniform(-0.35, 0.35)) / max(n, 1)
+        rr = size * rnd.uniform(0.38, 0.66)
+        L = size * rnd.uniform(0.3, 0.8) * drip * (1.15 if math.sin(u) < 0 else 0.8)
+        top = -size * rnd.uniform(0.0, 0.12)
+        w = size * rnd.uniform(0.15, 0.22)
+        d = Vector((math.cos(u) * rr, math.sin(u) * rr * 0.85, top - L * 0.4))
+        el.append(("ELLIPSOID", d, 1.0, (w, w * 0.9, L * 0.55)))
+        # la mèche s'effile : un second fuseau, plus mince, au bout
+        el.append(("ELLIPSOID", d + Vector((rnd.uniform(-0.03, 0.03), 0, -L * 0.5)), 1.0, (w * 0.62, w * 0.55, L * 0.32)))
+    return meta_to_mesh(name, el, material, c, grain=0.045)
 
 
 def tree():
-    rnd = random.Random(5)
-    x0, y0 = 0.15, 0.35                                  # un peu en arrière du centre : le relief y culmine
-    z0 = height(x0, y0) - 0.05
-    H = TREE_H
-    # tronc légèrement penché, qui se divise en trois branches maîtresses
-    fork = Vector((x0 - 0.08, y0 + 0.02, z0 + H * 0.34))
-    tapered("Tronc", (x0, y0, z0), fork, 0.32, 0.2, BARK, 8)
-    tips = []
-    for a, lean, L in ((0.3, 0.75, 0.85), (2.4, 0.8, 0.75), (4.3, 0.6, 0.8)):
-        tip = fork + Vector((math.cos(a) * lean, math.sin(a) * lean * 0.7, L))
-        tapered(f"Branche {len(tips)}", fork, tip, 0.17, 0.07, BARK, 6)
-        tips.append(tip)
-    # racines qui courent sur le gazon
-    for i, a in enumerate((0.4, 1.9, 3.3, 4.9)):
+    rnd = random.Random(8)
+    x0, y0 = TREE_XY
+    z0 = height(x0, y0) - 0.1
+    BARK2 = bark_mat()
+    LEAF_M = [foliage_mat("Feuillage clair", ("#23502a", "#3e8a3d", "#62ad4b", "#a2d670")),
+              foliage_mat("Feuillage", ("#1c4223", "#337a37", "#529d45", "#86c260")),
+              foliage_mat("Feuillage sombre", ("#14301a", "#25582b", "#3e7e3a", "#64a24f"))]
+    CORE = mat("Cœur du feuillage", "#1d3b22", 0.95)
+
+    # -- tronc : une colonne vertébrale en S, des brins qui s'enroulent autour en se resserrant
+    def spine(s):
+        return Vector((x0 + 0.38 * math.sin(math.pi * s * 1.15) - 0.12 * s, y0 + 0.12 * s, z0 + TRUNK_H * s))
+
+    def trunk_r(s):
+        return 0.27 + 0.36 * (1 - s) ** 3.2               # pied très évasé
+
+    N = 7
+    S = 26
+    for k in range(N):
+        ph = 2 * math.pi * k / N + rnd.uniform(-0.2, 0.2)
+        twist = 2.3 * math.pi
+        pts, rad = [], []
+        for i in range(S + 1):
+            s = i / S
+            a = ph + twist * s
+            R = trunk_r(s) * rnd.uniform(0.6, 0.68)
+            pts.append(spine(s) + Vector((math.cos(a) * R, math.sin(a) * R, 0)))
+            rad.append(trunk_r(s) * 0.42 * (1 + 0.15 * math.sin(s * 9 + k)))
+        curve_tube(f"Brin du tronc {k}", pts, rad, BARK2)
+    curve_tube("Cœur du tronc", [spine(i / 12) for i in range(13)], [trunk_r(i / 12) * 0.55 for i in range(13)], BARK2)
+
+    # -- racines : chaque brin repart du pied, se cambre au-dessus du gazon puis replonge
+    for k in range(8):
+        a = 2 * math.pi * k / 8 + rnd.uniform(-0.25, 0.25)
         d = Vector((math.cos(a), math.sin(a), 0))
-        p1 = Vector((x0, y0, 0)) + d * 0.75
-        p1.z = height(p1.x, p1.y) - 0.03
-        p0 = Vector((x0 + d.x * 0.18, y0 + d.y * 0.18, 0))
-        p0.z = max(height(p0.x, p0.y), z0) + 0.1
-        tapered(f"Racine {i}", p0, p1, 0.12, 0.035, ROOT_M, 5)
-    # houppier : grosses touffes autour des bouts de branches, puis des plus petites pour la silhouette
-    crown = fork + Vector((0, 0, H * 0.42))
-    blob("Houppier cœur", crown, 1.15, LEAF[1], rnd)
-    for i, tip in enumerate(tips):
-        blob(f"Houppier {i}", tip + Vector((0, 0, 0.2)), rnd.uniform(0.82, 0.95), LEAF[i % 3], rnd)
-    for i in range(9):
-        a = rnd.uniform(0, 2 * math.pi)
-        e = rnd.uniform(-0.25, 0.6)
-        p = crown + Vector((math.cos(a) * 1.3, math.sin(a) * 1.0, e * 0.85))
-        blob(f"Touffe {i}", p, rnd.uniform(0.45, 0.65), LEAF[rnd.randint(0, 2)], rnd)
-    blob("Cime", crown + Vector((0.1, 0.05, 0.85)), 0.55, LEAF[0], rnd)
-    # quelques fruits orange, l'accent du site
-    for i in range(7):
-        a = rnd.uniform(0, 2 * math.pi)
-        p = crown + Vector((math.cos(a) * 1.45, math.sin(a) * 1.1 - 0.3, rnd.uniform(-0.5, 0.3)))
-        blob(f"Fruit {i}", p, 0.075, FLOWER[3], rnd, sub=1, squash=1)
+        L = rnd.uniform(0.75, 1.3) * (1.2 if math.sin(a) < 0.3 else 0.85)
+        base = spine(0.04) + d * trunk_r(0) * 0.7
+        pts, rad = [], []
+        for i in range(9):
+            f = i / 8
+            p_ = Vector((x0, y0, 0)) + d * (trunk_r(0) * 0.8 + L * f)
+            p_ += Vector((-d.y, d.x, 0)) * math.sin(f * 3 + k) * 0.12      # elle serpente
+            g = height(p_.x, p_.y)
+            arch = math.sin(min(1, f * 1.15) * math.pi) * rnd.uniform(0.16, 0.3) if f > 0.2 else 0
+            z = (base.z + 0.25) * (1 - f) ** 2 + (g + arch) * (1 - (1 - f) ** 2) - (0.12 if i == 8 else 0)
+            pts.append(Vector((p_.x, p_.y, z)))
+            rad.append(0.15 * (1 - f) ** 0.7 + 0.03)
+        curve_tube(f"Racine {k}", pts, rad, BARK2)
+
+    # -- branches maîtresses : elles partent de la fourche, s'ouvrent en parasol et se tordent
+    fork = spine(1.0)
+    anchors = []
+    specs = [(-2.75, 2.3, 0.75), (-1.95, 2.0, 0.95), (-0.6, 1.5, 1.25), (0.5, 1.9, 1.05), (1.5, 2.2, 0.85),
+             (2.6, 1.6, 0.7), (3.6, 1.2, 0.95)]            # (direction (rad), portée, montée)
+    for j, (a, reach, rise) in enumerate(specs):
+        a += rnd.uniform(-0.12, 0.12)
+        d = Vector((math.cos(a), math.sin(a) * 0.8, 0))
+        pts, rad = [], []
+        for i in range(10):
+            f = i / 9
+            p_ = fork + d * reach * f + Vector((0, 0, rise * math.sin(f * math.pi * 0.62) - 0.15 * f * f))
+            p_ += Vector((-d.y, d.x, 0)) * 0.1 * math.sin(f * 5 + j)
+            pts.append(p_)
+            rad.append(0.17 * (1 - f) + 0.035)
+        curve_tube(f"Branche {j}", [fork - d * 0.1] + pts, [0.2] + rad, BARK2)
+        anchors.append((pts[-1], j))
+        anchors.append((pts[5], j))
+        for t_ in range(2):                                # rameaux secondaires
+            i0 = rnd.randint(3, 6)
+            side = Vector((-d.y, d.x, 0)) * rnd.choice((-1, 1))
+            q = [pts[i0] + (side * 0.55 + d * 0.3) * f + Vector((0, 0, 0.35 * f)) for f in (0, 0.5, 1.0)]
+            curve_tube(f"Rameau {j}-{t_}", q, [0.06, 0.04, 0.02], BARK2)
+            anchors.append((q[-1], j))
+    # la branche nue, à droite, qui sort du feuillage (comme sur la référence)
+    nb = [fork + Vector((0.3 * f + 0.9 * f * f, -0.15 * f, 0.3 * f - 0.45 * f * f)) + Vector((0.25, -0.1, -0.55))
+          for f in (0, 0.33, 0.66, 1.0)]
+    curve_tube("Branche nue", nb, [0.1, 0.07, 0.045, 0.02], BARK2)
+    for f, up in ((0.5, 0.35), (0.85, -0.25)):
+        p_ = nb[0].lerp(nb[-1], f)
+        curve_tube("Brindille", [p_, p_ + Vector((0.2, -0.05, up))], [0.03, 0.012], BARK2)
+
+    # -- le houppier : cœur sombre, puis les grappes, des plus sombres (fond, bas) aux plus claires (dessus, devant)
+    crown_c = fork + Vector((-0.15, 0.1, 1.15))
+    core = [("BALL", Vector((rnd.uniform(-1.3, 1.3), rnd.uniform(-0.7, 0.7), rnd.uniform(-0.4, 0.45))),
+             rnd.uniform(0.6, 0.85), None) for _ in range(14)]
+    meta_to_mesh("Cœur du houppier", core, CORE, crown_c, res=0.12)
+    placed = []
+    # grappes sur les bouts de branches
+    for p_, j in anchors:
+        c = p_ + Vector((0, 0, rnd.uniform(0.15, 0.4)))
+        placed.append(c)
+    # grappes de silhouette : un dôme large, asymétrique (plus ample à gauche, une grosse grappe basse devant)
+    for i in range(26):
+        u = rnd.uniform(0, 2 * math.pi)
+        v = rnd.uniform(0.15, 1.0)
+        rx = CROWN_R * (1.1 if math.cos(u) < 0 else 0.92)
+        c = crown_c + Vector((math.cos(u) * rx * v, math.sin(u) * rx * 0.6 * v, (1 - v * v) * 1.7 - 0.25 + rnd.uniform(-0.2, 0.2)))
+        placed.append(c)
+    placed.append(crown_c + Vector((-1.35, -0.85, -0.65)))   # la grosse grappe basse, devant à gauche
+    placed.append(crown_c + Vector((1.9, -0.6, -0.55)))
+    placed.append(crown_c + Vector((0.1, -0.2, 1.75)))       # le sommet
+    # trop proches : on garde la première
+    kept = []
+    for c in placed:
+        if all((c - k).length > 0.72 for k in kept):
+            kept.append(c)
+    for i, c in enumerate(kept):
+        front = (crown_c.y - c.y) / 1.5                   # > 0 : devant
+        up = (c.z - crown_c.z) / 1.2
+        shade = 0 if front + up > 0.9 else (1 if front + up > -0.1 else 2)
+        size = rnd.uniform(0.88, 1.22)
+        clump(f"Grappe {i}", c, size, LEAF_M[shade], rnd, drip=1.0 if c.z < crown_c.z + 1.2 else 0.55)
     return Vector((x0, y0))
 
 
@@ -557,8 +795,8 @@ def setup_render():
     cam = bpy.data.cameras.new("Caméra îlot")
     cam.lens = 50
     co = link("Caméra îlot", cam, [])
-    co.location = (0.7, -14.5, 6.6)
-    co.rotation_euler = (Vector((0.05, 0.3, 1.55)) - co.location).to_track_quat("-Z", "Y").to_euler()
+    co.location = (0.8, -17.5, 7.4)
+    co.rotation_euler = (Vector((0.05, 0.3, 2.35)) - co.location).to_track_quat("-Z", "Y").to_euler()
     sc.camera = co
     sun = bpy.data.lights.new("Soleil", "SUN")
     sun.energy = 3.4
@@ -578,7 +816,7 @@ def setup_render():
     sc.cycles.use_denoising = True
     sc.cycles.device = "GPU"
     r.film_transparent = True
-    r.resolution_x, r.resolution_y = 1600, 1100
+    r.resolution_x, r.resolution_y = 1600, 1250
     r.resolution_percentage = 50 if DRAFT else 100
     sc.view_settings.view_transform = "AgX"
     try:
