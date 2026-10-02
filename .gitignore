@@ -1,0 +1,7 @@
+# Sauvegardes automatiques de Blender
+*.blend1
+*.blend@
+# Système / outils
+.DS_Store
+node_modules/
+__pycache__/
