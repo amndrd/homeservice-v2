@@ -113,7 +113,8 @@
       if (t0 === null) t0 = now;
       const u = clamp((now - t0) / 1000 / dur, 0, 1);
       const e = lerp(u, u * u * (3 - 2 * u), 0.35);   // presque linéaire : le front se propage à vitesse lisible
-      if (phase === 'cover') draw(lerp(-0.25, 1.2, e), -1.4);   // le front dépasse l'écran : aucun trou à la fin
+      // le front dépasse l'écran de toute la profondeur du bord (EDGE_W / VEIL_M) : aucun trou à la fin
+      if (phase === 'cover') draw(lerp(-0.25, 1.05 + EDGE_W / VEIL_M, e), -1.4);
       else draw(1.25, lerp(-0.2, 1.25, e));
       root.classList.remove('veil-in');            // la toile a pris le relais du fond de secours
       if (u < 1) requestAnimationFrame(frame);
@@ -133,10 +134,15 @@
     run('clear', () => { hide(); busy = false; });
   }
 
-  // arrivée d'une transition : le voile couvre déjà (fond de secours html.veil-in), il sort par le haut
-  if (root.classList.contains('veil-in')) {
-    logoReady.then((ok) => (ok && !reduced ? clear() : root.classList.remove('veil-in')));
-  }
+  // arrivée d'une transition : le voile couvre déjà (fond de secours html.veil-in), il sort par le haut.
+  // Une page préparée d'avance (voir plus bas) attend d'être affichée pour le faire.
+  const arrive = () => logoReady.then((ok) => (ok && !reduced ? clear() : root.classList.remove('veil-in')));
+  if (document.prerendering) {
+    document.addEventListener('prerenderingchange', () => {
+      try { sessionStorage.removeItem(KEY); } catch {}
+      arrive();
+    }, { once: true });
+  } else if (root.classList.contains('veil-in')) arrive();
   // retour arrière depuis le cache du navigateur : la page revient telle qu'on l'a quittée, voile fermé
   window.addEventListener('pageshow', (e) => {
     if (!e.persisted || !busy) return;
@@ -144,9 +150,32 @@
     clear();
   });
 
+  // ------------------------------------------------------------ pages préparées d'avance
+  // Sans cela, la page suivante n'était demandée qu'une fois l'écran couvert, et l'image du voile restait figée le
+  // temps qu'elle arrive. Chrome et Edge préparent la page en entier dès le survol d'un lien (elle s'affiche alors
+  // d'un coup) ; les autres navigateurs la téléchargent au survol, ou au plus tard au clic, pendant que le voile monte.
+  if (HTMLScriptElement.supports?.('speculationrules')) {
+    const rules = document.createElement('script');
+    rules.type = 'speculationrules';
+    rules.textContent = JSON.stringify({ prerender: [{ source: 'document', where: { selector_matches: '[data-veil]' },
+      eagerness: 'moderate' }] });
+    document.head.appendChild(rules);
+  }
+  const fetched = new Set([location.pathname]);
+  function prefetch(href) {
+    const url = new URL(href, location.href);
+    if (url.origin !== location.origin || fetched.has(url.pathname)) return;
+    fetched.add(url.pathname);
+    const l = document.createElement('link');
+    l.rel = 'prefetch';
+    l.href = url.href;
+    document.head.appendChild(l);
+  }
+
   // ------------------------------------------------------------ navigation : logo, onglets, devis
   function go(href) {
     if (busy) return;                              // un voile passe déjà : le clic est ignoré
+    prefetch(href);
     const url = new URL(href, location.href);
     const ok = cover(() => {
       try { sessionStorage.setItem(KEY, '1'); } catch {}
@@ -159,6 +188,7 @@
     if (!ok) location.href = url.href;
   }
   document.querySelectorAll('[data-veil]').forEach((a) => {
+    for (const ev of ['pointerenter', 'focus', 'touchstart']) a.addEventListener(ev, () => prefetch(a.href), { passive: true });
     a.addEventListener('click', (e) => {
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;   // nouvel onglet, etc.
       e.preventDefault();

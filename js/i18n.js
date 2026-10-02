@@ -53,7 +53,10 @@
     box.querySelectorAll('[data-lang]').forEach((o) => o.setAttribute('aria-selected', String(o.dataset.lang === l)));
   }
   const asked = new URLSearchParams(location.search).get('lang');
-  apply([asked, store.get()].find((l) => l && LANGS[l]) || 'fr');
+  const wanted = () => [asked, store.get()].find((l) => l && LANGS[l]) || 'fr';
+  apply(wanted());
+  // page préparée d'avance (js/veil.js) : la langue a pu changer depuis, on la relit au moment de l'afficher
+  if (document.prerendering) document.addEventListener('prerenderingchange', () => apply(wanted()), { once: true });
 
   // sélecteur de la navbar : un bouton (code de la langue), un menu des trois langues
   if (!box) return;
