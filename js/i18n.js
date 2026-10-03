@@ -13,6 +13,7 @@
       'title.services': 'Services – HomeService BXL', 'title.how': 'How it works – HomeService BXL',
       'title.zone': 'Area – HomeService BXL', 'title.contact': 'Contact – HomeService BXL',
       'title.quote': 'Free quote – HomeService BXL',
+      'hero.label': 'Home', 'hero.drag': 'Drag to turn around',
     },
     nl: {
       home: 'HomeService BXL, startpagina', mainNav: 'Hoofdnavigatie', langBtn: 'Taal',
@@ -22,6 +23,7 @@
       'title.services': 'Diensten – HomeService BXL', 'title.how': 'Werkwijze – HomeService BXL',
       'title.zone': 'Regio – HomeService BXL', 'title.contact': 'Contact – HomeService BXL',
       'title.quote': 'Gratis offerte – HomeService BXL',
+      'hero.label': 'Startpagina', 'hero.drag': 'Sleep om rond te draaien',
     },
   };
   const store = {
