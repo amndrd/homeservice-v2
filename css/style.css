@@ -15,6 +15,28 @@ img { display: block; max-width: 100%; }
 /* contenu des pages : à venir */
 .page { min-height: 100vh; padding-top: 96px; }
 
+/* ---------------------------------------------------------------- hero de l'accueil : le vide blanc (js/hero.js)
+   La scène occupe tout l'écran, sous la navbar ; son sol se fond dans --paper, sans bord visible. */
+.page--hero { padding-top: 0; }
+.hero { position: relative; height: 100vh; height: 100svh; min-height: 520px; overflow: hidden; background: var(--paper); }
+.hero__scene { position: absolute; inset: 0; cursor: grab; touch-action: pan-y; }
+.hero__scene:active { cursor: grabbing; }
+.hero__scene canvas { display: block; width: 100%; height: 100%; }
+/* grain de pellicule, fixe : il donne de la matière au blanc sans alourdir la scène */
+.hero::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .035; mix-blend-mode: multiply;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.4 -.2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+/* en bas, le sol rejoint la page */
+.hero::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 18%; z-index: 1; pointer-events: none;
+  background: linear-gradient(to bottom, rgba(247, 247, 245, 0), var(--paper)); }
+.hero__hint { position: absolute; left: 50%; bottom: 28px; z-index: 2; display: flex; align-items: center; gap: 8px; margin: 0;
+  transform: translateX(-50%); color: rgba(15, 26, 44, .45); font-size: 12px; font-weight: 500; letter-spacing: .04em;
+  white-space: nowrap; pointer-events: none; animation: hint-in 1s var(--ease) 3.2s both; transition: opacity .6s; }
+.hero__hint svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round;
+  stroke-linejoin: round; }
+.hero--touched .hero__hint, .hero__scene--off ~ .hero__hint { opacity: 0; }
+@keyframes hint-in { from { opacity: 0; transform: translate(-50%, 6px); } }
+@media (prefers-reduced-motion: reduce) { .hero__hint { animation: none; } }
+
 /* ---------------------------------------------------------------- navbar (reprise du site immersif) */
 .header { position: fixed; top: 16px; left: 0; width: 100%; z-index: 80; display: flex; align-items: center;
   justify-content: center; pointer-events: none; }
