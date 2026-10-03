@@ -10,6 +10,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
 </head>
 <body>
 
@@ -40,10 +46,19 @@
   </div>
 </header>
 
-<!-- Accueil : contenu à venir -->
-<main class="page" id="main"></main>
+<main class="page page--hero" id="main">
+  <!-- le vide blanc : scène 3D temps réel (js/hero.js), on tourne autour de l'objet à la souris -->
+  <section class="hero" aria-label="Accueil" data-i18n-aria="hero.label">
+    <div class="hero__scene" id="hero-scene"></div>
+    <p class="hero__hint" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M4 12h16"/><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/></svg>
+      <span data-i18n="hero.drag">Glissez pour tourner autour</span>
+    </p>
+  </section>
+</main>
 
 <script src="js/veil.js"></script>
 <script src="js/i18n.js"></script>
+<script type="module" src="js/hero.js"></script>
 </body>
 </html>
