@@ -17,9 +17,11 @@ SRC = "/Users/amandindardenne/Desktop/homeservice-immersive/blender/services.ble
 SRC_COLL = "Prototypes · sol fondu"
 # objets de la scène du vide du site immersif (déjà à plat pour ceux qui se couchent, déjà renversé pour le pot)
 VIDE = "/Users/amandindardenne/Desktop/homeservice-immersive/web/assets/vide.glb"
-VIDE_ITEMS = [("Objet · brouette", "Brouette", "jardinage"), ("Objet · râteau", "Râteau", "jardinage"),
-              ("Objet · pelle", "Pelle", "jardinage"), ("Objet · pot renversé", "Pot renversé", "jardinage"),
-              ("Objet · échelle", "Échelle", "montage"), ("Objet · marteau", "Marteau", "montage")]
+VIDE_ITEMS = [("Objet · râteau", "Râteau", "jardinage"), ("Objet · pot renversé", "Pot renversé", "jardinage"),
+              ("Objet · échelle", "Échelle", "montage")]
+# modèles faits main (blender/scripts/modeles.py, exécuté avant ce script) : [fonction, nom, service]
+CUSTOM = [("brouette", "Brouette", "jardinage"), ("marteau", "Marteau", "montage"), ("pelle", "Pelle", "jardinage"),
+          ("sac_courses", "Sac de courses", "livraison")]
 SIZE = {"Montage 1": 0.7, "Échelle": 0.7}          # retouches de taille, par objet
 SCALE = 1.3
 TAS = "Tas"
@@ -44,7 +46,6 @@ ITEMS = [
     ("Pièce · Livraison · colis (proto)", "Colis", "livraison", 2, ("Colis", "Petit colis"), ()),
     ("Diable (proto)", "Diable", "livraison", 1, None, ()),
     ("Plante porte (proto)", "Plante", "livraison", 1, None, ()),
-    ("Pièce · Service · Livraison (proto)", "Sac de courses", "livraison", 1, None, ()),
 ]
 
 # La composition, dans le repère de la caméra du hero : u vers la droite de l'image, v en s'éloignant (m), à partir
@@ -54,12 +55,12 @@ ITEMS = [
 COMPO = [
     # au fond à gauche : la brouette, le pot renversé
     ("Brouette", -1.9, 1.6, 118, 0, 0),
-    ("Pot renversé", -1.2, 1.05, 20, 0, 0),
-    ("Pelle", -0.75, -2.7, 15, 0, 0),
+    ("Pot renversé", -1.55, 0.45, 20, 0, 0),
+    ("Pelle", -0.75, -2.7, 15, "couché", 0),
     # devant : le râteau, la pelle, l'échelle couchée dans l'herbe ; le marteau à droite
     ("Râteau", -2.7, -1.6, 118, 0, 0),
-    ("Échelle", 1.5, -2.3, 28, 0, 0),
-    ("Marteau", 2.6, -1.3, 75, 0, 0),
+    ("Échelle", 0.3, -1.0, 28, 0, 0),
+    ("Marteau", 2.6, -1.3, 75, "couché", 0),
     # au centre, un peu en retrait : la caisse à outils, un carton avec l'éponge dessus
     ("Montage 1", 0.05, 0.98, 68, 0, 0),
     ("Carton 1", 1.0, 1.45, 38, 0, 0),
@@ -88,7 +89,7 @@ COMPO = [
     ("Carton 2", 1.0, 2.5, 10, 0, 0),
     ("Carton 3", 1.75, 2.7, -15, 0, 0),
     ("Carton 4", 1.0, 2.5, 30, 0, 0),
-    ("Sac de courses", 0.05, 2.25, -60, 0, 0),
+    ("Sac de courses", 0.05, 2.25, 28, 0, 0),           # sa grande face (bande verte) vers la caméra
     ("Panneau", -1.25, 1.9, 30, 0, 0),
 ]
 CAM_AZ = math.radians(-28)                    # azimut de la caméra du hero (cf. cadrage dans hero.blend)
@@ -219,6 +220,13 @@ def import_objects():
     for o in list(tmp.all_objects):
         bpy.data.objects.remove(o, do_unlink=True)
     bpy.data.collections.remove(tmp)
+    for fn, name, service in CUSTOM:
+        o = globals()[fn]()
+        o.name = f"{name} · {service}"
+        o.data.transform(Matrix.Scale(SCALE, 4))
+        tas_coll().objects.link(o)
+        o["service"] = service
+        made[name] = o
     for label, k in SIZE.items():
         if label in made:
             made[label].data.transform(Matrix.Scale(k, 4))
@@ -275,7 +283,12 @@ def fit_normal(pts):
     return Vector((-a, -b, 1)).normalized()
 
 
-MAX_TILT = math.radians(28)                   # au-delà, la pente serait trop forte pour qu'un objet y tienne
+MAX_TILT = math.radians(28)
+
+
+def is_flat(o):
+    zs = [(o.matrix_world @ v.co).z for v in o.data.vertices]
+    return max(zs) - min(zs) < 0.15                   # au-delà, la pente serait trop forte pour qu'un objet y tienne
 
 
 def lay_flat(o):
@@ -359,7 +372,8 @@ def settle(o, xy, yaw, tx, ty, trees):
     bpy.context.view_layer.update()
     # descente : la base épouse la surface ; quelques sommets s'enfoncent à peine (l'herbe les cache)
     gaps = sorted(surface_z(trees, p.x, p.y) - p.z for p in support(bottom(o)))
-    dz = gaps[int(len(gaps) * 0.8)]
+    # un objet plat et long (échelle, râteau…) ne s'enfonce nulle part : il repose sur ses points les plus hauts
+    dz = gaps[-1] if is_flat(o) else gaps[int(len(gaps) * 0.8)]
     o.location.z += dz - SINK
     bpy.context.view_layer.update()
 
@@ -440,11 +454,20 @@ def compose():
         # proche, en spirale autour de l'endroit voulu (en restant du côté du centre de l'îlot si possible)
         others = [shrunk_tree(p) for p in placed]
 
+        full = [bvh(p) for p in placed]
+
         def ok():
-            if min(grass_mask(p.x, p.y) for p in (o.matrix_world @ v.co for v in o.data.vertices)) < 0.15:
+            pts = [o.matrix_world @ v.co for v in o.data.vertices]
+            if min(grass_mask(p.x, p.y) for p in pts) < 0.15:
                 return False
             mine = shrunk_tree(o)
-            return not any(mine.overlap(t) for t in others)
+            if any(mine.overlap(t) for t in others):
+                return False
+            if is_flat(o):                              # rien ne doit le surplomber (pieds de tabouret, de chaise…)
+                for p in pts[::max(1, len(pts) // 40)]:
+                    if any(t.ray_cast(p + Vector((0, 0, 0.02)), Vector((0, 0, 1)), 2.0)[0] is not None for t in full):
+                        return False
+            return True
 
         if not ok():
             inward = (CENTER - xy).normalized()
