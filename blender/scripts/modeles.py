@@ -251,7 +251,7 @@ def sac_courses():
     m.blob((-0.075, 0.005, H + 0.0), 0.075, "salade", subdiv=2, jitter=0.16, scale=(1, 0.95, 0.85))
     m.blob((-0.06, -0.02, H + 0.035), 0.045, "salade_sombre", subdiv=1, jitter=0.2)
     # deux baguettes, plantées au fond, qui dépassent en biais
-    for (x, y, lean, length, rot) in ((0.085, 0.035, 0.32, 0.62, 0.3), (0.105, -0.02, 0.18, 0.55, -0.4)):
+    for (x, y, lean, length, rot) in ((0.07, 0.035, 0.12, 0.58, 0.2), (0.095, -0.025, 0.07, 0.52, -0.3)):
         base = Vector((x, y, 0.03))
         dirv = Vector((math.sin(lean) * math.cos(rot), math.sin(lean) * math.sin(rot), math.cos(lean)))
         pts = [base + dirv * (length * f) for f in (0, 0.04, 0.5, 0.94, 1.0)]
@@ -288,7 +288,7 @@ def sac_courses():
 
 # ------------------------------------------------------------- brouette de l'écran de chargement, remplie d'herbe
 CHARGEMENT = "/Users/amandindardenne/Desktop/homeservice-immersive/web/assets/chargement.glb"
-BROUETTE_PARTS = ("Benne", "Brancard", "Moyeu", "Pied", "Pneu", "Poignée", "Rebord")
+BROUETTE_PARTS = ("Benne", "Brancard", "Moyeu", "Pied", "Pneu", "Poignée")   # (« Rebord » : celui du pot)
 
 
 def brouette():
