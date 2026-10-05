@@ -2,6 +2,7 @@
   --ink: #0f1a2c;
   --orange: #ff8a1f;
   --paper: #f7f7f5;                                   /* le « vide » crème du site immersif */
+  --green: #11703f;                                   /* le vert du site immersif (accent des services) */
   --title: "Manrope", ui-sans-serif, system-ui, sans-serif;
   --body: "Manrope", ui-sans-serif, system-ui, sans-serif;
   --ease: cubic-bezier(.22, 1, .36, 1);
@@ -15,27 +16,105 @@ img { display: block; max-width: 100%; }
 /* contenu des pages : à venir */
 .page { min-height: 100vh; padding-top: 96px; }
 
-/* ---------------------------------------------------------------- hero de l'accueil : le vide blanc (js/hero.js)
-   La scène occupe tout l'écran, sous la navbar ; son sol se fond dans --paper, sans bord visible. */
-.page--hero { padding-top: 0; }
-.hero { position: relative; height: 100vh; height: 100svh; min-height: 520px; overflow: hidden; background: var(--paper); }
-.hero__scene { position: absolute; inset: 0; cursor: grab; touch-action: pan-y; }
-.hero__scene:active { cursor: grabbing; }
+/* ---------------------------------------------------------------- hero de l'accueil : l'îlot des services (js/hero.js)
+   La scène occupe tout l'écran, sous la navbar ; hors de l'herbe, le sol a la couleur de la page. */
+.page--hero { padding-top: 0; min-height: 0; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+/* le hero reste en place (collant) toute la course : le vert le remplit, l'À propos arrive dessus, reste fixe le
+   temps de ses apparitions, puis défile sur le vert encore fixe (js/flood.js règle les hauteurs) */
+.hero-track { position: relative; }
+.hero-tail { height: 100vh; height: 100lvh; }
+/* la section suivante glisse sur le vert, juste derrière l'À propos (elle recouvre la fin de la course) */
+.hero-track + .section { margin-top: -100vh; margin-top: -100lvh; z-index: 5; background: var(--paper); }
+.hero-mark { position: absolute; left: 0; width: 1px; pointer-events: none; }
+.hero { position: sticky; top: 0; height: 100vh; height: 100svh; min-height: 520px; overflow: hidden; background: var(--paper); }
+.hero__scene { position: absolute; inset: 0; touch-action: pan-y; }   /* main au survol de l'îlot : js/hero.js */
 .hero__scene canvas { display: block; width: 100%; height: 100%; }
-/* grain de pellicule, fixe : il donne de la matière au blanc sans alourdir la scène */
-.hero::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .035; mix-blend-mode: multiply;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.4 -.2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-/* en bas, le sol rejoint la page */
-.hero::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 18%; z-index: 1; pointer-events: none;
-  background: linear-gradient(to bottom, rgba(247, 247, 245, 0), var(--paper)); }
-.hero__hint { position: absolute; left: 50%; bottom: 28px; z-index: 2; display: flex; align-items: center; gap: 8px; margin: 0;
-  transform: translateX(-50%); color: rgba(15, 26, 44, .45); font-size: 12px; font-weight: 500; letter-spacing: .04em;
-  white-space: nowrap; pointer-events: none; animation: hint-in 1s var(--ease) 3.2s both; transition: opacity .6s; }
-.hero__hint svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round;
-  stroke-linejoin: round; }
-.hero--touched .hero__hint, .hero__scene--off ~ .hero__hint { opacity: 0; }
-@keyframes hint-in { from { opacity: 0; transform: translate(-50%, 6px); } }
-@media (prefers-reduced-motion: reduce) { .hero__hint { animation: none; } }
+/* le vert du défilement (js/flood.js), au-dessus de l'îlot et du titre */
+.hero__flood { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; display: block; pointer-events: none; }
+.hero--flat .hero__flood { background: var(--green); opacity: 0; transition: opacity .6s ease; }
+.hero--flat.hero--green .hero__flood { opacity: 1; }
+/* titre et description, centrés en haut ; l'îlot en grand dessous (js/hero.js). Repris de l'écran titre du site
+   immersif (homeservice-immersive, style.css : .card h1, .card p, .card mark) */
+.hero__text { position: absolute; left: 50%; top: clamp(104px, 15vh, 160px); transform: translateX(-50%); z-index: 1;
+  will-change: opacity, translate;
+  width: min(900px, calc(100% - 40px)); text-align: center; pointer-events: none; }
+/* apparition : le titre puis la description montent en fondu, l'un après l'autre (comme l'écran titre du site
+   immersif), quand la page est prête (html.intro, posée par js/veil.js) */
+.hero__text > * { opacity: 0; transform: translateY(28px);
+  transition: opacity .7s ease, transform 1s cubic-bezier(.2, 1.15, .4, 1); }
+html.intro .hero__text > * { opacity: 1; transform: none; }
+html.intro .hero__text > h1 { transition-delay: .55s; }
+html.intro .hero__text > p { transition-delay: .72s; }
+@media (prefers-reduced-motion: reduce) { .hero__text > * { opacity: 1; transform: none; transition: none; } }
+.hero__text h1 { font: 800 clamp(44px, 5.4vw, 88px)/1 var(--title); letter-spacing: -.04em; margin: 0 0 22px;
+  color: var(--ink); }
+.hero__text p { max-width: 34em; margin: 0 auto; font: 500 clamp(16px, 1.3vw, 20px)/1.55 var(--body); color: #3a4352;
+  text-wrap: pretty; pointer-events: auto; }
+.hero__text mark { color: var(--ink); font-weight: 700; padding: 0 3px; border-radius: 3px; white-space: nowrap;
+  background: linear-gradient(100deg, transparent 2%, rgba(47, 212, 126, .5) 4%, rgba(47, 212, 126, .42) 94%, transparent 97%);
+  background-size: 100% 62%; background-position: 0 85%; background-repeat: no-repeat; }
+@media (max-aspect-ratio: 1/1) {
+  .hero__text { top: 108px; }
+  .hero__text h1 { font-size: clamp(38px, 10.5vw, 64px); margin-bottom: 14px; }
+  .hero__text p { font-size: 16px; }
+}
+
+/* invitation à faire défiler, reprise du site immersif (.scroll-hint, .mouse) : une souris dont la molette descend,
+   en bas de l'écran, blanche comme dans le site immersif ; elle arrive après le titre et part dès qu'on défile. */
+.scroll-hint { position: absolute; left: 50%; bottom: 28px; z-index: 2; transform: translate(-50%, 10px);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  font: 700 13px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: #fff;
+  text-shadow: 0 1px 8px rgba(15, 26, 44, .6); opacity: 0; transition: opacity .6s ease, transform .6s ease;
+  pointer-events: none; }
+html.intro .scroll-hint { opacity: 1; transform: translate(-50%, 0); transition-delay: 1.6s; }
+html.intro.scrolled .scroll-hint { opacity: 0; transform: translate(-50%, 10px); transition-delay: 0s; }
+.mouse { width: 24px; height: 38px; border: 2.5px solid #fff; border-radius: 14px; position: relative;
+  box-shadow: 0 2px 10px rgba(15, 26, 44, .35); }
+.mouse span { position: absolute; left: 50%; top: 7px; width: 4px; height: 8px; margin-left: -2px; border-radius: 2px;
+  background: #fff; animation: wheel 1.6s ease-in-out infinite; }
+@keyframes wheel { 0% { opacity: 0; transform: translateY(-3px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(10px); } }
+@media (prefers-reduced-motion: reduce) { .mouse span { animation: none; opacity: 1; } }
+
+/* ---------------------------------------------------------------- sections de la page */
+.section { position: relative; min-height: 100vh; min-height: 100svh; padding: 140px 5vw 96px; scroll-margin-top: 0; }
+.section__title { margin: 0; font: 800 clamp(40px, 5vw, 80px)/1 var(--title); letter-spacing: -.04em; color: var(--ink); }
+.section__tag { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 36px; font: 700 13px/1 var(--body);
+  letter-spacing: .14em; text-transform: uppercase; }
+.section__tag::before { content: ""; width: 28px; height: 2px; background: currentColor; }
+
+/* texte réservé aux lecteurs d'écran */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0; }
+
+/* ---------------------------------------------------------------- À propos (js/flood.js)
+   Posé sur le hero, sans fond : le vert est celui du hero. Repris du plan 1 du site immersif : le texte en Manrope
+   800, tous ses mots là à 16 % qui s'allument un à un au défilement, la partie en couleur qui passe au vert ; la photo qui
+   s'ouvre derrière le bord du vide. Couleurs claires, sur le vert. --arrive : arrivée en fondu (0 → 1). */
+.about-track { position: relative; z-index: 4; margin-top: -100vh; margin-top: -100lvh; pointer-events: none; }
+.about { position: sticky; top: 0; height: 100vh; height: 100svh; display: grid; place-items: center;
+  padding: 96px 5vw 48px; color: #f2f6f1; --arrive: 0; visibility: hidden; }
+.about.about--here { visibility: visible; }
+html.flooded .about { pointer-events: auto; }
+.about__inner { width: min(1240px, 100%); display: grid; grid-template-columns: 1fr 1fr;
+  gap: clamp(32px, 5vw, 80px); align-items: center; }
+.about__text { opacity: var(--arrive); }
+.about__text p { margin: 0; font: 800 clamp(26px, 2.6vw, 44px)/1.3 var(--title); letter-spacing: -.02em;
+  text-wrap: pretty; }
+.about__text .w { opacity: .16; }                 /* allumés au fil du défilement (js/flood.js) */
+.about__text .accent { --lit: 0; color: color-mix(in srgb, #7ee2a8 calc(var(--lit) * 100%), #f2f6f1); }
+.about__photo { position: relative; margin: 0; aspect-ratio: 736 / 552; }
+.about__photo img, .about__photo canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.about__photo img { object-fit: cover; border-radius: 18px; opacity: 0; transition: opacity .6s ease; }
+.about__photo--gl img { visibility: hidden; }
+@media (max-width: 760px), (max-aspect-ratio: 1/1) {
+  .about { padding: 88px 20px 24px; }
+  .about__inner { grid-template-columns: 1fr; gap: 20px; }
+  .about__text p { font-size: clamp(20px, 5.4vw, 28px); }
+  .about__photo { max-height: 36svh; justify-self: center; width: min(100%, calc(36svh * 736 / 552)); }
+  .section { padding: 120px 20px 72px; }
+}
 
 /* ---------------------------------------------------------------- navbar (reprise du site immersif) */
 .header { position: fixed; top: 16px; left: 0; width: 100%; z-index: 80; display: flex; align-items: center;
@@ -83,6 +162,34 @@ img { display: block; max-width: 100%; }
 .lang__menu button[aria-selected="true"]::after { content: ""; width: 6px; height: 6px; margin-left: auto;
   border-radius: 50%; background: var(--orange); }
 
+/* ---------------------------------------------------------------- écran de chargement (repris du site immersif)
+   Fond noir, logo blanc, cercle qui tourne ; à l'arrivée sur le site seulement (pas après une transition), jusqu'à ce
+   que la page soit prête (l'îlot chargé, sur l'accueil), puis il s'efface en fondu (js/veil.js). Dessiné en CSS sur
+   <html> : il couvre l'écran dès le premier rendu, sans balise dans les pages. */
+html.loading, html.loaded { overflow: hidden; }
+html.loading::before, html.loaded::before { content: ""; position: fixed; inset: 0; z-index: 200;
+  background: #000 url("../images/logo-blanc.png") center calc(50% - 36px) / min(150px, 38vw) auto no-repeat;
+  transition: opacity 1.1s ease, transform 1.1s ease; }
+html.loading::after, html.loaded::after { content: ""; position: fixed; left: 50%; top: calc(50% + 38px); z-index: 201;
+  width: 34px; height: 34px; margin-left: -17px; box-sizing: border-box; border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, .18); border-top-color: #fff; animation: spin .9s linear infinite;
+  transition: opacity .4s ease; }
+html.loaded::before { opacity: 0; pointer-events: none; }
+/* filet de sécurité : si le script ne prend jamais le relais (erreur, ancienne version en cache), l'écran de
+   chargement s'efface de lui-même au bout de 12 s et la page reste utilisable */
+html.loading::before { animation: loader-bail 1s ease 12s forwards; }
+html.loading::after { animation: spin .9s linear infinite, loader-bail 1s ease 12s forwards; }
+html.loading .header { animation: header-bail .9s cubic-bezier(.2, 1, .3, 1) 12.3s forwards; }
+@keyframes loader-bail { to { opacity: 0; visibility: hidden; } }
+@keyframes header-bail { to { transform: none; } }
+html.loading .hero__text > * { animation: header-bail .9s ease 12.5s forwards, text-bail .7s ease 12.5s forwards; }
+@keyframes text-bail { to { opacity: 1; } }
+html.loaded::after { opacity: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* la navbar arrive du haut de l'écran une fois le chargement fini */
+html.loading .header { transform: translateY(calc(-100% - 70px)); }
+html.loaded .header { transition: transform .9s cubic-bezier(.2, 1, .3, 1) .45s; }
+
 /* ---------------------------------------------------------------- voile des transitions (js/veil.js)
    Toile WebGL au-dessus de tout, navbar comprise : le voile bleu encre frappé du logo monte du bas avec le bord
    rongé du vide, couvre l'écran, on change de page, puis il sort par le haut sur la nouvelle page. */
@@ -92,3 +199,4 @@ img { display: block; max-width: 100%; }
    (même bleu, même logo au centre, à 7,5 % de la hauteur d'écran) */
 html.veil-in::after { content: ""; position: fixed; inset: 0; z-index: 151;
   background: #0f1a2c url("../images/logo-blanc.png") center / auto 7.5vh no-repeat; }
+
