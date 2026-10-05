@@ -13,7 +13,17 @@
       'title.services': 'Services – HomeService BXL', 'title.how': 'How it works – HomeService BXL',
       'title.zone': 'Area – HomeService BXL', 'title.contact': 'Contact – HomeService BXL',
       'title.quote': 'Free quote – HomeService BXL',
-      'hero.label': 'Home', 'hero.drag': 'Drag to turn around',
+      'hero.label': 'Home', hint: 'Scroll down',
+      about: '<p>You have better things to do than deal with everyday chores. <span class="accent">HomeService '
+        + 'comes to your home in Brussels for all your needs</span>, we take care of what you don\'t have the time to do, '
+        + 'so that you can focus on the things that really matter.</p>',
+      'about.photo': 'The HomeService team',
+      'stat.services': '<strong>services combined</strong>\n            No need for several providers, we take care of it all.',
+      'stat.communes': '<strong>municipalities served</strong>\n            We work everywhere in the Brussels region.',
+      'stat.devis': '<strong>to receive your quote</strong>\n            Quick response guaranteed from your very first request.',
+      'stat.devis.suffix': 'h', 'hero.title': 'Need a helping<br>hand?',
+      'hero.text': 'Cleaning, decluttering, furniture assembly, gardening… We take care of everything,\n'
+        + '        <mark>at your pace</mark> and <mark>within your budget</mark>.',
     },
     nl: {
       home: 'HomeService BXL, startpagina', mainNav: 'Hoofdnavigatie', langBtn: 'Taal',
@@ -23,7 +33,17 @@
       'title.services': 'Diensten – HomeService BXL', 'title.how': 'Werkwijze – HomeService BXL',
       'title.zone': 'Regio – HomeService BXL', 'title.contact': 'Contact – HomeService BXL',
       'title.quote': 'Gratis offerte – HomeService BXL',
-      'hero.label': 'Startpagina', 'hero.drag': 'Sleep om rond te draaien',
+      'hero.label': 'Startpagina', hint: 'Scroll naar beneden',
+      about: '<p>U hebt wel beters te doen dan u bezig te houden met uw klusjes. <span class="accent">HomeService komt '
+        + 'bij u thuis in Brussel voor al uw noden</span>, wij doen waar u zelf geen tijd voor hebt, zodat u zich kunt '
+        + 'concentreren op wat echt belangrijk is.</p>',
+      'about.photo': 'Het HomeService-team',
+      'stat.services': '<strong>diensten onder één dak</strong>\n            Niet langer meerdere vakmensen zoeken, wij regelen alles.',
+      'stat.communes': '<strong>gemeenten bediend</strong>\n            Wij zijn actief in het hele Brusselse Gewest.',
+      'stat.devis': '<strong>om uw offerte te ontvangen</strong>\n            Snelle reactie gegarandeerd vanaf uw eerste aanvraag.',
+      'stat.devis.suffix': 'u', 'hero.title': 'Een handje<br>hulp nodig?',
+      'hero.text': 'Schoonmaak, ontruiming, meubelmontage, tuinwerk… Wij regelen alles,\n'
+        + '        <mark>op uw tempo</mark> en <mark>binnen uw budget</mark>.',
     },
   };
   const store = {
@@ -34,7 +54,9 @@
   const FR = {};
   const slots = [
     ['[data-i18n]', 'i18n', (el) => el.innerHTML, (el, v) => { el.innerHTML = v; }],
-    ['[data-i18n-aria]', 'i18nAria', (el) => el.getAttribute('aria-label'), (el, v) => el.setAttribute('aria-label', v)]];
+    ['[data-i18n-aria]', 'i18nAria', (el) => el.getAttribute('aria-label'), (el, v) => el.setAttribute('aria-label', v)],
+    ['[data-i18n-alt]', 'i18nAlt', (el) => el.alt, (el, v) => { el.alt = v; }],
+    ['[data-i18n-suffix]', 'i18nSuffix', (el) => el.dataset.suffix, (el, v) => { el.dataset.suffix = v; }]];
   for (const [sel, key, get] of slots) document.querySelectorAll(sel).forEach((el) => { FR[el.dataset[key]] = get(el); });
   const titleKey = root.dataset.i18nTitle;
   if (titleKey) FR[titleKey] = document.title;
@@ -50,6 +72,7 @@
     for (const [sel, key, , set] of slots) {
       document.querySelectorAll(sel).forEach((el) => { const v = t[el.dataset[key]]; if (v !== undefined) set(el, v); });
     }
+    window.dispatchEvent(new CustomEvent('hs:lang', { detail: l }));   // l'À propos redécoupe ses mots (js/flood.js)
     if (!box) return;
     box.querySelector('.lang__code').textContent = l.toUpperCase();
     box.querySelectorAll('[data-lang]').forEach((o) => o.setAttribute('aria-selected', String(o.dataset.lang === l)));
