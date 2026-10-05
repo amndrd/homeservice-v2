@@ -19,7 +19,7 @@
   const VERT = `attribute vec2 aPos; varying vec2 vUv;
     void main() { vUv = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }`;
   const FRAG = `precision highp float;
-    uniform float uTop, uBot, uAspect; uniform vec3 uCol; uniform sampler2D uLogo; uniform vec2 uLogoSize;
+    uniform float uTop, uBot, uAspect, uLogoOn; uniform vec3 uCol; uniform sampler2D uLogo; uniform vec2 uLogoSize;
     varying vec2 vUv;
     float vdHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
     float vdNoise(vec3 x) {
@@ -37,7 +37,7 @@
       // le logo, petit et blanc au centre de l'écran, peint sur le voile
       vec2 lq = (vUv - 0.5) * vec2(uAspect, 1.0) / uLogoSize + 0.5;
       vec4 logo = texture2D(uLogo, lq);
-      float inLogo = step(0.0, lq.x) * step(lq.x, 1.0) * step(0.0, lq.y) * step(lq.y, 1.0);
+      float inLogo = step(0.0, lq.x) * step(lq.x, 1.0) * step(0.0, lq.y) * step(lq.y, 1.0) * uLogoOn;
       gl_FragColor = vec4(mix(uCol, logo.rgb, logo.a * inLogo) * a, a);
     }`;
 
@@ -62,9 +62,10 @@
       gl.enableVertexAttribArray(aPos);
       gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
       U = {};
-      for (const k of ['uTop', 'uBot', 'uAspect', 'uCol', 'uLogo', 'uLogoSize']) U[k] = gl.getUniformLocation(prog, k);
+      for (const k of ['uTop', 'uBot', 'uAspect', 'uCol', 'uLogo', 'uLogoSize', 'uLogoOn']) U[k] = gl.getUniformLocation(prog, k);
       gl.uniform3fv(U.uCol, VEIL_COL);
       gl.uniform1i(U.uLogo, 0);
+      gl.uniform1f(U.uLogoOn, 1);
     }
   }
   const logo = new Image();
@@ -196,5 +197,48 @@
     });
   });
 
-  window.hsVeil = { cover, clear, busy: () => busy };
+  // ------------------------------------------------------------ chargement, puis entrée de la page
+  // À l'arrivée sur le site (html.loading, posée dans <head>) : l'écran de chargement reste au moins un instant (le
+  // logo se voit), puis tant que la page n'est pas prête — sur l'accueil, que l'îlot ne soit chargé (événement
+  // hero:ready de js/hero.js). Il s'efface en fondu, la navbar descend du haut ; html.intro lance l'entrée du
+  // contenu (titre, description, îlot). Après une transition, le contenu entre quand le voile commence à sortir.
+  const LOADER_MIN = 900, LOADER_MAX = 10000;      // ms : durée minimale, et au-delà on n'attend plus
+  const intro = () => { root.classList.add('intro'); window.dispatchEvent(new Event('site:intro')); };
+  const hasHero = !!document.getElementById('hero-scene');
+  const pageReady = hasHero
+    ? new Promise((r) => (window.__heroReady ? r() : window.addEventListener('hero:ready', r, { once: true })))
+    : new Promise((r) => (document.readyState === 'complete' ? r() : window.addEventListener('load', r, { once: true })));
+  if (root.classList.contains('loading')) {
+    const t0 = performance.now();
+    Promise.race([pageReady, new Promise((r) => setTimeout(r, LOADER_MAX))]).then(() => {
+      setTimeout(() => {
+        root.classList.replace('loading', 'loaded');
+        intro();
+        setTimeout(() => root.classList.remove('loaded'), 1600);
+      }, Math.max(0, LOADER_MIN - (performance.now() - t0)));
+    });
+  } else {
+    Promise.race([pageReady, new Promise((r) => setTimeout(r, LOADER_MAX))]).then(() => setTimeout(intro, 250));
+  }
+
+  // ------------------------------------------------------------ navbar : la section à l'écran est allumée
+  const links = [...document.querySelectorAll('.nav a[href^="#"]')];
+  const spy = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      links.forEach((a) => {
+        const on = a.getAttribute('href') === '#' + e.target.id;
+        a.classList.toggle('active', on);
+        if (on) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+      });
+    }
+  }, { rootMargin: '-45% 0px -50% 0px' });
+  document.querySelectorAll('main > section[id], .hero-mark[id]').forEach((el) => spy.observe(el));
+
+  // on a défilé : l'invitation à faire défiler s'efface
+  const onScroll = () => root.classList.toggle('scrolled', window.scrollY > 40);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  window.hsVeil = { cover, clear, busy: () => busy, shader: { VERT, FRAG, VEIL_M, EDGE_W } };
 })();
