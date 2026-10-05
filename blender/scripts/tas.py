@@ -17,12 +17,13 @@ SRC = "/Users/amandindardenne/Desktop/homeservice-immersive/blender/services.ble
 SRC_COLL = "Prototypes · sol fondu"
 # objets de la scène du vide du site immersif (déjà à plat pour ceux qui se couchent, déjà renversé pour le pot)
 VIDE = "/Users/amandindardenne/Desktop/homeservice-immersive/web/assets/vide.glb"
-VIDE_ITEMS = [("Objet · râteau", "Râteau", "jardinage"), ("Objet · pot renversé", "Pot renversé", "jardinage"),
+VIDE_ITEMS = [("Objet · pot renversé", "Pot renversé", "jardinage"),
               ("Objet · échelle", "Échelle", "montage")]
 # modèles faits main (blender/scripts/modeles.py, exécuté avant ce script) : [fonction, nom, service]
 CUSTOM = [("brouette", "Brouette", "jardinage"), ("marteau", "Marteau", "montage"), ("pelle", "Pelle", "jardinage"),
+          ("rateau", "Râteau", "jardinage"),
           ("sac_courses", "Sac de courses", "livraison")]
-SIZE = {"Montage 1": 0.7, "Échelle": 0.7}          # retouches de taille, par objet
+SIZE = {"Montage 1": 0.7, "Échelle": 0.7, "Tabouret": 0.8, "Plante": 0.8}        # retouches de taille, par objet
 SCALE = 1.3
 TAS = "Tas"
 SINK = 0.015                                  # enfoncés d'un rien dans l'herbe : posés, pas collés dessus

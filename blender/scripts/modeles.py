@@ -1,10 +1,10 @@
 """Modèles faits main pour l'îlot, plus soignés que leurs équivalents importés : marteau, pelle, sac de courses
-rempli, et la brouette de l'écran de chargement du site immersif, remplie d'herbe coupée. (En cours : pas encore
-branché dans tas.py.)
+rempli, râteau à arceaux, et la brouette de terre du site immersif (services.blend).
 Chaque fonction rend un objet à taille réelle (m), posé sur z = 0, centré en x/y, en facettes (low poly).
 À exécuter après ilot.py, dans le même espace de noms (mat, M, srgb, coll…)."""
 import bpy, bmesh, math, random
 from mathutils import Vector, Matrix
+from mathutils.bvhtree import BVHTree
 
 R_MOD = random.Random(21)
 
@@ -195,6 +195,36 @@ def pelle():
     return m.finish("Pelle")
 
 
+# ------------------------------------------------------------- râteau à dents (couché sur le dos, dents en l'air)
+def rateau():
+    """Râteau de jardin, couché sur le dos comme on le laisse dans l'herbe : le manche le long de x, la tête en x = 0,
+    les dents dressées. Traverse tenue par deux bras en arc (râteau « à arceaux »), virole d'acier, poignée verte."""
+    m = Mesh()
+    R = 0.017                                   # rayon du manche : il repose au sol, son axe à z = R
+    # manche en bois, légèrement effilé vers la tête, et poignée caoutchouc au bout
+    m.tube([(0.12, 0, R), (0.6, 0, R), (1.25, 0, R), (1.5, 0, R)], [0.015, 0.016, 0.0165, 0.0165], "bois", segs=8)
+    m.tube([(1.37, 0, R), (1.385, 0, R), (1.47, 0, R), (1.51, 0, R), (1.52, 0, R)],
+           [0.0175, 0.0195, 0.0195, 0.0185, 0.014], "vert", segs=8)
+    # virole : la douille d'acier qui enserre le manche, évasée côté tête
+    m.tube([(0.015, 0, R), (0.04, 0, R), (0.1, 0, R), (0.145, 0, R)], [0.014, 0.0185, 0.0175, 0.0165], "acier", segs=8)
+    # traverse chanfreinée, à plat dans l'herbe
+    W, bx, bh = 0.4, -0.02, 0.026
+    beveled_box(m, (bx, 0, bh / 2), (0.03, W, bh), "acier_sombre", 0.005)
+    # deux bras en arc de la virole aux bouts de la traverse
+    for sy in (-1, 1):
+        pts = [(0.03, sy * 0.008, R), (0.0, sy * 0.06, R * 0.9), (-0.012, sy * 0.12, bh * 0.6),
+               (bx, sy * (W / 2 - 0.02), bh * 0.5)]
+        m.tube(pts, [0.008, 0.0075, 0.007, 0.0075], "acier_sombre", segs=6)
+    # les dents : dressées depuis la traverse, recourbées vers le manche au bout, effilées
+    n = 14
+    for k in range(n):
+        y = (k / (n - 1) - 0.5) * (W - 0.03)
+        pts = [(bx, y, bh - 0.004), (bx, y, bh + 0.03), (bx + 0.006, y, bh + 0.06), (bx + 0.02, y, bh + 0.082),
+               (bx + 0.036, y, bh + 0.09)]
+        m.tube(pts, [0.006, 0.0055, 0.0048, 0.0038, 0.0024], "acier", segs=5, squash=0.7)
+    return m.finish("Râteau")
+
+
 # ------------------------------------------------------------- sac de courses en kraft, rempli
 def sac_courses():
     m = Mesh()
@@ -286,28 +316,106 @@ def sac_courses():
     return m.finish("Sac de courses")
 
 
-# ------------------------------------------------------------- brouette de l'écran de chargement, remplie d'herbe
-CHARGEMENT = "/Users/amandindardenne/Desktop/homeservice-immersive/web/assets/chargement.glb"
-BROUETTE_PARTS = ("Benne", "Brancard", "Moyeu", "Pied", "Pneu", "Poignée")   # (« Rebord » : celui du pot)
+# ------------------------------------------------------------- brouette de terre du site immersif
+SERVICES = "/Users/amandindardenne/Desktop/homeservice-immersive/blender/services.blend"
+BROUETTE_ROOT = "Jardinage · brouette"
+BROUETTE_PARTS = ["Benne", "Brancard", "Brancard.001", "Moyeu.002", "Pied", "Pied.001", "Pneu", "Poignée.002", "Poignée.003",
+                  "Terre"] + [f"Motte {k}" for k in range(5)] + [f"Pousse {k}" for k in range(3)]
+TERRE_BORD, TERRE_HAUT = 0.875, 0.08   # bord du tas (fraction de la hauteur de la benne), sommet au-dessus du rebord (m)
+ESSIEU_R, ESSIEU_DEPASSE = 0.014, 0.035   # rayon de l'essieu ; brancards prolongés jusqu'à cette distance après lui (m)
+TERRE_DANS_PAROI = 0.012               # bord du tas pris dans l'épaisseur de la paroi (2,5 cm) : ni trou ni débord
+
+
+def terre(m, benne, mat, rng):
+    """Tas de terre qui remplit toute la benne : une grille posée sur la section rectangulaire de la benne à la hauteur
+    du bord (coins compris), bombée vers le centre, en facettes. Rend la hauteur de sa surface (facettes) en (x, y)."""
+    pts = [benne.matrix_world @ v.co for v in benne.data.vertices]
+    zb, zt = min(p.z for p in pts), max(p.z for p in pts)
+    lo = [p for p in pts if abs(p.z - zb) < 1e-4]
+    hi = [p for p in pts if abs(p.z - zt) < 1e-4]
+    z0 = zb + (zt - zb) * TERRE_BORD
+    t = TERRE_BORD
+    lerp = lambda a, b: a + (b - a) * t
+    x0 = lerp(min(p.x for p in lo), min(p.x for p in hi)) + TERRE_DANS_PAROI
+    x1 = lerp(max(p.x for p in lo), max(p.x for p in hi)) - TERRE_DANS_PAROI
+    y0 = lerp(min(p.y for p in lo), min(p.y for p in hi)) + TERRE_DANS_PAROI
+    y1 = lerp(max(p.y for p in lo), max(p.y for p in hi)) - TERRE_DANS_PAROI
+    top = zt + TERRE_HAUT - z0
+
+    def height(x, y):
+        u = (2 * (x - x0) / (x1 - x0) - 1)
+        v = (2 * (y - y0) / (y1 - y0) - 1)
+        d = min(1.0, (abs(u) ** 3 + abs(v) ** 3) ** (1 / 3))
+        return z0 + top * (1 - d ** 2) ** 0.6
+
+    nx, ny = 10, 6
+    grid = []
+    for i in range(nx + 1):
+        row = []
+        for j in range(ny + 1):
+            x, y = x0 + (x1 - x0) * i / nx, y0 + (y1 - y0) * j / ny
+            edge = i in (0, nx) or j in (0, ny)
+            z = z0 if edge else height(x, y) + rng.uniform(-0.012, 0.012)
+            if not edge:
+                x += rng.uniform(-0.25, 0.25) * (x1 - x0) / nx
+                y += rng.uniform(-0.25, 0.25) * (y1 - y0) / ny
+            row.append(m.bm.verts.new((x, y, z)))
+        grid.append(row)
+    k = m.mats.index(mat) if mat in m.mats else (m.mats.append(mat) or len(m.mats) - 1)
+    tris = []
+    for i in range(nx):
+        for j in range(ny):
+            a, b, c, d = grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]
+            for tri in (((a, b, c), (a, c, d)) if (i + j) % 2 else ((a, b, d), (b, c, d))):
+                m.bm.faces.new(tri).material_index = k
+                tris.append([v.co.copy() for v in tri])
+    tree = BVHTree.FromPolygons([p for t in tris for p in t], [(3 * i, 3 * i + 1, 3 * i + 2) for i in range(len(tris))])
+
+    def surface(x, y):
+        hit = tree.ray_cast(Vector((x, y, zt + 1)), Vector((0, 0, -1)))
+        return hit[0].z if hit[0] else z0
+    return surface
 
 
 def brouette():
-    """Importe la brouette verte de l'écran de chargement (sans son pot de fleurs) et remplit la benne d'un tas
-    d'herbe coupée : un dôme à facettes, des brins dressés, quelques-uns qui débordent."""
-    scene = bpy.context.scene
-    tmp = bpy.data.collections.new("_import chargement")
-    scene.collection.children.link(tmp)
-    prev = bpy.context.view_layer.active_layer_collection
-    bpy.context.view_layer.active_layer_collection = bpy.context.view_layer.layer_collection.children[tmp.name]
-    bpy.ops.import_scene.gltf(filepath=CHARGEMENT)
-    bpy.context.view_layer.active_layer_collection = prev
-    root = next(o for o in tmp.all_objects if o.name.startswith("Chargement_jardinage"))
-    parts = [o for o in root.children_recursive if o.type == "MESH" and o.name.split(".")[0].startswith(BROUETTE_PARTS)]
+    """La brouette de terre de services.blend (benne verte, mottes, pousses), avec un tas de terre refait qui remplit
+    toute la benne, tournée d'un quart de tour pour garder l'orientation de l'ancienne (la roue vers -y)."""
+    with bpy.data.libraries.load(SERVICES, link=False) as (src, dst):
+        dst.objects = [BROUETTE_ROOT] + BROUETTE_PARTS
+    parts = [o for o in dst.objects[1:] if o.type == "MESH" and o.name != "Terre"]
+    terreau = next(o for o in dst.objects if o.name == "Terre").data.materials[0]
+    tmp = bpy.data.collections.new("_import brouette")
+    bpy.context.scene.collection.children.link(tmp)
+    for o in dst.objects:
+        tmp.objects.link(o)
     dg = bpy.context.evaluated_depsgraph_get()
     m = Mesh()
+    height = terre(m, next(o for o in parts if o.name == "Benne"), terreau, random.Random(7))
+    moyeu = next(o for o in parts if o.name.startswith("Moyeu"))
+    hub = sum((moyeu.matrix_world @ v.co for v in moyeu.data.vertices), Vector()) / len(moyeu.data.vertices)
     for o in parts:
         me = bpy.data.meshes.new_from_object(o.evaluated_get(dg), depsgraph=dg)
         me.transform(o.matrix_world)
+        if o.name.startswith("Brancard"):   # prolongés dans leur axe jusqu'au-delà de l'essieu (ils s'arrêtaient avant)
+            vs = [v.co for v in me.vertices]
+            mid = sum((v.x for v in vs)) / len(vs)
+            front = [v for v in vs if (v.x - mid) * (hub.x - mid) > 0]
+            back = [v for v in vs if v not in front]
+            fc, bc = sum(front, Vector()) / len(front), sum(back, Vector()) / len(back)
+            axis = (fc - bc).normalized()
+            push = axis * ((hub.x + ESSIEU_DEPASSE - fc.x) / axis.x)
+            for v in front:
+                v += push
+        if o.name.startswith(("Motte", "Pousse")):   # reposées sur le nouveau tas : à moitié enterrées, sans flotter
+            vs = [v.co for v in me.vertices]
+            zmin, zmax = min(v.z for v in vs), max(v.z for v in vs)
+            if o.name.startswith("Motte"):              # au plus bas de la surface sous la motte, enfoncée d'un tiers
+                ground = min(height(v.x, v.y) for v in vs if v.z < zmin + (zmax - zmin) * 0.5)
+                dz = ground - zmin - (zmax - zmin) * 0.35
+            else:
+                cx, cy = sum(v.x for v in vs) / len(vs), sum(v.y for v in vs) / len(vs)
+                dz = height(cx, cy) - zmin - 0.015
+            me.transform(Matrix.Translation((0, 0, dz)))
         remap = []
         for mt in me.materials:
             if mt not in m.mats:
@@ -317,57 +425,17 @@ def brouette():
             p.material_index = remap[p.material_index] if remap else 0
         m.bm.from_mesh(me)
         bpy.data.meshes.remove(me)
-    benne = next(o for o in parts if o.name.startswith("Benne"))
-    bpts = [benne.matrix_world @ v.co for v in benne.data.vertices]
-    for o in list(tmp.all_objects):
+    # l'essieu : traverse le moyeu et les deux brancards, la roue est tenue
+    metal = moyeu.data.materials[0]
+    span = max(abs(p.y - hub.y) for o in parts if o.name.startswith("Brancard")
+               for p in (o.matrix_world @ v.co for v in o.data.vertices) if abs(p.x - hub.x) < 0.15) + 0.012
+    res = bmesh.ops.create_cone(m.bm, cap_ends=True, segments=8, radius1=ESSIEU_R, radius2=ESSIEU_R, depth=2 * span,
+                                matrix=Matrix.Translation(hub) @ Matrix.Rotation(math.pi / 2, 4, "X"))
+    k = m.mats.index(metal) if metal in m.mats else (m.mats.append(metal) or len(m.mats) - 1)
+    for f in {f for v in res["verts"] for f in v.link_faces}:
+        f.material_index = k
+    bmesh.ops.rotate(m.bm, verts=m.bm.verts, matrix=Matrix.Rotation(-math.pi / 2, 3, "Z"))
+    for o in dst.objects:
         bpy.data.objects.remove(o, do_unlink=True)
     bpy.data.collections.remove(tmp)
-    # le tas d'herbe : un dôme qui épouse le haut de la benne
-    mn = Vector((min(p.x for p in bpts), min(p.y for p in bpts), min(p.z for p in bpts)))
-    mx = Vector((max(p.x for p in bpts), max(p.y for p in bpts), max(p.z for p in bpts)))
-    c = (mn + mx) / 2
-    rx, ry = (mx.x - mn.x) / 2 * 0.86, (mx.y - mn.y) / 2 * 0.86
-    rim = mx.z - 0.015
-    top = 0.13
-    bm = m.bm
-    rings, segs = 5, 16
-    center = bm.verts.new((c.x, c.y, rim + top))
-    prev_ring = None
-    faces = []
-    for ri in range(1, rings + 1):
-        f = ri / rings
-        ring = []
-        for k in range(segs):
-            a = k / segs * math.tau
-            x = c.x + math.cos(a) * rx * f
-            y = c.y + math.sin(a) * ry * f
-            z = rim + top * (1 - f ** 2) ** 0.8 + R_MOD.uniform(-0.012, 0.012) * (1 - f)
-            ring.append(bm.verts.new((x, y, z - (0.02 if ri == rings else 0))))
-        for k in range(segs):
-            k2 = (k + 1) % segs
-            faces.append(bm.faces.new((center, ring[k], ring[k2]) if prev_ring is None else
-                                      (prev_ring[k], ring[k], ring[k2], prev_ring[k2])))
-        prev_ring = ring
-    for fc in faces:
-        fc.material_index = m.mi(R_MOD.choice(("herbe", "herbe", "herbe_claire", "herbe_sombre")))
-    # brins : des touffes plantées dans le tas, plus quelques-uns qui pendent par-dessus le bord
-    def blade(base, d, h, w, key):
-        side = d.cross(Vector((0, 0, 1)))
-        side = (side.normalized() if side.length > 1e-6 else Vector((1, 0, 0))) * w
-        v1, v2 = bm.verts.new(base - side), bm.verts.new(base + side)
-        v3 = bm.verts.new(base + d * h)
-        bm.faces.new((v1, v2, v3)).material_index = m.mi(key)
-
-    for k in range(70):
-        a, f = R_MOD.uniform(0, math.tau), math.sqrt(R_MOD.random()) * 0.92
-        x, y = c.x + math.cos(a) * rx * f, c.y + math.sin(a) * ry * f
-        z = rim + top * (1 - f ** 2) ** 0.8 - 0.01
-        d = Vector((math.cos(a) * 0.35 * f, math.sin(a) * 0.35 * f, 1)).normalized()
-        blade(Vector((x, y, z)), d, R_MOD.uniform(0.06, 0.12), R_MOD.uniform(0.008, 0.014),
-              R_MOD.choice(("herbe_sombre", "herbe", "herbe_claire")))
-    for k in range(18):
-        a = R_MOD.uniform(0, math.tau)
-        x, y = c.x + math.cos(a) * rx * 1.02, c.y + math.sin(a) * ry * 1.02
-        d = Vector((math.cos(a) * 0.8, math.sin(a) * 0.8, -0.6)).normalized()
-        blade(Vector((x, y, rim + 0.01)), d, R_MOD.uniform(0.05, 0.09), 0.009, "herbe_sombre")
     return m.finish("Brouette")
