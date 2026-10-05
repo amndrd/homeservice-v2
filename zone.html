@@ -1,49 +1,13 @@
 <!DOCTYPE html>
-<html lang="fr-BE" data-i18n-title="title.zone">
+<html lang="fr-BE">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zone – HomeService BXL</title>
-<!-- arrivée d'une transition : l'écran est couvert dès le premier rendu (voir js/veil.js) -->
-<script>try { if (document.prerendering || sessionStorage.getItem('hs-veil')) { document.documentElement.classList.add('veil-in'); sessionStorage.removeItem('hs-veil'); } } catch (e) {}</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css">
+<title>HomeService BXL</title>
+<!-- le site tient sur une seule page : cette adresse mène à sa section -->
+<meta http-equiv="refresh" content="0; url=index.html#zone">
+<link rel="canonical" href="index.html#zone">
+<script>location.replace('index.html' + location.search + '#zone');</script>
 </head>
-<body>
-
-<header class="header" id="header">
-  <div class="header__bar">
-    <a href="index.html" class="logo" data-veil aria-label="HomeService BXL, accueil" data-i18n-aria="home"><img src="images/logo-blanc.png" alt="HomeService BXL" width="801" height="380"></a>
-    <nav class="nav" aria-label="Navigation principale" data-i18n-aria="mainNav">
-      <a href="a-propos.html" data-veil data-i18n="nav.about">À propos</a>
-      <a href="services.html" data-veil data-i18n="nav.services">Services</a>
-      <a href="fonctionnement.html" data-veil data-i18n="nav.how">Fonctionnement</a>
-      <a href="zone.html" data-veil data-i18n="nav.zone" class="active" aria-current="page">Zone</a>
-      <a href="contact.html" data-veil data-i18n="nav.contact">Contact</a>
-    </nav>
-    <div class="lang" id="lang">
-      <button class="lang__btn" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Langue"
-        data-i18n-aria="langBtn">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>
-        <span class="lang__code">FR</span>
-        <svg class="lang__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
-      </button>
-      <ul class="lang__menu" role="listbox">
-        <li><button type="button" role="option" data-lang="fr" lang="fr"><span>FR</span>Français</button></li>
-        <li><button type="button" role="option" data-lang="en" lang="en"><span>EN</span>English</button></li>
-        <li><button type="button" role="option" data-lang="nl" lang="nl"><span>NL</span>Nederlands</button></li>
-      </ul>
-    </div>
-    <a href="devis.html" class="header__cta" data-veil data-i18n="cta">Devis gratuit</a>
-  </div>
-</header>
-
-<!-- Zone : contenu à venir -->
-<main class="page" id="main"></main>
-
-<script src="js/veil.js"></script>
-<script src="js/i18n.js"></script>
-</body>
+<body><a href="index.html#zone">HomeService BXL</a></body>
 </html>
