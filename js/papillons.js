@@ -182,9 +182,17 @@ function wingMaterials(name, prepare) {
     map: tex, emissiveMap: tex, emissive: '#ffffff', emissiveIntensity: 0.0,
     roughness: 0.75, metalness: 0, side: THREE.DoubleSide, alphaTest: 0.5, alphaToCoverage: true,
   }));
+  // pour les ombres : la profondeur vue du soleil, découpée comme l'aile (sinon l'ombre serait un carré)
+  const depth = (tex) => prepare(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: tex,
+    alphaTest: 0.5, side: THREE.DoubleSide }));
+  const foreTex = paintWing(sp, FORE, sp.fore, false, seed);
+  const hindTex = paintWing(sp, HIND, [sp.hind[0], sp.hind[1]], true, seed + 1);
   const m = {
-    fore: make(paintWing(sp, FORE, sp.fore, false, seed)),
-    hind: make(paintWing(sp, HIND, [sp.hind[0], sp.hind[1]], true, seed + 1)),
+    fore: make(foreTex),
+    hind: make(hindTex),
+    foreDepth: depth(foreTex),
+    hindDepth: depth(hindTex),
+    bodyDepth: depth(null),
     body: prepare(new THREE.MeshStandardMaterial({ color: sp.body, roughness: 0.45, metalness: 0.15 })),
     abdomen: prepare(new THREE.MeshStandardMaterial({ color: new THREE.Color(sp.body).lerp(new THREE.Color('#a87c6c'), 0.6),   // brun rosé
       roughness: 0.6 })),
@@ -270,7 +278,14 @@ export function makeButterfly(species, span, prepare = (m) => m) {
       wings.push({ pivot, side, lag, amp, fore: mat === mats.fore });
     }
   }
+  // il porte une ombre : sur l'îlot (le soleil de la scène), découpée comme ses ailes, qui bat avec elles
+  root.traverse((c) => {
+    if (!c.isMesh) return;
+    c.castShadow = true;
+    c.customDepthMaterial = c.material === mats.fore ? mats.foreDepth : c.material === mats.hind ? mats.hindDepth : mats.bodyDepth;
+  });
   const st = { phase: Math.random() * 6.3, glide: 0 };
+  const wingState = { spread: 1 };                  // ouverture des ailes vue de dessus (1 : à plat, 0 : dressées)
   // le battement, image par image. Le vol (js/hero.js) dit quand planer (`glide`, 0 ou 1) et l'effort (0 à 1 : en
   // montée ou en virage, il bat plus vite et plus ample). Planer : les ailes se figent à demi levées, en V ouvert ;
   // elles y vont et en repartent en douceur.
@@ -283,10 +298,11 @@ export function makeButterfly(species, span, prepare = (m) => m) {
       const s = Math.sin(p + 0.32 * Math.sin(p));   // la descente (s qui baisse) plus vive que la remontée
       const a = (0.42 + 1.02 * s) * w.amp * amp * lift + 0.3 * st.glide;
       w.pivot.rotation.set(0, w.side * (w.fore ? 0.14 : 0.04) * Math.cos(p) * lift, w.side * a);
+      if (w.fore && w.side > 0) wingState.spread = Math.abs(Math.cos(a));
     }
     // le corps monte quand les ailes descendent, retombe un peu à la remontée
     body.position.y = -0.05 * span * Math.sin(st.phase - 0.4) * lift;
     body.rotation.x = -0.06 * Math.cos(st.phase) * lift;
   }
-  return { root, flap };
+  return { root, flap, wingState };
 }
