@@ -15,7 +15,7 @@ const host = document.getElementById('hero-scene');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const PAPER = '#f7f7f5';                            // = --paper
-const MODEL = 'models/ilot.glb';
+const MODEL = 'models/ilot.glb?v=panneau-glissant';    // la version force le rechargement quand le modèle change
 // La caméra des dioramas du site immersif : objectif 35 mm, en face du modèle, qu'elle domine de 10,6 m à 36 m de
 // distance (SVC_SHOT : recul 33, hauteur 18 ; MINI : 3 m plus loin, à 7,4 m) — une plongée de 16,4°.
 const LENS = 35;
@@ -32,7 +32,7 @@ const GRASS_R = 5.2;                                // on n'attrape l'îlot que 
 const FIT_RADIUS = 5.4;                             // rayon de l'îlot (herbe), pour le cadrage (m)
 // Place de l'îlot à l'écran : en grand, dans la moitié basse, sous le titre et la description.
 // [centre de l'îlot (part de la largeur, de la hauteur de l'écran), largeur qu'il occupe (part de l'écran)]
-const FRAME = { wide: { x: 0.5, y: 0.7, width: 0.84 }, tall: { x: 0.5, y: 0.71, width: 1.6 } };
+const FRAME = { wide: { x: 0.5, y: 0.73, width: 0.84 }, tall: { x: 0.5, y: 0.74, width: 1.6 } };
 const FPS = 24;                                     // le temps de hero.blend (les pilotes sont écrits en frames)
 
 const blender = (x, y, z) => new THREE.Vector3(x, z, -y);   // un point de Blender dans three
