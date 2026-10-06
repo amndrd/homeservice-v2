@@ -26,8 +26,11 @@ const CENTER = new THREE.Vector3(0, 0.95, 0);       // le milieu de l'îlot : pi
 // rad par pixel glissé (0,009 dans le site immersif, ralenti ici), retour de l'élan à la rotation lente (1/s)]
 const TURN = { yaw: -0.5, spin: 0.12, drag: 0.006, settle: 3 };
 // bascule autour de l'axe horizontal de l'écran (MINI_PITCH) : [rad par pixel glissé, max vers la caméra (rad), marge
-// gardée avant de voir le sol par la tranche (rad), vitesse du retour à plat (1/s)]
-const TILT = { drag: 0.006, up: 0.3, margin: 0.14, back: 4 };
+// gardée avant de voir le sol par la tranche (rad), vitesse du retour à plat (1/s), écart gardé entre le bord du sol et
+// le bas de la description (px)]. Vers la caméra, la bascule s'arrête aussi avant que le sol ne passe devant le texte
+// (tiltUp, calculé au cadrage) : seuls les objets posés dessus peuvent passer devant.
+const TILT = { drag: 0.006, up: 0.3, margin: 0.14, back: 4, gap: 10 };
+const GROUND_Y = 1.197;                             // hauteur du sol plat de l'îlot (blender/scripts/plat.py : PLAT)
 const GRASS_R = 5.2;                                // on n'attrape l'îlot que sur l'herbe, pas sur le sol fondu dans la page
 const FIT_RADIUS = 5.4;                             // rayon de l'îlot (herbe), pour le cadrage (m)
 // Place de l'îlot à l'écran : en grand, dans la moitié basse, sous le titre et la description.
@@ -55,7 +58,7 @@ if (THREE.ShaderChunk.tonemapping_pars_fragment.includes(AGX_SIGMOID)) {
 // ------------------------------------------------------------ rendu
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
 } catch {
   throw new Error('WebGL indisponible');            // la page reste blanche, sans l'îlot
 }
@@ -66,7 +69,8 @@ renderer.toneMappingExposure = 2.3;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 // l'îlot tourne sous un soleil fixe : l'ombre est recalculée à chaque image
-renderer.setClearColor(PAPER);
+// toile transparente, posée sur le titre et la description : les objets de l'îlot passent devant eux
+renderer.setClearColor(PAPER, 0);
 renderer.domElement.setAttribute('aria-hidden', 'true');
 host.appendChild(renderer.domElement);
 
@@ -195,9 +199,8 @@ function voidD(p) {
 // des textures vues de biais. Au-delà du bord, après le mappage des tons, le sol prend la couleur de la page.
 function blendIntoPage(material) {
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.uPaper = { value: new THREE.Color(PAPER).convertLinearToSRGB() };   // sortie : en sRGB
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 uPaper;\nfloat grassMask = 1.0;')
+      .replace('#include <common>', '#include <common>\nfloat grassMask = 1.0;')
       .replace('#include <map_fragment>', `#include <map_fragment>
         #ifdef USE_MAP
           float edge = texture2D( map, vMapUv ).a;
@@ -206,7 +209,7 @@ function blendIntoPage(material) {
         #endif
 `)
       .replace('#include <colorspace_fragment>',
-        '#include <colorspace_fragment>\ngl_FragColor.rgb = mix(uPaper, gl_FragColor.rgb, grassMask);');
+        '#include <colorspace_fragment>\ngl_FragColor = vec4(gl_FragColor.rgb * grassMask, grassMask);');   // prémultiplié
   };
   material.customProgramCacheKey = () => 'ilot-sol';
 }
@@ -525,7 +528,7 @@ function turn(dt) {
     yawA += spinV * dt;
     spinV = cruise + (spinV - cruise) * Math.exp(-dt * TURN.settle);
   }
-  pitchA = Math.min(TILT.up, Math.max(-Math.max(0, DIVE - TILT.margin), pitchA));
+  pitchA = Math.min(tiltUp, Math.max(-Math.max(0, DIVE - TILT.margin), pitchA));
   if (!drag) pitchA *= Math.exp(-dt * TILT.back); // lâché : il revient en douceur à plat
   yaw.rotation.y = yawA;
   pitch.quaternion.setFromAxisAngle(tiltAxis, pitchA);
@@ -553,7 +556,36 @@ function resize() {
   camera.lookAt(CENTER);
   camera.setViewOffset(w, h, -(frameF.x - 0.5) * w, -(frameF.y - 0.5) * h, w, h);
   camera.updateProjectionMatrix();
+  tiltUp = maxTiltUp(h);
   dirty = true;
+}
+
+// la plus forte bascule vers la caméra pour laquelle le bord du sol (cercle de rayon FIT_RADIUS, quelle que soit la
+// rotation) reste sous la description, d'au moins TILT.gap px
+let tiltUp = TILT.up;
+const textEl = document.querySelector('.hero__text');
+const _rim = new THREE.Vector3();
+function rimTop(a) {                                // haut du bord du sol à l'écran (px), pour la bascule a
+  let top = Infinity;
+  for (let i = 0; i < 48; i++) {
+    const t = (i / 48) * Math.PI * 2;
+    _rim.set(Math.cos(t) * FIT_RADIUS, GROUND_Y - CENTER.y, Math.sin(t) * FIT_RADIUS)
+      .applyAxisAngle(tiltAxis, a).add(CENTER).project(camera);
+    top = Math.min(top, (1 - _rim.y) / 2);
+  }
+  return top;
+}
+function maxTiltUp(h) {
+  if (!textEl) return TILT.up;
+  const limit = (textEl.offsetTop + textEl.offsetHeight + TILT.gap) / h;
+  if (rimTop(TILT.up) >= limit) return TILT.up;
+  if (rimTop(0) < limit) return 0;
+  let lo = 0, hi = TILT.up;
+  for (let k = 0; k < 20; k++) {
+    const mid = (lo + hi) / 2;
+    if (rimTop(mid) >= limit) lo = mid; else hi = mid;
+  }
+  return lo;
 }
 
 // ------------------------------------------------------------ boucle : à l'écran seulement
@@ -582,7 +614,9 @@ function frame() {
     dirty = false;
   }
 }
-new ResizeObserver(resize).observe(host);
+const sizes = new ResizeObserver(resize);
+sizes.observe(host);
+if (textEl) sizes.observe(textEl);                  // le texte change de hauteur (langue, police chargée)
 new IntersectionObserver(([e]) => {
   visible = e.isIntersecting;
   start();

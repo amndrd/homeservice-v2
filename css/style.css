@@ -29,7 +29,7 @@ html { scroll-behavior: smooth; }
 .hero-track + .section { margin-top: -100vh; margin-top: -100lvh; z-index: 5; background: var(--paper); }
 .hero-mark { position: absolute; left: 0; width: 1px; pointer-events: none; }
 .hero { position: sticky; top: 0; height: 100vh; height: 100svh; min-height: 520px; overflow: hidden; background: var(--paper); }
-.hero__scene { position: absolute; inset: 0; touch-action: pan-y; }   /* main au survol de l'îlot : js/hero.js */
+.hero__scene { position: absolute; inset: 0; z-index: 1; touch-action: pan-y; }   /* devant le titre ; main au survol de l’îlot : js/hero.js */
 .hero__scene canvas { display: block; width: 100%; height: 100%; }
 /* le vert du défilement (js/flood.js), au-dessus de l'îlot et du titre */
 .hero__flood { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; display: block; pointer-events: none; }
@@ -37,7 +37,7 @@ html { scroll-behavior: smooth; }
 .hero--flat.hero--green .hero__flood { opacity: 1; }
 /* titre et description, centrés en haut ; l'îlot en grand dessous (js/hero.js). Repris de l'écran titre du site
    immersif (homeservice-immersive, style.css : .card h1, .card p, .card mark) */
-.hero__text { position: absolute; left: 50%; top: clamp(104px, 15vh, 160px); transform: translateX(-50%); z-index: 1;
+.hero__text { position: absolute; left: 50%; top: clamp(104px, 15vh, 160px); transform: translateX(-50%); z-index: 0;
   will-change: opacity, translate;
   width: min(900px, calc(100% - 40px)); text-align: center; pointer-events: none; }
 /* apparition : le titre puis la description montent en fondu, l'un après l'autre (comme l'écran titre du site
