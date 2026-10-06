@@ -103,7 +103,7 @@ def bake_ground():
             ground.data.uv_layers.remove(uv)
 
 
-def prune_outside(mask, names=("Îlot · Prairie", "Îlot · Fougères", "Îlot · Détails", "Îlot · Printemps")):
+def prune_outside(mask, names=("Îlot · Prairie", "Îlot · Fougères", "Îlot · Détails", "Îlot · Printemps", "Îlot · Flore", "Îlot · Buissons")):
     """Retire les brins, fougères, fleurs et détails plantés hors de l'herbe : sur le site, ils flotteraient dans le
     blanc. Une plante peut être faite de plusieurs pièces (tige, corolle, cœur) : seules les pièces plantées dans le
     sol sont jugées, à leur pied, sur le masque précalculé ; une pièce en l'air (corolle, cœur) suit la tige la plus
@@ -200,4 +200,16 @@ for o in bpy.data.collections["Îlot"].all_objects:    # au repos : le site anim
             o.modifiers.remove(m)
         o.data.attributes["souplesse"].name = "_souplesse"  # « _ » : attribut exporté tel quel
 prune_outside(MASK)
+# les fleurs relevées pour les abeilles (tetes.py) : seulement celles qui sont dans l'herbe
+fl = bpy.data.objects.get("Îlot · Flore")
+if fl and fl.get("tetes"):
+    import json
+    xs = [v.co.x for v in ground.data.vertices]
+    ys = [v.co.y for v in ground.data.vertices]
+    x0, y0 = min(xs), min(ys)
+    size = max(max(xs) - x0, max(ys) - y0)
+    heads = [h for h in json.loads(fl["tetes"])
+             if MASK[int((h[1] - y0) / size * (TEX - 1)), int((h[0] - x0) / size * (TEX - 1))] >= 0.55]
+    fl["tetes"] = json.dumps(heads)
+    print("têtes de fleurs :", len(heads))
 export()
