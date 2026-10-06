@@ -143,8 +143,9 @@
   // ------------------------------------------------------------ la photo : elle s'ouvre derrière le bord du vide
   // Le shader du site immersif (photoMat), à plat : la photo mesure PHOTO_W m de large ; une ouverture en rectangle
   // arrondi grandit depuis son centre, son bord est le bruit du vide (mêmes fréquences, bande de 6 m pendant
-  // l'ouverture, 3 m une fois ouverte) ; ouverte, elle n'atteint pas le cadre : son contour reste ondulé.
-  const PHOTO_W = 18.5, PHOTO_EDGE = 6.0, PHOTO_REST = 3.0, PHOTO_ROUND = 2.2;
+  // l'ouverture) ; sur la fin, la bande ondulée se resserre jusqu'à disparaître : ouverte, la photo est entière, aux
+  // bords nets et aux coins arrondis comme les images du site (PHOTO_CORNER px). Le contour est lissé au pixel près.
+  const PHOTO_W = 18.5, PHOTO_EDGE = 6.0, PHOTO_ROUND = 2.2, PHOTO_CORNER = 18;
   const photoBox = about.querySelector('.about__photo');
   const img = photoBox?.querySelector('img');
   const pCanvas = document.createElement('canvas');
@@ -155,7 +156,7 @@
     pgl = pCanvas.getContext('webgl', { alpha: true, antialias: false, premultipliedAlpha: true });
     const prog = pgl && program(pgl, `attribute vec2 aPos; varying vec2 vUv;
       void main() { vUv = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }`, `precision highp float;
-      uniform sampler2D uImg; uniform float uReveal, uAlpha; uniform vec2 uSize; varying vec2 vUv;
+      uniform sampler2D uImg; uniform float uReveal, uAlpha, uPx, uCorner; uniform vec2 uSize; varying vec2 vUv;
       float vdHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
       float vdNoise(vec3 x) {
         vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -166,17 +167,18 @@
         vec2 pm = vUv * uSize;                                          // en mètres, comme le vide
         vec3 w = vec3(pm.x + 31.0, 0.0, pm.y + 17.0);
         float n = vdNoise(w * 0.33) * 0.75 + vdNoise(w * 1.9) * 0.25;
-        float edge = mix(${PHOTO_EDGE.toFixed(1)}, ${PHOTO_REST.toFixed(1)}, smoothstep(0.55, 1.0, uReveal));
-        vec2 hs = uReveal * (uSize * 0.5 - edge);                       // l'ouverture grandit jusqu'au cadre moins le bord
-        float rc = min(uReveal * ${PHOTO_ROUND.toFixed(1)}, min(hs.x, hs.y));
+        float edge = mix(${PHOTO_EDGE.toFixed(1)}, 0.0, smoothstep(0.55, 1.0, uReveal));   // le bord ondulé se resserre
+        vec2 hs = uReveal * (uSize * 0.5 - edge);                       // l'ouverture grandit jusqu'au cadre
+        float rc = min(mix(uReveal * ${PHOTO_ROUND.toFixed(1)}, uCorner, smoothstep(0.7, 1.0, uReveal)), min(hs.x, hs.y));
         vec2 q = abs(pm - uSize * 0.5) - hs + rc;
         float sd = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - rc;  // > 0 : hors de l'ouverture
-        if (-sd + (n - 1.0 + uReveal) * edge <= 0.0) { gl_FragColor = vec4(0.0); return; }
-        gl_FragColor = texture2D(uImg, vUv) * uAlpha;
+        float a = clamp((-sd + (n - 1.0 + uReveal) * edge) / uPx + 0.5, 0.0, 1.0);   // bord lissé sur un pixel
+        if (a <= 0.0) { gl_FragColor = vec4(0.0); return; }
+        gl_FragColor = texture2D(uImg, vUv) * uAlpha * a;
       }`);
     if (prog) {
       PU = {};
-      for (const k of ['uImg', 'uReveal', 'uAlpha', 'uSize']) PU[k] = pgl.getUniformLocation(prog, k);
+      for (const k of ['uImg', 'uReveal', 'uAlpha', 'uSize', 'uPx', 'uCorner']) PU[k] = pgl.getUniformLocation(prog, k);
       pgl.uniform1i(PU.uImg, 0);
       const load = () => {
         const tex = pgl.createTexture();
@@ -198,6 +200,9 @@
   function drawPhoto(open, alpha) {
     if (!photoReady) { if (img) img.style.opacity = String(Math.min(alpha, open > 0.02 ? 1 : 0)); return; }
     fit(pCanvas, pgl, pCanvas, 2);
+    const mpp = PHOTO_W / Math.max(1, pCanvas.width);                   // mètres par pixel de la toile
+    pgl.uniform1f(PU.uPx, mpp);
+    pgl.uniform1f(PU.uCorner, PHOTO_CORNER * (pCanvas.width / Math.max(1, pCanvas.clientWidth)) * mpp);
     pgl.uniform1f(PU.uReveal, open);
     pgl.uniform1f(PU.uAlpha, alpha);
     pgl.clearColor(0, 0, 0, 0);

@@ -104,7 +104,7 @@ html.flooded .about { pointer-events: auto; }
   text-wrap: pretty; }
 .about__text .w { opacity: .16; }                 /* allumés au fil du défilement (js/flood.js) */
 .about__text .accent { --lit: 0; color: color-mix(in srgb, #7ee2a8 calc(var(--lit) * 100%), #f2f6f1); }
-.about__photo { position: relative; margin: 0; aspect-ratio: 736 / 552; }
+.about__photo { position: relative; margin: 0; aspect-ratio: 1300 / 970; }   /* celui de l’image */
 .about__photo img, .about__photo canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .about__photo img { object-fit: cover; border-radius: 18px; opacity: 0; transition: opacity .6s ease; }
 .about__photo--gl img { visibility: hidden; }
@@ -112,7 +112,7 @@ html.flooded .about { pointer-events: auto; }
   .about { padding: 88px 20px 24px; }
   .about__inner { grid-template-columns: 1fr; gap: 20px; }
   .about__text p { font-size: clamp(20px, 5.4vw, 28px); }
-  .about__photo { max-height: 36svh; justify-self: center; width: min(100%, calc(36svh * 736 / 552)); }
+  .about__photo { max-height: 36svh; justify-self: center; width: min(100%, calc(36svh * 1300 / 970)); }
   .section { padding: 120px 20px 72px; }
 }
 
