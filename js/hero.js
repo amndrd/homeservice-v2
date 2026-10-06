@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { makeButterfly } from './papillons.js';
 
 const host = document.getElementById('hero-scene');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -385,21 +386,159 @@ function updateParticles(t) {
   seedAlpha.needsUpdate = true;
 }
 
-// ------------------------------------------------------------ papillons (vfx.py, printemps.py : les mêmes pilotes)
-// Chaque papillon porte ses réglages (propriétés exportées) : centre du huit (cx, cy), hauteur (cz), rayon (rad),
-// phase (ph), vitesse (sp). Ils dessinent un huit, montent et descendent un peu, s'orientent dans le sens du vol et
-// battent des ailes.
+// ------------------------------------------------------------ papillons (js/papillons.js)
+// Les papillons de hero.blend donnent leur coin de l'îlot (propriétés exportées : centre cx, cy, hauteur cz, rayon
+// rad, phase ph, vitesse sp) ; leur modèle et leur battement sont ceux de js/papillons.js. Chacun vole pour de bon :
+// une position et une vitesse, qui poursuivent un point qui bouge — chez lui, une boucle irrégulière au-dessus de son
+// coin d'herbe (elle tourne avec l'îlot) ; en excursion, un tracé dans l'image. Accélération et vitesse bornées,
+// jamais à l'arrêt, un vol un peu erratique ; le cap suit la vitesse en tournant à vitesse limitée, il penche dans les
+// virages. Il plane en vol rapide et à peu près droit, en descendant un peu ; il bat des ailes pour monter et tourner.
+// Deux d'entre eux partent de temps en temps en excursion : ils montent devant la description et le titre, sortent
+// de l'îlot, passent tout près de l'écran, puis rentrent. L'excursion est tracée dans l'image (part de l'écran,
+// profondeur en part du recul de la caméra), calée sur la place du texte.
+// [envergure (m), espèces dans l'ordre des papillons de l'îlot]
+const BUTTERFLY = { span: 0.2, species: ['peche', 'menthe', 'rose', 'aurore', 'vieuxrose', 'peche', 'rose'] };
+// le vol : [pulsation de la poursuite (rad/s), amortissement, accélération max (m/s²), vitesse min, max chez lui, max
+// en excursion (m/s), vol erratique : de côté, en hauteur (m/s²), virage max (rad/s), planés : durée (s), repos entre
+// deux (s), chute (m/s²), ampleur des boucles chez lui (× leur rayon de hero.blend), hauteur min au-dessus du sol (m)]
+const FLIGHT = { omega: 1.8, zeta: 0.8, accel: 4, vmin: 0.28, vmax: 0.85, vtrip: 2.4, wander: [0.55, 2.2], yawRate: 3.5,
+  glide: [0.45, 1.2], rest: [1.2, 3.5], sink: 0.8, roam: 1.8, floor: 0.3 };
+// excursions : [papillon, premier départ (s après l'apparition), retour tous les… (s), durée (s), points de passage :
+// [x (part de la largeur du texte, 0 à gauche, 1 à droite ; hors de 0..1 : à côté), y (0 : haut du titre, 1 : bas
+// de la description ; au-delà : plus bas), profondeur (part du recul)]]
+const TRIPS = [
+  { who: 3, first: 2.5, every: 38, dur: 16, path: [[0.45, 1.6, 0.95], [0.25, 0.85, 0.85], [0.5, 0.3, 0.8], [0.8, 0.55, 0.58],
+    [1.05, 1.3, 0.22], [0.75, 1.9, 0.55]] },
+  { who: 0, first: 17, every: 44, dur: 17, path: [[0.6, 1.6, 0.95], [0.8, 0.8, 0.88], [0.45, 0.4, 0.82], [0.0, 0.6, 0.7],
+    [-0.25, 1.45, 0.26], [0.2, 1.9, 0.6]] },
+];
 const flyers = [];
+const baseView = new THREE.Matrix4();               // caméra à sa place (sans le mouvement de la souris) → monde
+const _ndc = new THREE.Vector3(), _home = new THREE.Vector3(), _vel = new THREE.Vector3(), _look = new THREE.Vector3();
+const _bx = new THREE.Vector3(), _bz = new THREE.Vector3();
+let lifeAt = Infinity;                              // fin de l'apparition : les excursions peuvent commencer
 
-function updateButterflies(t) {
-  const f = t * FPS;
-  for (const { node, wings, cx, cy, cz, rad, ph, sp } of flyers) {
-    const x = cx + rad * Math.sin(f * sp + ph);
-    const y = cy + rad * 0.8 * Math.sin(f * sp * 2 + ph);
-    const z = cz + 0.06 * Math.sin(f * 0.31 + ph) + 0.03 * Math.sin(f * 0.9);
-    node.position.copy(blender(x, y, z));
-    node.rotation.set(0, Math.atan2(rad * 0.8 * 2 * Math.cos(f * sp * 2 + ph), rad * Math.cos(f * sp + ph)), 0);
-    for (const [w, sgn] of wings) w.rotation.set(-sgn * (0.15 + 1.05 * Math.abs(Math.sin(f * 0.55 + ph))), 0, 0);
+// un point de l'image (x, y en part de l'écran) à une profondeur donnée (m), dans le monde
+function screenToWorld(sx, sy, depth, out) {
+  _ndc.set(sx * 2 - 1, 1 - sy * 2, 0.5).applyMatrix4(camera.projectionMatrixInverse);
+  return out.copy(_ndc).multiplyScalar(depth / -_ndc.z).applyMatrix4(baseView);
+}
+// la boucle d'un papillon au-dessus de son coin d'herbe, dans le monde
+function homeAt(f, t, out) {
+  const a = (t * f.sp * FPS) / FLIGHT.roam + f.ph, r = f.rad * FLIGHT.roam;   // plus amples, à la même allure
+  const x = f.cx + r * 0.9 * (Math.sin(a) + 0.4 * Math.sin(1.7 * a + f.ph * 0.5));
+  const y = f.cy + r * 0.8 * (Math.sin(2 * a) + 0.3 * Math.sin(2.9 * a + 1));
+  const z = f.cz + 0.08 * Math.sin(0.6 * a + f.ph) + 0.04 * Math.sin(1.9 * a);
+  return island.localToWorld(out.copy(blender(x, y, z)));
+}
+// où en est l'excursion d'un papillon à l'instant t : null s'il est chez lui
+function tripAt(f, t) {
+  const tr = f.trip;
+  if (!tr || t < lifeAt + tr.first) return null;
+  const k = (t - lifeAt - tr.first) % tr.every;
+  return k < tr.dur ? k / tr.dur : null;
+}
+const _pts = Array.from({ length: 8 }, () => new THREE.Vector3());
+const tripCurve = new THREE.CatmullRomCurve3(_pts, false, 'centripetal');
+function tripPoint(f, u, t, out) {
+  const box = textBox();
+  homeAt(f, t, _pts[0]);
+  _pts[7].copy(_pts[0]);
+  f.trip.path.forEach(([x, y, d], i) => {
+    screenToWorld(box.x0 + x * (box.x1 - box.x0), box.y0 + y * (box.y1 - box.y0), d * baseDist, _pts[i + 1]);
+  });
+  tripCurve.updateArcLengths();
+  return tripCurve.getPointAt(Math.min(1, u), out);   // à allure régulière le long du tracé
+}
+// la place du titre et de la description à l'écran (part de la largeur et de la hauteur)
+function textBox() {
+  const w = host.clientWidth || 1, h = host.clientHeight || 1;
+  if (!textEl) return { x0: 0.3, x1: 0.7, y0: 0.15, y1: 0.45 };
+  const x0 = textEl.offsetLeft - textEl.offsetWidth / 2;   // centré (translateX(-50%))
+  return { x0: x0 / w, x1: (x0 + textEl.offsetWidth) / w, y0: textEl.offsetTop / h,
+    y1: (textEl.offsetTop + textEl.offsetHeight) / h };
+}
+
+const _acc = new THREE.Vector3(), _tgt = new THREE.Vector3(), _hv = new THREE.Vector3();
+const rand = (a, b) => a + Math.random() * (b - a);
+function flyStep(f, t, h) {
+  // le point poursuivi : la boucle chez lui, ou le tracé de l'excursion, pris un peu en avance
+  const u = tripAt(f, t);
+  if (u === null) homeAt(f, t + 0.35, _tgt);
+  else tripPoint(f, u + 0.35 / f.trip.dur, t, _tgt);
+  f.u = u;
+  const w = FLIGHT.omega;
+  _acc.subVectors(_tgt, f.pos).multiplyScalar(w * w).addScaledVector(f.vel, -2 * FLIGHT.zeta * w);
+  // vol erratique : en hauteur, des sautes vives (le papillon monte et descend à chaque série de battements) ; de
+  // côté, une dérive lente — il ne zigzague pas, il ondule
+  const k = f.gliding ? 0.3 : 1, [kh, kv] = FLIGHT.wander;
+  _acc.x += k * kh * (Math.sin(t * 0.7 + f.ph * 3) + 0.5 * Math.sin(t * 1.13 + f.ph));
+  _acc.z += k * kh * (Math.sin(t * 0.83 + f.ph * 7) + 0.5 * Math.sin(t * 1.29 + f.ph * 4));
+  _acc.y += k * kv * (Math.sin(t * 2.6 + f.ph * 5) + 0.5 * Math.sin(t * 4.3 + f.ph * 2));
+  if (f.gliding) _acc.y -= FLIGHT.sink;
+  const low = GROUND_Y + FLIGHT.floor - f.pos.y;   // trop bas : il remonte (il ne vole pas dans l'herbe)
+  if (low > 0) _acc.y += low * 30;
+  if (_acc.length() > FLIGHT.accel) _acc.setLength(FLIGHT.accel);
+  f.vel.addScaledVector(_acc, h);
+  const vmax = u === null ? FLIGHT.vmax : FLIGHT.vtrip;
+  const sp = f.vel.length();
+  if (sp > vmax) f.vel.multiplyScalar(vmax / sp);
+  else if (sp < FLIGHT.vmin) f.vel.addScaledVector(f.head, FLIGHT.vmin - sp);   // jamais sur place : il avance
+  f.pos.addScaledVector(f.vel, h);
+  f.acc.copy(_acc);
+}
+
+function updateButterflies(t, dt) {
+  for (const f of flyers) {
+    if (!f.started) {                               // premier pas : il part de sa boucle, déjà lancé
+      homeAt(f, t, f.pos);
+      homeAt(f, t + 0.1, _tgt);
+      f.vel.subVectors(_tgt, f.pos).multiplyScalar(10);
+      f.started = true;
+    }
+    const n = Math.max(1, Math.ceil(dt / 0.02));    // pas fixes : le même vol quelle que soit la cadence
+    for (let i = 0; i < n; i++) flyStep(f, t - dt + ((i + 1) * dt) / n, dt / n);
+    // le cap : vers sa vitesse à l'horizontale, en tournant à vitesse limitée
+    _hv.set(f.vel.x, 0, f.vel.z);
+    const yawWanted = _hv.lengthSq() > 1e-6 ? Math.atan2(_hv.x, _hv.z) : f.yaw;
+    let dy = yawWanted - f.yaw;
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    const maxTurn = FLIGHT.yawRate * dt;
+    const turn = THREE.MathUtils.clamp(dy, -maxTurn, maxTurn);
+    f.yaw += turn;
+    f.head.set(Math.sin(f.yaw), 0, Math.cos(f.yaw));
+    const yawRate = turn / Math.max(dt, 1e-3);
+    // planer : en vol rapide, à peu près droit et sans monter ; il reprend ses battements pour monter ou tourner
+    const speed = f.vel.length();
+    f.timer -= dt;
+    if (f.gliding) {
+      if (f.timer <= 0 || f.vel.y > 0.35 || Math.abs(yawRate) > 2.2) { f.gliding = false; f.timer = rand(...FLIGHT.rest); }
+    } else if (f.timer <= 0 && speed > 0.45 && f.vel.y < 0.1 && Math.abs(yawRate) < 0.9 && Math.random() < dt * 1.2) {
+      f.gliding = true;
+      f.timer = rand(...FLIGHT.glide);
+    }
+    const effort = THREE.MathUtils.clamp(0.35 + f.vel.y * 0.8 + Math.abs(yawRate) * 0.15, 0, 1);
+    // penché dans les virages (accélération de côté), cabré un peu, plus en montée
+    const side = f.acc.x * f.head.z - f.acc.z * f.head.x;
+    f.bank += (THREE.MathUtils.clamp(-side * 0.1, -0.55, 0.55) - f.bank) * (1 - Math.exp(-dt * 5));
+    const pitchUp = 0.24 + THREE.MathUtils.clamp(f.vel.y * 0.35, -0.2, 0.3);
+    f.pitch += (pitchUp - f.pitch) * (1 - Math.exp(-dt * 4));
+    f.root.position.copy(f.pos);
+    f.root.rotation.set(0, 0, 0);
+    f.root.rotateY(f.yaw);
+    f.root.rotateX(-f.pitch);
+    f.root.rotateZ(f.bank);
+    // en excursion, il se penche vers l'écran : on voit le dessus de ses ailes, pas sa tranche
+    const show = f.u === null ? 0 : Math.sin(Math.PI * f.u) * 0.9;
+    if (show > 0) {
+      _look.subVectors(camera.position, f.pos).normalize();
+      _m.makeRotationFromQuaternion(f.root.quaternion);
+      _bx.setFromMatrixColumn(_m, 0);                // sa droite
+      _bz.setFromMatrixColumn(_m, 2);                // l'avant
+      f.root.rotateZ(-show * _look.dot(_bx));
+      f.root.rotateX(show * _look.dot(_bz));
+    }
+    f.flap(dt, f.gliding ? 1 : 0, effort);
   }
 }
 
@@ -434,20 +573,17 @@ gltfLoader.load(MODEL, (gltf) => {
   drop.forEach((o) => o.parent?.remove(o));
   root.updateMatrixWorld(true);                     // encore seul : son repère est celui de l'îlot
 
-  // papillons : chaque corps (et ses deux ailes) suit ses pilotes de Blender
+  // papillons : les anciens modèles cèdent la place à ceux de js/papillons.js, qui gardent leurs réglages
   const bodies = [];
   root.traverse((o) => { if (o.userData.papillon) bodies.push(o); });
-  bodies.forEach((node) => {
+  bodies.forEach((node, i) => {
     const { cx, cy, cz, rad, ph, sp } = node.userData;
-    const wings = [];
-    node.traverse((c) => {
-      if (/aile g/.test(c.name) || /aile_g/.test(c.name)) wings.push([c, 1]);
-      if (/aile d/.test(c.name) || /aile_d/.test(c.name)) wings.push([c, -1]);
-      if (c.isMesh) c.material.side = THREE.DoubleSide;
-    });
     node.parent.remove(node);
-    island.add(node);
-    flyers.push({ node, wings, cx, cy, cz, rad, ph, sp });
+    const b = makeButterfly(BUTTERFLY.species[i % BUTTERFLY.species.length], BUTTERFLY.span, voidify);
+    scene.add(b.root);
+    flyers.push({ ...b, cx, cy, cz, rad, ph, sp, trip: TRIPS.find((tr) => tr.who === i) || null,
+      pos: new THREE.Vector3(), vel: new THREE.Vector3(), acc: new THREE.Vector3(), head: new THREE.Vector3(0, 0, 1),
+      yaw: 0, bank: 0, pitch: 0.24, gliding: false, timer: rand(...FLIGHT.rest), started: false, u: null });
   });
 
   island.add(root);
@@ -475,6 +611,7 @@ function reveal(t) {
   const u = Math.min(1, Math.max(0, (t - born - REVEAL.wait) / REVEAL.dur));
   const e = u + (u * u * (3 - 2 * u) - u) * 0.35;
   uReveal.value = u >= 1 ? 1e5 : R0 + (R1 - R0) * e;   // fini : plus de calcul du vide
+  if (u >= 1) lifeAt = t;                           // les papillons peuvent partir en excursion
 }
 
 // ------------------------------------------------------------ on attrape l'îlot (site immersif : rotation à la souris)
@@ -555,6 +692,8 @@ function resize() {
   camera.position.set(0, Math.sin(DIVE) * baseDist, Math.cos(DIVE) * baseDist).add(CENTER);
   camera.lookAt(CENTER);
   basePos.copy(camera.position);
+  camera.updateMatrixWorld();
+  baseView.copy(camera.matrixWorld);
   camera.setViewOffset(w, h, -(frameF.x - 0.5) * w, -(frameF.y - 0.5) * h, w, h);
   camera.updateProjectionMatrix();
   tiltUp = maxTiltUp(h);
@@ -647,7 +786,7 @@ function frame() {
   uTime.value += dt;
   const moving = swayCamera(dt) | turn(dt);
   if (animating) {
-    updateButterflies(uTime.value);
+    updateButterflies(uTime.value, dt);
     reveal(uTime.value);
     updateParticles(uTime.value);
   }
