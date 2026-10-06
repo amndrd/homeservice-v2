@@ -554,10 +554,52 @@ function resize() {
   // la caméra des dioramas : en face, en légère plongée, l'îlot décalé à sa place à l'écran
   camera.position.set(0, Math.sin(DIVE) * baseDist, Math.cos(DIVE) * baseDist).add(CENTER);
   camera.lookAt(CENTER);
+  basePos.copy(camera.position);
   camera.setViewOffset(w, h, -(frameF.x - 0.5) * w, -(frameF.y - 0.5) * h, w, h);
   camera.updateProjectionMatrix();
   tiltUp = maxTiltUp(h);
+  sway.x += 1e-3;                                   // la caméra reprend son décalage autour de sa nouvelle place
   dirty = true;
+}
+
+// ------------------------------------------------------------ la caméra suit un peu la souris
+// Elle glisse de quelques centimètres autour de sa place (souris à droite : elle part à droite ; en haut : elle monte),
+// toujours tournée vers le centre de l'îlot, et rattrape la souris en douceur. Le titre et la description sont comme
+// fixés dans la scène, au bord du fond de l'îlot (FIT_RADIUS derrière son centre) : ils bougent exactement comme un
+// objet posé là.
+// [déplacement quand la souris est au bord de la fenêtre, à l'horizontale et à la verticale (m), vitesse (1/s)]
+const SWAY = { x: 0.35, y: 0.18, ease: 2.5 };
+let textShift = 0;                                  // décalage vertical du texte (px), pris en compte par la bascule
+const basePos = new THREE.Vector3();
+const sway = { x: 0, y: 0, tx: 0, ty: 0 };
+if (!reduced) {
+  window.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    sway.tx = (e.clientX / window.innerWidth) * 2 - 1;
+    sway.ty = -((e.clientY / window.innerHeight) * 2 - 1);
+  }, { passive: true });
+  document.documentElement.addEventListener('mouseleave', () => { sway.tx = sway.ty = 0; });
+}
+const _right = new THREE.Vector3(), _up = new THREE.Vector3();
+function swayCamera(dt) {
+  const k = 1 - Math.exp(-dt * SWAY.ease);
+  sway.x += (sway.tx - sway.x) * k;
+  sway.y += (sway.ty - sway.y) * k;
+  if (Math.abs(sway.tx - sway.x) + Math.abs(sway.ty - sway.y) < 1e-4) return false;
+  camera.position.copy(basePos);
+  camera.lookAt(CENTER);
+  _right.setFromMatrixColumn(camera.matrix, 0);
+  _up.setFromMatrixColumn(camera.matrix, 1);
+  camera.position.addScaledVector(_right, sway.x * SWAY.x).addScaledVector(_up, sway.y * SWAY.y);
+  camera.lookAt(CENTER);
+  camera.updateMatrixWorld();
+  // le texte : à la profondeur du fond de l'îlot, il glisse dans le sens de la caméra
+  const h = host.clientHeight, fpx = h / (2 * Math.tan(vfovR / 2));
+  const g = fpx * (1 / baseDist - 1 / (baseDist + FIT_RADIUS));
+  textShift = -sway.y * SWAY.y * g;
+  if (textEl) textEl.style.translate = `${(sway.x * SWAY.x * g).toFixed(2)}px ${textShift.toFixed(2)}px`;
+  tiltUp = maxTiltUp(h);            // vu d'un peu plus haut, le sol remonte : la bascule s'adapte
+  return true;
 }
 
 // la plus forte bascule vers la caméra pour laquelle le bord du sol (cercle de rayon FIT_RADIUS, quelle que soit la
@@ -577,7 +619,7 @@ function rimTop(a) {                                // haut du bord du sol à l'
 }
 function maxTiltUp(h) {
   if (!textEl) return TILT.up;
-  const limit = (textEl.offsetTop + textEl.offsetHeight + TILT.gap) / h;
+  const limit = (textEl.offsetTop + textEl.offsetHeight + Math.max(0, textShift) + TILT.gap) / h;
   if (rimTop(TILT.up) >= limit) return TILT.up;
   if (rimTop(0) < limit) return 0;
   let lo = 0, hi = TILT.up;
@@ -603,7 +645,7 @@ function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);       // pas de bond au retour d'un onglet
   uTime.value += dt;
-  const moving = turn(dt);
+  const moving = swayCamera(dt) | turn(dt);
   if (animating) {
     updateButterflies(uTime.value);
     reveal(uTime.value);
