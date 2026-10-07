@@ -11,11 +11,32 @@ Les éléments du site immersif y sont repris un à un, adaptés à un site clas
 - **Écran de chargement** repris du site immersif (fond noir, logo blanc, cercle qui tourne), à l'arrivée sur le site
   seulement, jusqu'à ce que la page soit prête ; il s'efface en fondu, la navbar descend du haut de l'écran, puis le
   titre et la description de l'accueil montent l'un après l'autre (`css/style.css`, `js/veil.js`).
-- **Une seule page** : la navbar fait défiler jusqu'à chaque section (la section à l'écran y est allumée). Au
-  défilement, le vert du site monte du bas de l'écran et le remplit, avec le bord rongé du voile des onglets (sans le
-  logo). À 80 %, l'À propos arrive et reste fixe le temps de ses apparitions, reprises du site immersif : les mots
-  s'allument un à un, la photo s'ouvre derrière le bord du vide ; puis il défile sur le vert, et la section suivante
-  glisse dessus (`js/flood.js`).
+- **Une seule page, sur le blanc** : la navbar fait défiler jusqu'à chaque section (la section à l'écran y est
+  allumée). Sur ordinateur, au défilement, le hero reste en place : les objets des services décollent d'eux-mêmes,
+  les légers d'abord, les lourds ensuite, et font chacun un seul trajet, du sol jusqu'au-dessus de l'écran : ils
+  montent, s'écartent un peu et tournent lentement sur eux-mêmes, puis poursuivent dans la même direction en prenant
+  de la vitesse, en se balançant à leur rythme. Leur ombre de soleil les suit dans le sens de la lumière, et sous eux
+  le ciel est masqué selon leur silhouette vue de dessus ; de la terre tombe de la brouette, des brins d'herbe restent
+  accrochés dessous, des pétales et des aigrettes montent avec eux. Une fois les objets en l'air, le vide reprend
+  l'îlot et le titre — l'apparition jouée à l'envers, même bord ondulé (le titre, en HTML, est recouvert par la scène,
+  qui peint la couleur de la page là où le vide l'a repris) ; les objets ralentissent un peu le temps qu'il passe.
+  Puis l'À propos monte juste en dessous, et les objets sortent par le haut en passant devant lui (réglages `LIFT`,
+  `PATH`, `HOVER`, `EXIT`, `SKY`, `RISE`, `CRUMBS`, `BLADES` de `js/hero.js`). Sur téléphone et en mouvement
+  réduit, le hero défile simplement, l'îlot avec lui.
+- **Le papillon guide** (ordinateur) : l'un des papillons de l'îlot, turquoise et rose, accompagne la page. Ce n'est
+  pas une animation au défilement : à chaque image, il regarde l'écran et décide (`js/hero.js` : `GUIDE`, `BEHAVE`,
+  `GESTURE`, `PATH_LAND`, `SHADOW`). Il quitte l'îlot quand les objets décollent, vole parmi eux en les évitant, n'est
+  pas repris par le vide ; quand l'À propos arrive, il va se poser sur le dernier mot. À partir de là, la page est son
+  sol : il vole au-dessus d'elle, et son ombre portée (sa silhouette, projetée selon la lumière) montre sa hauteur ;
+  posé, il est à plat, vu de dessus, collé à la page. Il vit sa vie même quand on ne défile plus : de longs repos
+  (postures d'ailes, pivots, quelques pas, frémissements), des vols variés (saut, patrouille, exploration du texte,
+  escapade hors de l'écran), des poses en chemin, sur un mot ou sur le blanc, au bout d'une courbe d'approche ; il se
+  redresse pour se poser, claque des ailes pour décoller, s'enfuit devant le curseur. En remontant jusqu'à l'îlot, il
+  rentre chez lui. La page lui dit où en est la lecture et où il peut se poser (`js/apropos.js` : `window.hsPage`).
+- **À propos** : une section de la page, reprise du site immersif : le texte dans la colonne de gauche, ses mots
+  s'allument un à un, dans l'ordre de lecture, pendant qu'il traverse le milieu de l'écran, la partie en couleur passe au vert (`js/apropos.js`). La photo
+  de l'équipe (colonne de droite) est retirée pour l'instant ; le script sait encore l'ouvrir derrière le bord du vide.
+  Tout en bas, l'image « en construction » annonce la suite (clin d'œil provisoire).
 - **Transition (changement de langue)** : le voile bleu encre frappé du logo monte du bas de l'écran, au bord rongé
   comme le vide du site immersif, couvre l'écran pendant le changement de page, puis sort par le haut
   (`js/veil.js`, WebGL sans dépendance). La page suivante est préparée d'avance pour un passage sans à-coup.
@@ -45,7 +66,7 @@ Les éléments du site immersif y sont repris un à un, adaptés à un site clas
 | `fonts/manrope-*.woff2` | La police Manrope (fichiers de Google Fonts), servie par le site |
 | `outils/` | Construction : scripts minifiés, versions des fichiers, optimisation du modèle |
 | `vercel.json`, `.vercelignore` | Cache d'un an des fichiers versionnés ; ce qui n'est pas mis en ligne |
-| `js/flood.js` | Le vert du défilement, du hero à l'À propos |
+| `js/apropos.js` | Du hero à l'À propos, au défilement : la course, l'À propos (mots, photo) |
 | `images/teampic.webp` | Photo de l'équipe (À propos) |
 | `blender/` | Scène du hero et scripts (îlot, objets, export web) |
 
