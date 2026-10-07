@@ -1,7 +1,7 @@
 // Hero de l'accueil : l'îlot des services (models/ilot.glb, exporté de blender/hero.blend par
 // blender/scripts/export_web.py), en 3D temps réel. Il sort du blanc de la page : hors de l'herbe, le sol prend
 // exactement la couleur de la page, avec un bord net comme dans Blender. L'îlot vit comme dans hero.blend
-// (blender/scripts/vfx.py, printemps.py) : l'herbe et les fougères ondulent sous la brise, du pollen doré flotte, des
+// (blender/scripts/vfx.py, printemps.py) : l'herbe et les fougères ondulent sous la brise, une poussière brille dans le rai, des
 // aigrettes de pissenlit dérivent avec le vent, des papillons volettent. À l'arrivée, le vide blanc le révèle (plus bas).
 // Présentation reprise des dioramas de la section Services du site immersif (homeservice-immersive, web/js/app.js,
 // SVC_SHOT, MINI, MINI_PITCH) : caméra fixe en légère plongée, modèle de trois quarts qui tourne lentement sur lui-même ;
@@ -19,7 +19,7 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const desktop = matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches;
 
 const PAPER = '#f7f7f5';                            // = --paper
-const MODEL = 'models/ilot.glb?v=abeilles-2';    // la version force le rechargement quand le modèle change
+const MODEL = 'models/ilot.glb?v=tondeuse-1';    // la version force le rechargement quand le modèle change
 // La caméra des dioramas du site immersif : objectif 35 mm, en face du modèle, qu'elle domine de 10,6 m à 36 m de
 // distance (SVC_SHOT : recul 33, hauteur 18 ; MINI : 3 m plus loin, à 7,4 m) — une plongée de 16,4°.
 const LENS = 35;
@@ -91,7 +91,7 @@ const clock = new THREE.Clock();
 const uTime = { value: 0 };
 
 // l'îlot sur ses deux pivots, au centre de l'îlot : bascule (axe horizontal de l'écran), puis rotation autour de la
-// verticale. Tout ce qui vit sur l'îlot (papillons, pollen, aigrettes) tourne avec lui.
+// verticale. Tout ce qui vit sur l'îlot (papillons, aigrettes) tourne avec lui.
 const pitch = new THREE.Group();
 pitch.position.copy(CENTER);
 const yaw = new THREE.Group();
@@ -134,7 +134,7 @@ scene.add(rai, rai.target);
 // haut à gauche sur l'îlot. Ici, un cône dans l'axe exact du spot, rendu en lumière ajoutée (additive) : il éclaircit
 // ce qu'il traverse — l'herbe, les objets — mais pas le blanc de la page, qui ne peut pas être plus blanc : le vide
 // reste pur. Le faisceau est plus dense en son cœur et vers le sol, se dissout vers le haut ; une poussière lumineuse
-// y dérive lentement (le bruit de la brume de Blender). Le pollen s'allume quand il le traverse (pollenMat).
+// y dérive lentement (le bruit de la brume de Blender). De fins grains de poussière y scintillent (dustMat).
 // [couleur, intensité, part du faisceau dessinée (depuis le sol), adoucissement du bord, échelle et vitesse de la brume,
 //  hauteur (m) sur laquelle il se fond en approchant du sol]
 const SHAFT = { color: '#fff1d2', strength: 0.22, len: 0.62, soft: 0.55, mist: 0.9, drift: 0.05, feather: 1.1 };
@@ -244,7 +244,7 @@ function voidify(m) {
   m.customProgramCacheKey = () => prevKey() + '|vide';
   return m;
 }
-// le même calcul, côté script (pollen et aigrettes : rien tant que l'endroit est dans le vide)
+// le même calcul, côté script (aigrettes : rien tant que l'endroit est dans le vide)
 const vdFract = (x) => x - Math.floor(x);
 function vdHash(x, y, z) {
   x = vdFract(x * 0.3183099 + 0.1) * 17; y = vdFract(y * 0.3183099 + 0.1) * 17; z = vdFract(z * 0.3183099 + 0.1) * 17;
@@ -342,7 +342,7 @@ function windy(material) {
 const depthPlain = voidify(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }));
 const depthWind = voidify(windy(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking })));
 
-// ------------------------------------------------------------ particules : pollen et aigrettes (vfx.py)
+// ------------------------------------------------------------ particules : aigrettes (vfx.py) et poussière du rai
 // Les particules de Blender, refaites ici : chacune naît dans un volume (ellipsoïde), vit quelques secondes en
 // dérivant (brise, mouvement brownien, un rien de montée pour les aigrettes), s'allume puis s'éteint.
 const WIND_DIR = blender(Math.cos(VENT.dir), Math.sin(VENT.dir), 0);
@@ -384,41 +384,73 @@ class Swarm {
   }
 }
 
-// pollen : points de lumière dorée en suspension (printemps.py : #ffe08a, émission 5)
-const pollen = new Swarm({ count: 260, center: { x: 0, y: 0, z: 1.5 }, radius: 4.6, squash: 0.4, life: 220,
-  drift: 0.035, rise: 0.0, brown: 0.12, fadeIn: 0.2, fadeOut: 0.3, size: 0.011, sizeRand: 0.6 });
-const pollenGeo = new THREE.BufferGeometry();
-pollenGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pollen.count * 3), 3));
-pollenGeo.setAttribute('aAlpha', new THREE.BufferAttribute(new Float32Array(pollen.count), 1));
-pollenGeo.setAttribute('aSize', new THREE.BufferAttribute(new Float32Array(pollen.count), 1));
-const pollenMat = new THREE.ShaderMaterial({
-  transparent: true, depthWrite: false, toneMapped: false,
-  uniforms: { uColor: { value: new THREE.Color('#ffe08a') }, uScale: { value: 1 }, uApex: uShaft.apex, uAxis: uShaft.axis,
-    uTan: uShaft.tan, uFade: uShaft.fade },
-  vertexShader: `
-    attribute float aAlpha; attribute float aSize; uniform float uScale, uTan, uFade; uniform vec3 uApex, uAxis;
-    varying float vAlpha, vLit;
-    void main() {
-      vec4 mv = modelViewMatrix * vec4( position, 1.0 );
-      gl_Position = projectionMatrix * mv;
-      // dans le rai de lumière, il brille : plus gros, plus lumineux, plus blanc
-      vec3 d = ( modelMatrix * vec4( position, 1.0 ) ).xyz - uApex;
-      float t = dot( d, uAxis ), r = length( d - uAxis * t );
-      vLit = uFade * ( 1.0 - smoothstep( 0.55, 1.0, r / max( t * uTan, 1e-3 ) ) );
-      gl_PointSize = max( 1.5, 2.0 * aSize * ( 1.0 + 1.3 * vLit ) * uScale / - mv.z );   // au moins un pixel et demi
-      vAlpha = aAlpha;
-    }`,
-  fragmentShader: `
-    uniform vec3 uColor; varying float vAlpha, vLit;
-    void main() {
-      float r = length( gl_PointCoord - 0.5 ) * 2.0;
-      float a = vAlpha * ( 1.0 - smoothstep( 0.55 - 0.3 * vLit, 1.0, r ) );
-      if ( a < 0.01 ) discard;
-      gl_FragColor = vec4( mix( uColor, vec3( 1.0, 0.98, 0.9 ), vLit * 0.7 ) * ( 1.0 + 0.8 * vLit ), a );
-    }`,
-});
-const pollenPoints = new THREE.Points(pollenGeo, pollenMat);
-pollenPoints.frustumCulled = false;
+// poussière du rai : à la place du pollen doré, de fins grains clairs qui ne se voient que dans le faisceau, comme
+// la poussière dans un rayon de soleil. Ils naissent dans sa partie visible, dérivent à peine (quelques cm/s, en
+// tournoyant) dans le bas du faisceau, là où il passe devant l'îlot (plus haut, il est devant la page, où rien ne
+// s'ajoute), et scintillent : un grain qui tourne renvoie la lumière par éclats. Tout se calcule dans le shader
+// (chaque grain renaît ailleurs à chaque cycle). Rendus comme le rai : lumière ajoutée × l'alpha de la toile, donc
+// rien sur la page ; dans le repère du monde, comme le faisceau (ils ne tournent pas avec l'îlot).
+// [nombre, diamètre (m), durée d'un cycle (s), dérive (m/s), tournoiement (m), lueur et éclat, part du rayon du cône
+//  occupée, hauteurs au-dessus du sol (m)]
+const DUST = { count: 260, size: 0.01, life: [7, 13], drift: 0.025, swirl: 0.05, base: 0.6, glint: 2.4, fill: 0.9,
+  high: [0.1, 1.3] };
+const dustGeo = new THREE.BufferGeometry();
+{
+  const seed = new Float32Array(DUST.count * 4), pos = new Float32Array(DUST.count * 3);
+  for (let i = 0; i < DUST.count; i++)
+    seed.set([Math.random(), Math.random() * 6.283, rnd(...DUST.life), rnd(0.6, 1.0)], i * 4);
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));   // (inutilisé : le shader place les grains)
+  dustGeo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
+}
+const dustMat = (() => {
+  const ax = uShaft.axis.value, u = new THREE.Vector3().crossVectors(ax, new THREE.Vector3(0, 1, 0)).normalize(), w = new THREE.Vector3().crossVectors(ax, u);
+  return new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, toneMapped: false, blending: THREE.CustomBlending,
+    blendSrc: THREE.DstAlphaFactor, blendDst: THREE.OneFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor,
+    uniforms: { uTime, uScale: { value: 1 }, uFade: uShaft.fade, uColor: { value: new THREE.Color(SHAFT.color) },
+      uApex: uShaft.apex, uAxis: uShaft.axis, uU: { value: u }, uW: { value: w }, uTan: uShaft.tan,
+      uGround: { value: GROUND_Y } },
+    vertexShader: `
+      attribute vec4 aSeed; uniform float uTime, uScale, uTan, uGround, uFade; uniform vec3 uApex, uAxis, uU, uW;
+      varying float vK;
+      float h1( float x ) { return fract( sin( x * 127.1 ) * 43758.5453 ); }
+      void main() {
+        float life = aSeed.z, c = ( uTime + aSeed.x * life ) / life, n = floor( c ), a = fract( c ), age = a * life;
+        float id = aSeed.x * 91.7 + n * 13.3;
+        // un point du bas du faisceau, réparti en volume dans le cône : sa hauteur au-dessus du sol donne sa place sur l'axe
+        float t = ( uApex.y - uGround - mix( ${DUST.high[0].toFixed(2)}, ${DUST.high[1].toFixed(2)}, h1( id ) ) ) / - uAxis.y;
+        float ang = h1( id + 1.0 ) * 6.283, rad = sqrt( h1( id + 2.0 ) ) * ${DUST.fill.toFixed(2)} * t * uTan;
+        vec3 p = uApex + uAxis * t + ( uU * cos( ang ) + uW * sin( ang ) ) * rad;
+        // il dérive à peine et tournoie
+        p += vec3( 0.6, -0.4, 0.3 ) * ${DUST.drift.toFixed(3)} * age;
+        p += ${DUST.swirl.toFixed(3)} * vec3( sin( age * 0.7 + aSeed.y ), sin( age * 0.5 + aSeed.y * 1.7 ), cos( age * 0.6 + aSeed.y ) );
+        vec4 mv = viewMatrix * vec4( p, 1.0 );
+        gl_Position = projectionMatrix * mv;
+        // dans le cône (et pas près du sol, où le faisceau se fond), il apparaît et s'éteint en douceur
+        vec3 d = p - uApex; float tt = dot( d, uAxis ), r = length( d - uAxis * tt ) / max( tt * uTan, 1e-3 );
+        float inside = 1.0 - smoothstep( 0.6, 1.0, r );
+        float along = smoothstep( uGround, uGround + 0.25, p.y ) * ( 1.0 - smoothstep( 1.6, 2.2, p.y - uGround ) );
+        float life01 = smoothstep( 0.0, 0.2, a ) * ( 1.0 - smoothstep( 0.75, 1.0, a ) );
+        // l'éclat : par moments, le grain renvoie la lumière
+        float glint = pow( 0.5 + 0.5 * sin( uTime * ( 1.2 + 2.8 * aSeed.w ) + aSeed.y * 3.0 ), 6.0 );
+        vK = uFade * inside * along * life01 * aSeed.w * ( ${DUST.base.toFixed(2)} + ${DUST.glint.toFixed(2)} * glint );
+        gl_PointSize = max( 1.0, ${DUST.size.toFixed(4)} * ( 1.0 + 0.6 * glint ) * uScale / - mv.z );
+      }`,
+    fragmentShader: `
+      uniform vec3 uColor; varying float vK;
+      void main() {
+        float r = length( gl_PointCoord - 0.5 ) * 2.0;
+        float k = vK * ( 1.0 - smoothstep( 0.2, 1.0, r ) );
+        if ( k < 0.004 ) discard;
+        gl_FragColor = vec4( mix( uColor, vec3( 1.0 ), 0.5 ) * k, 0.0 );   // ajouté : l'alpha ne change pas
+      }`,
+  });
+})();
+const dustPoints = new THREE.Points(dustGeo, dustMat);
+dustPoints.frustumCulled = false;
+dustPoints.renderOrder = 3;
+dustPoints.visible = !reduced;
+scene.add(dustPoints);
 
 // aigrettes de pissenlit : debout (le parasol vers le ciel), elles dérivent avec la brise en tournoyant
 const seeds = new Swarm({ count: 90, center: { x: 0, y: 0, z: 1.1 }, radius: 4.4, squash: 0.35, life: 260,
@@ -451,14 +483,6 @@ const UP = new THREE.Vector3(0, 1, 0);
 // pendant l'apparition : une particule encore dans le vide n'est pas dessinée
 const born_ = (p) => (voidD(p) >= 0 ? 1 : 0);
 function updateParticles(t) {
-  const pos = pollenGeo.attributes.position, al = pollenGeo.attributes.aAlpha, sz = pollenGeo.attributes.aSize;
-  for (let i = 0; i < pollen.count; i++) {
-    const s = pollen.state(i, t, _p);
-    pos.setXYZ(i, _p.x, _p.y, _p.z);
-    al.setX(i, s.alpha * born_(_p));
-    sz.setX(i, s.size);
-  }
-  pos.needsUpdate = al.needsUpdate = sz.needsUpdate = true;
   if (!seedMesh) return;
   for (let i = 0; i < seeds.count; i++) {
     const s = seeds.state(i, t, _p);
@@ -699,49 +723,136 @@ function updateEscapes(t, dt) {
 
 // ------------------------------------------------------------ rafales : l'herbe se couche, des pétales s'envolent
 // De temps en temps, une rafale traverse l'îlot dans le sens de la brise : l'herbe, les fleurs et les fougères se
-// couchent à son passage (uGust, dans le vent des matériaux), puis se relèvent. Quand le front passe sur des fleurs,
-// quelques pétales s'en détachent : ils filent dans le sens du vent en virevoltant comme des feuilles — ils montent,
-// passent pour certains devant le texte, et sortent de l'écran du côté où souffle le vent. Les couleurs des pétales
-// sont celles des fleurs de l'îlot, dans leurs proportions (sauf le blanc des marguerites : invisible sur la page).
-// [attente entre deux rafales (s), durée de la traversée (s), force (en plus du vent ordinaire), pétales par rafale,
-//  vitesse des pétales (m/s), taille d'un pétale (m), part de ceux qui passent devant le texte]
-const RAFALE = { every: [22, 38], cross: 4.2, force: 3.0, petals: [4, 6], speed: [0.9, 1.4], size: 0.08, text: 0.6 };
-const PETAL_COLORS = [['#417cff', 882], ['#a26bff', 516], ['#ffd120', 510], ['#ff6fad', 370],
-  ['#ff3d2e', 304]];                                // bleuet, lavande, bouton d'or, rose, coquelicot
+// couchent à son passage (uGust, dans le vent des matériaux), puis se relèvent. Quand le front atteint une fleur qui
+// s'effeuille, un ou deux pétales s'en détachent — de cette fleur, à sa place, du côté où souffle le vent — puis
+// filent avec le vent, passent pour certains devant le texte, et sortent de l'écran du côté où souffle le vent.
+// Chaque espèce a ses pétales, dessinés comme dans flore.py (forme, creux, courbure, dégradé), et son envol :
+//   coquelicot : grand pétale de soie, il ondule et culbute lentement, porté loin ;
+//   églantine : il se balance en feuille morte, d'un côté à l'autre, en basculant à chaque bout ;
+//   marguerite : la languette tourne vite sur sa longueur, à plat ;
+//   bouton d'or : la petite coupe brillante tourne sur elle-même, creux en bas, plus lourde, plus directe ;
+//   bleuet : le fleuron en entonnoir file en volant, le bout étroit devant, en tournant sur son axe.
+// Les autres fleurs (lavande, pissenlit, myosotis, campanule, trèfle) ne s'effeuillent pas au vent.
+// [attente entre deux rafales (s), durée de la traversée (s), force (en plus du vent ordinaire), fleurs qui
+//  s'effeuillent par rafale, part des pétales qui passent devant le texte]
+const RAFALE = { every: [22, 38], cross: 4.2, force: 3.0, flowers: [3, 5], text: 0.6 };
+// par espèce : [pétale (mesures de flore.py, × FLEUR de remplace_flore.py)], chances de s'effeuiller, pétales par
+// fleur, allure (m/s), envol (mode, balancement : amplitude m et fréquence Hz, rotation rad/s, ondulation du pétale)
+const FLEUR = 1.35;
+const PETALE = {
+  coquelicot: { p: { length: 0.08, width: 0.1, cup: 0.3, curl: 0.22, round: 1, crumple: 0.05, nu: 7, nv: 8,
+      prof: (v) => Math.sin(Math.PI * Math.min(1, 0.06 + v * 0.7)) ** 0.45,
+      stops: [[0, '#140809'], [0.17, '#240a0c'], [0.27, '#a80804'], [1, '#d4170c']] },   // tache noire à la base
+    odds: 3, count: [1, 2], speed: [0.7, 1.0], mode: 'culbute', sway: [0.16, 0.45], spin: 2.2, flap: 0.35 },
+  eglantine: { p: { length: 0.058, width: 0.062, cup: 0.3, curl: -0.15, notch: 0.55, round: 1, nu: 6, nv: 5,
+      prof: (v) => Math.sin(Math.PI * Math.min(1, 0.06 + v * 0.62)) ** 0.5,
+      stops: [[0, '#fff3e6'], [0.3, '#ffd0e0'], [0.75, '#ff7bb0'], [1, '#f2588f']] },
+    odds: 3, count: [1, 2], speed: [0.8, 1.1], mode: 'feuille', sway: [0.13, 0.7], spin: 0.6, flap: 0.12 },
+  marguerite: { p: { length: 0.072, width: 0.017, cup: 0.25, curl: -0.35, notch: 0.4, nu: 2, nv: 5,
+      prof: (v) => Math.sin(Math.PI * Math.min(1, 0.2 + v * 0.75)) ** 0.4,
+      stops: [[0, '#dfe8d2'], [0.25, '#f8f9f2'], [1, '#ffffff']] },
+    odds: 0.5, count: [1, 2], speed: [0.9, 1.3], mode: 'languette', sway: [0.05, 0.9], spin: 15, flap: 0.05 },
+  bouton_or: { p: { length: 0.04, width: 0.042, cup: 0.5, curl: 0.2, nu: 4, nv: 4, gloss: true,
+      prof: (v) => Math.sin(Math.PI * Math.min(1, 0.1 + v * 0.78)) ** 0.45,
+      stops: [[0, '#7f7a00'], [0.3, '#d8c400'], [1, '#e8d400']] },
+    odds: 1, count: [1, 1], speed: [1.1, 1.5], mode: 'toupie', sway: [0.04, 1.2], spin: 10, flap: 0.02 },
+  bleuet: { p: { length: 0.042, width: 0.026, cup: 0.7, fringe: 1, nu: 4, nv: 4,
+      prof: (v) => 0.35 + 0.65 * v ** 0.8,
+      stops: [[0, '#2a3fb8'], [0.5, '#2f63ef'], [1, '#5a8cff']] },
+    odds: 1, count: [1, 1], speed: [1.0, 1.4], mode: 'volant', sway: [0.05, 0.8], spin: 7, flap: 0.04 },
+};
 const petals = [];
-let gust = null, nextGust = Infinity, petalGeo = null;
-const _pa = new THREE.Vector3(), _pb = new THREE.Vector3();
+let gust = null, nextGust = Infinity;
+const petalGeos = {};
+const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pq2 = new THREE.Quaternion();
+const _pm = new THREE.Matrix4(), _px = new THREE.Vector3(), _py = new THREE.Vector3(), _pz = new THREE.Vector3();
+const AX_X = new THREE.Vector3(1, 0, 0), AX_Y = new THREE.Vector3(0, 1, 0), AX_Z = new THREE.Vector3(0, 0, 1);
 
-// un pétale : ovale pointu, un peu creusé en cuillère (3 × 4 sommets), long de 1
-function makePetalGeometry() {
-  const g = new THREE.PlaneGeometry(1, 1, 2, 3);
-  const p = g.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i) + 0.5;      // y : de la base (0) à la pointe (1)
-    const w = 0.62 * Math.sin(Math.PI * Math.min(1, y * 0.95 + 0.05)) ** 0.8;
-    p.setXYZ(i, x * w, y - 0.5, 0.14 * (x * w * 2) ** 2 - 0.06 * y);
+// le pétale de flore.py (Flore.petal) : il part de la base vers +y, sa face vers +z ; il se creuse en cuillère (cup),
+// se courbe (curl), sa largeur suit prof(v), sa pointe peut être échancrée (notch), frangée (fringe) ou arrondie aux
+// coins (round) ; froissé (crumple, la soie du coquelicot). Dégradé de couleur de la base à la pointe (sommets). Recentré sur son milieu : il tourne autour.
+// aUV garde (u, v) pour l'ondulation du pétale en vol.
+function makePetalGeometry({ length, width, cup = 0, curl = 0, notch = 0, fringe = 0, round = 0, crumple = 0, nu, nv, prof, stops }) {
+  const L0 = length * FLEUR, W0 = width * FLEUR;
+  const stopCols = stops.map(([t, h]) => [t, new THREE.Color(h)]);   // en linéaire, comme Col dans Blender
+  const ramp = (t, out) => {
+    for (let i = 1; i < stopCols.length; i++) {
+      const [t0, c0] = stopCols[i - 1], [t1, c1] = stopCols[i];
+      if (t <= t1) return out.copy(c0).lerp(c1, Math.min(1, Math.max(0, (t - t0) / Math.max(t1 - t0, 1e-6))));
+    }
+    return out.copy(stopCols.at(-1)[1]);
+  };
+  const pos = [], col = [], uv = [], idx = [], c = new THREE.Color();
+  for (let j = 0; j <= nv; j++) {
+    for (let i = 0; i <= nu; i++) {
+      const u = -1 + 2 * i / nu, v = j / nv;
+      const w = W0 / 2 * prof(v);
+      let L = L0 * v;
+      if (v > 0.6) {                                // la pointe : échancrure, dents, coins arrondis
+        const k = ((v - 0.6) / 0.4) ** 2;
+        L -= L0 * k * notch * (1 - u * u) * 0.35;
+        L -= L0 * k * fringe * 0.12 * (0.5 + 0.5 * Math.cos(u * Math.PI * 3));
+        L -= L0 * k * round * 0.3 * u ** 4;
+      }
+      const th = curl * v * v;
+      const cr = crumple * L0 * v * Math.sin(u * 7.1 + v * 3.3) * Math.sin(v * 9.7 - u * 2.1);
+      pos.push(u * w, L * Math.cos(th), L * Math.sin(th) + cup * w * u * u + cr);
+      ramp(v, c); col.push(c.r, c.g, c.b);
+      uv.push(u, v);
+    }
   }
-  g.computeVertexNormals();
+  for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+    const a = j * (nu + 1) + i, b = a + 1, d = a + nu + 1, e = d + 1;
+    idx.push(a, b, e, a, e, d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setIndex(idx);
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('aUV', new THREE.Float32BufferAttribute(uv, 2));
+  g.computeBoundingBox();
+  const mid = g.boundingBox.getCenter(new THREE.Vector3());
+  g.translate(-mid.x, -mid.y, -mid.z);
+  g.userData.base = new THREE.Vector3(0, -mid.y, -mid.z);   // où était la base (attache à la fleur)
+  g.userData.length = L0;
   return g;
 }
-function petalColor() {
-  let r = Math.random() * PETAL_COLORS.reduce((a, [, n]) => a + n, 0);
-  for (const [c, n] of PETAL_COLORS) if ((r -= n) <= 0) return c;
-  return PETAL_COLORS[0][0];
+
+// l'ondulation du pétale en vol : sa pointe et ses bords battent (uFlap : amplitude, phase), dans le shader
+function petalMaterial(gloss) {
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: gloss ? 0.38 : 0.62, flatShading: true,
+    side: THREE.DoubleSide, transparent: true, opacity: 1 });
+  mat.userData.flap = { value: new THREE.Vector2() };
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uFlap = mat.userData.flap;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec2 aUV;\nuniform vec2 uFlap;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        transformed.z += uFlap.x * ( aUV.y * aUV.y * sin( uFlap.y ) + 0.6 * aUV.x * aUV.x * sin( uFlap.y * 1.3 + 1.7 ) );`);
+  };
+  return mat;
 }
+
 // le sens du vent à l'instant, dans le monde (il tourne avec l'îlot)
 const windWorld = (out) => out.copy(WIND_DIR).transformDirection(island.matrixWorld).setY(0).normalize();
 
-function spawnPetal(t, local) {
-  petalGeo ??= makePetalGeometry();
-  const mat = new THREE.MeshStandardMaterial({ color: petalColor(), roughness: 0.6, side: THREE.DoubleSide,
-    transparent: true, opacity: 0, depthWrite: false });
-  const mesh = new THREE.Mesh(petalGeo, mat);
-  mesh.scale.setScalar(RAFALE.size);
+function spawnPetal(t, head, sp) {
+  const S = PETALE[sp];
+  const geo = petalGeos[sp] ??= makePetalGeometry(S.p);
+  const mat = petalMaterial(S.p.gloss);
+  const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
+  mesh.castShadow = true;
   scene.add(mesh);
-  const p0 = island.localToWorld(local.clone());
   const wind = windWorld(new THREE.Vector3());
+  // sur la fleur : le pétale du côté où souffle le vent, ouvert vers le haut, sa base au cœur
+  const heart = island.localToWorld(head.clone());
+  const out = wind.clone().applyAxisAngle(UP, rand(-0.9, 0.9));
+  _py.copy(out).multiplyScalar(Math.cos(0.4)).addScaledVector(UP, Math.sin(0.4));   // longueur : vers le dehors
+  _pz.copy(UP).multiplyScalar(Math.cos(0.4)).addScaledVector(out, -Math.sin(0.4));  // face : vers le ciel
+  _px.crossVectors(_py, _pz);
+  const q0 = new THREE.Quaternion().setFromRotationMatrix(_pm.makeBasis(_px, _py, _pz));
+  const p0 = heart.clone().sub(geo.userData.base.clone().applyQuaternion(q0));
   // il file avec le vent, en montant ; une partie passe devant le texte, à la profondeur où il se trouve à peu près
   const p1 = p0.clone().addScaledVector(wind, 1.6).add(_pa.set(0, 0.9, 0));
   const ahead = p0.clone().addScaledVector(wind, 6).project(camera), from = p0.clone().project(camera);
@@ -753,20 +864,83 @@ function spawnPetal(t, local) {
   const p2 = screenToWorld(sx, sy, depth, new THREE.Vector3());
   const p3 = screenToWorld(goRight ? 1.25 : -0.25, sy - rand(0.15, 0.4), depth * rand(0.8, 1.1), new THREE.Vector3());
   const curve = new THREE.CatmullRomCurve3([p0, p1, p2, p3], false, 'centripetal');
-  petals.push({ mesh, mat, curve, born: t, dur: curve.getLength() / rand(...RAFALE.speed),
-    spin: new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize(), rate: rand(4, 8), ph: rand(0, 6.3) });
+  petals.push({ mesh, mat, S, curve, q0, born: t, dur: curve.getLength() / rand(...S.speed),
+    side: new THREE.Vector3().crossVectors(UP, wind).normalize(), ph: rand(0, 6.3), dir: Math.random() < 0.5 ? -1 : 1,
+    axis: new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize(), q: new THREE.Quaternion() });
 }
 
+// la pose en vol, selon l'espèce ; pos : sur le tracé (déjà placé), tan : sens de la course
+function flightPose(pt, age, pos, tan, q) {
+  const S = pt.S, [A, f] = S.sway, w = Math.PI * 2 * f, a = age * w + pt.ph;
+  const sway = Math.sin(a);
+  switch (S.mode) {
+    case 'feuille': {
+      // feuille morte : il glisse d'un côté à l'autre, remonte un peu à chaque bout et y bascule ; à plat
+      pos.addScaledVector(pt.side, A * sway);
+      pos.y += 0.35 * A * Math.cos(2 * a);
+      q.setFromAxisAngle(AX_Y, age * S.spin * pt.dir);                     // il pivote doucement
+      q.premultiply(_pq.setFromAxisAngle(_pb.copy(tan).setY(0).normalize(), 0.9 * Math.cos(a)));
+      q.multiply(_pq2.setFromAxisAngle(AX_X, -Math.PI / 2));                 // face vers le ciel
+      break;
+    }
+    case 'culbute': {
+      // soie : grands balancements lents, il culbute autour d'un axe qui dérive
+      pos.addScaledVector(pt.side, A * sway);
+      pos.y += 0.5 * A * Math.sin(a * 0.7 + 1);
+      q.setFromAxisAngle(_pb.copy(pt.axis).applyAxisAngle(AX_Y, 0.4 * age), age * S.spin * pt.dir);
+      q.multiply(_pq2.setFromAxisAngle(AX_X, 0.8 * Math.sin(age * 1.7 + pt.ph)));
+      break;
+    }
+    case 'languette': {
+      // la languette tourne vite sur sa longueur, couchée en travers du vent, et vrille lentement
+      pos.addScaledVector(pt.side, A * sway);
+      _pb.copy(pt.side).applyAxisAngle(UP, 0.5 * Math.sin(age * 0.8 + pt.ph)).applyAxisAngle(tan, 0.25 * sway);
+      q.setFromUnitVectors(AX_Y, _pb);
+      q.multiply(_pq2.setFromAxisAngle(AX_Y, age * S.spin * pt.dir));
+      break;
+    }
+    case 'toupie': {
+      // la coupe tourne sur elle-même, creux en bas, en vacillant
+      pos.addScaledVector(pt.side, A * sway);
+      _pb.set(0.35 * Math.cos(a), -1, 0.35 * Math.sin(a)).normalize();       // son creux : vers le bas
+      q.setFromUnitVectors(AX_Z, _pb);
+      q.multiply(_pq2.setFromAxisAngle(AX_Z, age * S.spin * pt.dir));
+      break;
+    }
+    case 'volant': {
+      // le fleuron vole le bout étroit devant, comme un volant, et tourne sur son axe en vacillant
+      pos.addScaledVector(pt.side, A * sway);
+      _pb.copy(tan).negate().addScaledVector(pt.side, 0.3 * sway).normalize();   // la pointe (large) traîne
+      q.setFromUnitVectors(AX_Y, _pb);
+      q.multiply(_pq2.setFromAxisAngle(AX_Y, age * S.spin * pt.dir));
+      break;
+    }
+  }
+}
+
+// les fleurs qui s'effeuilleront à cette rafale, dans l'ordre où le front les atteindra
+function pickGustFlowers() {
+  const d = new THREE.Vector2(Math.cos(VENT.dir), Math.sin(VENT.dir));
+  const pool = flowerHeads.filter((h) => PETALE[h.sp]);
+  const total = pool.reduce((s, h) => s + PETALE[h.sp].odds, 0);
+  const n = Math.round(rand(RAFALE.flowers[0] - 0.49, RAFALE.flowers[1] + 0.49));
+  const out = [];
+  for (let k = 0; k < n && pool.length; k++) {
+    let r = Math.random() * total, h = pool[0];
+    for (const x of pool) if ((r -= PETALE[x.sp].odds) <= 0) { h = x; break; }
+    if (out.some((o) => o.head === h)) continue;
+    // les pétales d'une même fleur partent l'un après l'autre (le front avance de 16 m en RAFALE.cross)
+    const c = PETALE[h.sp].count, m = Math.round(rand(c[0] - 0.49, c[1] + 0.49));
+    for (let i = 0; i < m; i++)
+      out.push({ head: h, sp: h.sp, along: h.x * d.x - h.z * d.y + i * rand(0.6, 1.4) });
+  }
+  return out.sort((a, b) => a.along - b.along);
+}
+
+const DETACH = 0.45;                                 // le temps de se détacher de la fleur (s)
 function updateGusts(t) {
   if (t >= nextGust && !gust) {
-    // les pétales de cette rafale : sur des fleurs, rangés dans l'ordre où le front les atteindra
-    const n = Math.round(rand(RAFALE.petals[0] - 0.49, RAFALE.petals[1] + 0.49));
-    const d = new THREE.Vector2(Math.cos(VENT.dir), Math.sin(VENT.dir));
-    const spots = Array.from({ length: n }, () => {
-      const a = Math.random() * Math.PI * 2, r = rand(0.6, 3.6), x = Math.cos(a) * r, y = Math.sin(a) * r;
-      return { along: x * d.x + y * d.y, local: blender(x, y, GROUND_Y + rand(0.25, 0.4)) };
-    }).sort((a, b) => a.along - b.along);
-    gust = { t0: t, spots };
+    gust = { t0: t, spots: flowerHeads.length ? pickGustFlowers() : [] };
     nextGust = t + RAFALE.cross + rand(...RAFALE.every);
   }
   if (gust) {
@@ -775,21 +949,30 @@ function updateGusts(t) {
     else {
       const front = -8 + 16 * u;                    // il traverse l'îlot de part en part
       uGust.value.set(front, RAFALE.force * Math.sin(Math.PI * u) ** 0.5);
-      while (gust.spots.length && gust.spots[0].along <= front) spawnPetal(t, gust.spots.shift().local);
+      while (gust.spots.length && gust.spots[0].along <= front) {
+        const s = gust.spots.shift();
+        spawnPetal(t, s.head, s.sp);
+      }
     }
   }
   for (let i = petals.length - 1; i >= 0; i--) {
     const pt = petals[i];
     const age = t - pt.born, u = age / pt.dur;
     if (u >= 1) { scene.remove(pt.mesh); pt.mat.dispose(); petals.splice(i, 1); continue; }
-    // emporté d'un coup, puis porté ; il virevolte : il bascule sans cesse et oscille de côté, comme une feuille
-    pt.curve.getPointAt(Math.min(1, u * (1.35 - 0.35 * u)), _pa);
-    _pa.y += 0.08 * Math.sin(age * 9 + pt.ph);
-    _pa.x += 0.1 * Math.sin(age * 5.5 + pt.ph * 2);
-    pt.mesh.position.copy(_pa);
-    pt.mesh.quaternion.setFromAxisAngle(pt.spin, age * pt.rate);
-    pt.mesh.rotateX(0.9 * Math.sin(age * 7 + pt.ph));
-    pt.mat.opacity = Math.min(1, age / 0.25) * Math.min(1, (1 - u) / 0.08);
+    // emporté d'un coup, puis porté
+    const k = Math.min(1, u * (1.35 - 0.35 * u));
+    pt.curve.getPointAt(k, _pa);
+    pt.curve.getTangentAt(k, _px);
+    // le balancement et la rotation s'installent pendant qu'il se détache : au départ, il est encore sur la fleur
+    const e = Math.min(1, age / DETACH), ease = e * e * (3 - 2 * e);
+    _py.copy(_pa);
+    flightPose(pt, age, _pa, _px, pt.q);
+    pt.mesh.position.lerpVectors(_py, _pa, ease);
+    // il se soulève d'abord à sa base (il pivote autour de son attache), puis part
+    _pq.copy(pt.q0).multiply(_pq2.setFromAxisAngle(AX_X, 0.9 * Math.min(1, age / (DETACH * 0.5))));
+    pt.mesh.quaternion.slerpQuaternions(_pq, pt.q, ease);
+    pt.mat.userData.flap.value.set(pt.S.flap * pt.S.p.length * FLEUR * ease, age * (pt.S.mode === 'culbute' ? 7 : 11) + pt.ph);
+    pt.mat.opacity = Math.min(1, (1 - u) / 0.08);
   }
 }
 
@@ -1029,7 +1212,6 @@ gltfLoader.load(MODEL, (gltf) => {
   island.add(root);
   grabbable = root;
   if (!reduced) {
-    island.add(pollenPoints);
     if (seedTemplate) makeSeeds(seedTemplate);
     if (seedTemplate && desktop) escapeGeo = makeEscapeGeometry(seedTemplate);
     // les fleurs relevées dans le modèle (tetes.py), pour les abeilles
@@ -1143,10 +1325,6 @@ let vfovR = 0, frameF = FRAME.wide, baseDist = 10;
 function resize() {
   const w = host.clientWidth, h = host.clientHeight;
   renderer.setSize(w, h, false);
-  const pr = renderer.getPixelRatio();
-  dofTarget.setSize(Math.round(w * pr), Math.round(h * pr));
-  dofMat.uniforms.uRes.value.set(Math.round(w * pr), Math.round(h * pr));
-  dofMat.uniforms.uScale.value = pr * h / 900;      // les flous sont réglés pour un écran de 900 px de haut
   camera.aspect = w / h;
   camera.setFocalLength(LENS);
   vfovR = THREE.MathUtils.degToRad(camera.fov);
@@ -1154,8 +1332,8 @@ function resize() {
   // recul pour que l'îlot, quelle que soit sa rotation, occupe la largeur voulue
   frameF = camera.aspect < 1 ? FRAME.tall : FRAME.wide;
   baseDist = FIT_RADIUS / (frameF.width * Math.tan(hfov / 2));
-  // taille des points de pollen : leur diamètre réel, projeté à la hauteur de l'écran
-  pollenMat.uniforms.uScale.value = h * renderer.getPixelRatio() / (2 * Math.tan(vfovR / 2));
+  // taille des grains de poussière : leur diamètre réel, projeté à la hauteur de l'écran
+  dustMat.uniforms.uScale.value = h * renderer.getPixelRatio() / (2 * Math.tan(vfovR / 2));
   // la caméra des dioramas : en face, en légère plongée, l'îlot décalé à sa place à l'écran
   camera.position.set(0, Math.sin(DIVE) * baseDist, Math.cos(DIVE) * baseDist).add(CENTER);
   camera.lookAt(CENTER);
@@ -1240,86 +1418,6 @@ function maxTiltUp(h) {
 }
 
 
-// ------------------------------------------------------------ profondeur de champ légère
-// La scène est rendue dans une image hors écran, telle qu'elle s'affiche (mappage des tons et sRGB faits par les
-// matériaux eux-mêmes : les chunks de three sont forcés ; le pollen et le rai, qui n'en ont pas, restent tels quels),
-// avec sa profondeur. Puis un flou de mise au point la recompose : net au centre de l'îlot ; le fond à peine adouci ;
-// ce qui passe tout près de l'œil (papillons, aigrettes, pétales) franchement flou. Le flou de l'îlot ne déborde
-// jamais sur la page (son bord reste net) ; seuls les éléments tout proches y étalent un peu leur flou.
-// [flou devant (px par unité d'écart relatif), flou au fond, flou max (px), zone nette devant le centre (m), seuil (px)
-//  au-delà duquel un flou peut déborder sur la page]
-const DOF = { near: 8, far: 5, max: 12, sharp: 3.5, spill: 3 };
-const dofOn = desktop && renderer.capabilities.isWebGL2;
-if (dofOn) {
-  // (hors écran, three ne fait ni l'un ni l'autre, et n'inclut même pas ses fonctions de mappage : on les ajoute au
-  // code commun des matériaux — celles d'AgX avec notre look —, l'exposition en constante, sous un autre nom)
-  const pars = THREE.ShaderChunk.tonemapping_pars_fragment
-    .replace(/uniform float toneMappingExposure;/, `const float hsExposure = ${renderer.toneMappingExposure.toFixed(4)};`)
-    .replace(/toneMappingExposure/g, 'hsExposure')
-    .replace(/\b(\w+ToneMapping|agx\w+|RRTAndODTFit|OptimizedCineonToneMapping|CustomToneMapping|LinearToneMapping)\b/g, 'hs_$1')
-    .replace(/#ifndef saturate[\s\S]*?#endif/, '');
-  THREE.ShaderChunk.common += '\n' + pars + '\n';
-  THREE.ShaderChunk.tonemapping_fragment = 'gl_FragColor.rgb = hs_AgXToneMapping( gl_FragColor.rgb );';
-  THREE.ShaderChunk.colorspace_fragment = 'gl_FragColor = sRGBTransferOETF( gl_FragColor );';
-}
-const dofTarget = new THREE.WebGLRenderTarget(1, 1, { samples: 4, depthTexture: new THREE.DepthTexture(1, 1) });
-const dofMat = new THREE.ShaderMaterial({
-  uniforms: { tColor: { value: dofTarget.texture }, tDepth: { value: dofTarget.depthTexture }, uRes: { value: new THREE.Vector2() },
-    uNear: { value: 0.1 }, uFar: { value: 100 }, uFocus: { value: 10 }, uScale: { value: 1 } },
-  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }',
-  fragmentShader: `
-    uniform sampler2D tColor, tDepth; uniform vec2 uRes; uniform float uNear, uFar, uFocus, uScale; varying vec2 vUv;
-    float dist( vec2 uv ) {                          // distance à l'œil (m), le long de la visée
-      float d = texture2D( tDepth, uv ).x;
-      return uNear * uFar / ( uFar - d * ( uFar - uNear ) );
-    }
-    float coc( float z ) {                           // le flou (px) à cette distance
-      float n = max( 0.0, ( uFocus - ${DOF.sharp.toFixed(1)} - z ) / z ) * ${DOF.near.toFixed(1)};
-      float f = max( 0.0, ( z - uFocus ) / z ) * ${DOF.far.toFixed(1)};
-      return min( ${DOF.max.toFixed(1)}, ( n + f ) * uScale );
-    }
-    void main() {
-      vec4 c0 = texture2D( tColor, vUv );
-      float z0 = dist( vUv );
-      bool page = c0.a < 0.01;                      // la page (rien de dessiné) : elle ne prend que les flous proches
-      float k0 = page ? 0.0 : coc( z0 );
-      vec4 acc = c0; float wsum = 1.0;
-      const int N = 48;
-      for ( int i = 1; i < N; i++ ) {
-        float fi = float( i );
-        float r = ${DOF.max.toFixed(1)} * uScale * pow( fi / float( N ), 0.75 );
-        float a = fi * 2.39996;
-        vec2 o = vec2( cos( a ), sin( a ) ) * r;
-        vec2 uv = vUv + o / uRes;
-        vec4 cs = texture2D( tColor, uv );
-        float zs = dist( uv );
-        float ks = cs.a < 0.01 ? 0.0 : coc( zs );
-        // un point devant étale son propre flou ; un point derrière ne mord que dans le flou du centre
-        float reach = zs < z0 ? ks : min( ks, k0 );
-        if ( page ) reach = ks > ${DOF.spill.toFixed(1)} * uScale ? ks : 0.0;
-        float w = clamp( reach - r + 0.5, 0.0, 1.0 );
-        acc += cs * w; wsum += w;
-      }
-      gl_FragColor = acc / wsum;                     // couleurs prémultipliées : l'alpha suit
-    }`,
-  depthTest: false, depthWrite: false,
-});
-const dofScene = new THREE.Scene();
-const dofCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-dofScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), dofMat));
-const _fwd = new THREE.Vector3();
-function render() {
-  if (!dofOn) { renderer.render(scene, camera); return; }
-  renderer.setRenderTarget(dofTarget);
-  renderer.render(scene, camera);
-  renderer.setRenderTarget(null);
-  camera.getWorldDirection(_fwd);
-  dofMat.uniforms.uFocus.value = _fwd.dot(_bt.copy(CENTER).sub(camera.position));
-  dofMat.uniforms.uNear.value = camera.near;
-  dofMat.uniforms.uFar.value = camera.far;
-  renderer.render(dofScene, dofCam);
-}
-
 // ------------------------------------------------------------ boucle : à l'écran seulement
 // (et pas quand le vert du défilement couvre tout l'écran : html.flooded, posée par js/flood.js)
 let dirty = true, visible = true, animating = false, running = false;
@@ -1347,7 +1445,7 @@ function frame() {
     updateParticles(uTime.value);
   }
   if (dirty || animating || moving) {
-    render();
+    renderer.render(scene, camera);
     dirty = false;
   }
 }
