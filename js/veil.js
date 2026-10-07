@@ -83,7 +83,7 @@
       res(true);
     };
     logo.onerror = () => res(false);
-    logo.src = new URL('../images/logo-blanc.png', document.currentScript.src).href;
+    logo.src = new URL('../images/logo-blanc.webp', document.currentScript.src).href;
   });
 
   function draw(top, bot) {
