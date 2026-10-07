@@ -1,0 +1,16 @@
+# ce qui ne sert pas au site en ligne : sources Blender, outillage, documentation, restes non utilisés
+blender/
+outils/
+docs/
+README.md
+fonts/*.typeface.json
+js/about3d.js
+models/services.glb
+# les sources : le site charge leurs versions construites (*.min.js, style.min.css : outils/build.mjs)
+js/hero.js
+js/papillons.js
+js/abeilles.js
+js/veil.js
+js/i18n.js
+js/flood.js
+css/style.css
