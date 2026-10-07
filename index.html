@@ -7,22 +7,17 @@
 <!-- arrivée d'une transition : l'écran est couvert dès le premier rendu (voir js/veil.js) -->
 <!-- arrivée sur le site (pas d'une transition) : écran de chargement du site immersif, jusqu'à ce que la page soit prête -->
 <script>try { var v = sessionStorage.getItem('hs-veil'); if (document.prerendering || v) { document.documentElement.classList.add('veil-in'); sessionStorage.removeItem('hs-veil'); } else document.documentElement.classList.add('loading'); } catch (e) { document.documentElement.classList.add('loading'); }</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=28">
-<script type="importmap">
-{ "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-} }
-</script>
+<!-- chargés tout de suite : la police, le script de l'îlot et son modèle (même version que MODEL dans js/hero.js) -->
+<link rel="preload" href="fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="modulepreload" href="js/hero.min.js?v=c111605233">
+<link rel="preload" href="models/ilot.glb?v=fe77098755" as="fetch" crossorigin>
+<link rel="stylesheet" href="css/style.min.css?v=78846ded9a">
 </head>
 <body>
 
 <header class="header" id="header">
   <div class="header__bar">
-    <a href="#accueil" class="logo" aria-label="HomeService BXL, accueil" data-i18n-aria="home" aria-current="page"><img src="images/logo-blanc.png" alt="HomeService BXL" width="801" height="380"></a>
+    <a href="#accueil" class="logo" aria-label="HomeService BXL, accueil" data-i18n-aria="home" aria-current="page"><img src="images/logo-blanc.webp" alt="HomeService BXL" width="801" height="380"></a>
     <nav class="nav" aria-label="Navigation principale" data-i18n-aria="mainNav">
       <a href="#a-propos" data-i18n="nav.about">À propos</a>
       <a href="#services" data-i18n="nav.services">Services</a>
@@ -76,7 +71,7 @@
     <div class="about__inner">
       <div class="about__text"></div>
       <figure class="about__photo">
-        <img src="images/en-construction.png" alt="Site en construction" data-i18n-alt="about.photo" loading="lazy">
+        <img src="images/en-construction.webp" alt="Site en construction" data-i18n-alt="about.photo" loading="lazy">
       </figure>
     </div>
   </section>
@@ -89,9 +84,10 @@
   </div>
 </main>
 
-<script src="js/veil.js?v=28"></script>
-<script src="js/i18n.js?v=28"></script>
-<script src="js/flood.js?v=28"></script>
-<script type="module" src="js/hero.js?v=28"></script>
+<!-- fichiers construits à partir des sources (js/*.js, css/style.css) : outils/build.mjs -->
+<script src="js/veil.min.js?v=8586458b18"></script>
+<script src="js/i18n.min.js?v=45c45513cc"></script>
+<script src="js/flood.min.js?v=64ac7be3d0"></script>
+<script type="module" src="js/hero.min.js?v=c111605233"></script>
 </body>
 </html>

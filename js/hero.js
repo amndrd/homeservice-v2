@@ -19,7 +19,9 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const desktop = matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches;
 
 const PAPER = '#f7f7f5';                            // = --paper
-const MODEL = 'models/ilot.glb?v=tondeuse-1';    // la version force le rechargement quand le modèle change
+// l'adresse du modèle, avec une version tirée de son contenu (posée par outils/build.mjs) : un nouvel export est
+// toujours rechargé, l'ancien peut rester en cache
+const MODEL = __MODEL__;
 // La caméra des dioramas du site immersif : objectif 35 mm, en face du modèle, qu'elle domine de 10,6 m à 36 m de
 // distance (SVC_SHOT : recul 33, hauteur 18 ; MINI : 3 m plus loin, à 7,4 m) — une plongée de 16,4°.
 const LENS = 35;
@@ -1164,7 +1166,9 @@ function next(b) {
 }
 
 // ------------------------------------------------------------ chargement de l'îlot
-const draco = new DRACOLoader().setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs/draco/gltf/');
+// le décodeur Draco, servi par le site (outils/build.mjs), chargé tout de suite : en même temps que le modèle
+const draco = new DRACOLoader().setDecoderPath('js/draco/');
+draco.preload();
 const gltfLoader = new GLTFLoader().setDRACOLoader(draco);
 gltfLoader.load(MODEL, (gltf) => {
   const root = gltf.scene;

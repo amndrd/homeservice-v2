@@ -1,0 +1,17 @@
+{
+  "name": "homeservice-outils",
+  "private": true,
+  "description": "Construction du site : npm run modele (après un export Blender), puis npm run build — depuis ce dossier",
+  "type": "module",
+  "scripts": {
+    "modele": "node optimise_modele.mjs",
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "draco3dgltf": "^1.5.7",
+    "esbuild": "^0.25.0",
+    "three": "0.170.0"
+  }
+}
