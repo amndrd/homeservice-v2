@@ -11,7 +11,7 @@
 - **Le blanc de la page reste pur** : aucun halo ni voile sur la page. Chaque effet a été vérifié pixel par pixel au-dessus de l'îlot, avec une différence de 0.
 - **Ne pas redessiner un élément existant sans le demander** (par exemple, les aigrettes gardent le modèle de l'îlot).
 - **Commits et push** uniquement sur demande. Un push sur `main` déploie automatiquement sur https://homeservice-test.vercel.app.
-- **Refusé** : papillons qui réagissent à la souris, ombre des papillons sur le titre, allers-retours des abeilles hors de l'îlot.
+- **Refusé** : papillons qui réagissent à la souris, ombre des papillons sur le titre, allers-retours des abeilles hors de l'îlot, profondeur de champ (flou).
 
 ## Les 7 étapes
 
@@ -29,9 +29,19 @@ Les papillons projettent leur ombre sous le soleil de la scène. Elle est décou
 
 ### 3. Rafales de vent et pétales — validée
 
-Toutes les 22 à 38 s, un front de rafale traverse l'îlot dans le sens de la brise (`uGust`, dans le vent des matériaux) : l'herbe se couche, puis se relève. Quand le front passe, 4 à 6 pétales aux couleurs des fleurs s'envolent en virevoltant, passent pour certains devant le texte et sortent du côté du vent.
+Toutes les 22 à 38 s, un front de rafale traverse l'îlot dans le sens de la brise (`uGust`, dans le vent des matériaux) : l'herbe se couche, puis se relève. Quand le front atteint une fleur qui s'effeuille, un ou deux pétales s'en détachent, à sa place et du côté où souffle le vent : la base se soulève d'abord, puis le pétale part. Il passe parfois devant le texte et sort du côté du vent.
 
-- Réglages : `RAFALE`, `PETAL_COLORS`
+**Pétales par espèce** (refaits le 7 octobre, cohérents avec la flore) : chaque pétale reprend la forme de `flore.py` (mesures, creux, courbure, échancrure, franges, dégradé de couleur), et chaque espèce a son envol.
+- Coquelicot : grand pétale de soie froissé avec la tache noire à la base ; il ondule et culbute lentement.
+- Églantine : pétale en cœur, blanc à la base et rose au bord ; il se balance comme une feuille morte.
+- Marguerite : languette blanche qui tourne vite sur sa longueur (peu visible sur la page, comme la fleur).
+- Bouton d'or : petite coupe brillante qui tourne sur elle-même, creux en bas.
+- Bleuet : fleuron en entonnoir frangé qui vole comme un volant, en tournant sur son axe.
+- Lavande, pissenlit, myosotis, campanule et trèfle ne s'effeuillent pas.
+
+Pour savoir quelle fleur est où, `tetes.py` reconnaît maintenant l'espèce de chaque fleur d'après sa palette (dix espèces au lieu de six couleurs). Les abeilles restent donc fidèles à une vraie espèce.
+
+- Réglages : `RAFALE`, `PETALE` (forme, chances de s'effeuiller, nombre, allure, envol)
 
 ### Intermède : flore et buissons refaits — validé
 
@@ -55,7 +65,7 @@ Toutes les 22 à 38 s, un front de rafale traverse l'îlot dans le sens de la br
 
 **Modèle** : `js/abeilles.js`. Abeille domestique réaliste, ambre doré à bandes brun sombre, ailes claires repliées une fois posée.
 
-**Fleurs** : `blender/scripts/tetes.py` relève la place et la couleur de chaque fleur dans `Îlot · Flore` (propriété `tetes`, filtrée à l'export). Le site lit ces données.
+**Fleurs** : `blender/scripts/tetes.py` relève la place et l'espèce de chaque fleur dans `Îlot · Flore` (propriété `tetes`, filtrée à l'export). Le site lit ces données.
 
 **Comportement** : trois abeilles.
 - Elles restent fidèles à une couleur de fleur pendant leur tournée.
@@ -72,7 +82,7 @@ Toutes les 22 à 38 s, un front de rafale traverse l'îlot dans le sens de la br
 
 **Faisceau** : un cône dans l'axe du spot `Rai` de `hero.blend`, en lumière ajoutée multipliée par l'alpha de la toile, donc rien sur la page. Il est plus dense au cœur, se dissout vers le haut et se fond près du sol (pas de bord net). Une brume dérive à l'intérieur. Il se lève dès le début de l'apparition de l'îlot.
 
-**Pollen** : il brille quand il traverse le faisceau (dans `pollenMat`).
+**Poussière du rai** (7 octobre, remplace le pollen doré, jugé gênant : « des petites boules jaunes qui flottent ») : de fins grains clairs qui n'existent que dans le bas du faisceau, là où il passe devant l'îlot. Ils dérivent à peine et scintillent par éclats. Rendus comme le rai (lumière ajoutée × alpha de la toile) : rien sur la page. Réglages : `DUST`.
 
 **Réglages** : `SHAFT`
 
@@ -84,34 +94,14 @@ Toutes les 22 à 38 s, un front de rafale traverse l'îlot dans le sens de la br
 
 **Réglages** : `MIST`
 
-### 7. Profondeur de champ légère — en cours, à valider
+### 7. Profondeur de champ légère — refusée, retirée
 
-**Principe** : la scène est rendue hors écran, telle qu'elle s'affiche, avec sa profondeur. Un flou de mise au point la recompose ensuite (48 échantillons, en couleurs prémultipliées).
-- **Mise au point** sur le centre de l'îlot.
-- **Fond** à peine adouci (1 à 2 px), **avant** presque net.
-- **Éléments très proches** (papillons, aigrettes, pétales) franchement flous, jusqu'à 12 px.
-- **Le flou de l'îlot ne déborde jamais sur la page** : seuls les éléments très proches y étalent un peu de flou.
-
-**Points techniques** :
-- Hors écran, three ne fait ni le mappage des tons ni la conversion sRGB, et n'inclut pas leurs fonctions. Elles sont ajoutées au code commun des matériaux (`hs_AgXToneMapping`, avec notre look et l'exposition en constante), et les chunks `tonemapping_fragment` et `colorspace_fragment` sont forcés.
-- Le pollen et le rai, qui n'utilisent pas ces chunks, restent identiques.
-
-**Vérifié** :
-- Sans flou, l'image hors écran est identique au rendu direct.
-- La page n'est pas touchée par le flou de l'îlot.
-- Le fond est légèrement adouci, l'avant net et le bord net.
-
-**Pas encore vérifié** :
-- Le flou d'un papillon qui passe tout près de l'écran (trop lent à capturer sans carte graphique). À regarder en vrai.
-- Les performances sur une machine modeste (48 échantillons par pixel).
-
-**Réglages** : `DOF`. Pour désactiver le flou, mettre `dofOn` à faux.
+Un flou de mise au point (net au centre de l'îlot, fond adouci, éléments très proches flous) a été essayé le 6 octobre, puis retiré le 7 octobre à la demande : « je n'aime pas ». Le rendu est revenu au rendu direct de three.js, sans image hors écran. Le plan des sept étapes est donc terminé.
 
 ## Reprise
 
-1. Recharger http://localhost:8000/ (serveur sans cache). Le modèle est versionné dans `js/hero.js` (`MODEL = 'models/ilot.glb?v=…'`) : changer la version à chaque export.
-2. Valider l'étape 7 en mouvement : flou des papillons proches, intensité du flou du fond, fluidité.
-3. Ensuite, au choix : ajustements fins, ou retour aux autres sections du site, que l'utilisatrice reprend une par une (la page s'arrête pour l'instant après l'À propos).
+1. Recharger http://localhost:8000/ (serveur sans cache). Le site charge des fichiers construits : après toute modification, `cd outils && npm run build` (les versions se mettent à jour seules).
+2. Ensuite, au choix : ajustements fins, ou retour aux autres sections du site, que l'utilisatrice reprend une par une (la page s'arrête pour l'instant après l'À propos).
 
 ## Chaîne Blender (pour modifier l'îlot)
 
@@ -120,7 +110,9 @@ Toutes les 22 à 38 s, un front de rafale traverse l'îlot dans le sens de la br
 1. `plat.py`
 2. `caisse.py`
 3. `panneau.py`
+3 bis. `tondeuse.py` (la tondeuse reposée sur ses quatre roues, 7 octobre)
 4. `remplace_flore.py`
 5. `remplace_buissons.py`
 6. `tetes.py`
 7. l'export : `Blender -b copie.blend --python blender/scripts/export_web.py`
+8. l'optimisation et la construction du site : `cd outils && npm run modele && npm run build`

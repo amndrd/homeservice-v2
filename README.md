@@ -36,11 +36,15 @@ Les éléments du site immersif y sont repris un à un, adaptés à un site clas
 |---|---|
 | `index.html` | Le site entier, sur une seule page : accueil, à propos, services, fonctionnement, zone, contact, devis |
 | `a-propos.html`, `services.html`… | Anciennes adresses : elles mènent à leur section de `index.html` |
-| `css/style.css` | Navbar, voile des transitions |
+| `css/style.css` | Navbar, voile des transitions (source : le site charge `style.min.css`) |
 | `js/veil.js` | Navigation et transition entre les pages |
 | `js/i18n.js` | Langue du site |
-| `js/hero.js` | Scène 3D du hero de l'accueil |
-| `models/ilot.glb` | L'îlot exporté de Blender (Draco) |
+| `js/hero.js` | Scène 3D du hero de l'accueil (source : le site charge `hero.min.js`, avec three.js) |
+| `models/ilot.glb` | L'îlot exporté de Blender, optimisé (Draco, texture WebP) |
+| `js/draco/` | Décodeur Draco de three.js, servi par le site |
+| `fonts/manrope-*.woff2` | La police Manrope (fichiers de Google Fonts), servie par le site |
+| `outils/` | Construction : scripts minifiés, versions des fichiers, optimisation du modèle |
+| `vercel.json`, `.vercelignore` | Cache d'un an des fichiers versionnés ; ce qui n'est pas mis en ligne |
 | `js/flood.js` | Le vert du défilement, du hero à l'À propos |
 | `images/teampic.webp` | Photo de l'équipe (À propos) |
 | `blender/` | Scène du hero et scripts (îlot, objets, export web) |
@@ -51,3 +55,21 @@ Les éléments du site immersif y sont repris un à un, adaptés à un site clas
 python3 -m http.server 8000
 # puis ouvrir http://localhost:8000
 ```
+
+## Construire (après chaque modification)
+
+Le site charge des fichiers **construits** à partir des sources : `js/hero.min.js` (hero.js, papillons.js,
+abeilles.js et three.js en un seul fichier minifié), `js/*.min.js`, `css/style.min.css`. Leurs versions (`?v=…`
+dans `index.html`, et celle du modèle) sont tirées de leur contenu : un fichier modifié est rechargé par les
+navigateurs, les autres restent en cache.
+
+```bash
+cd outils
+npm install          # une fois
+npm run build        # après chaque modification d'un script ou de la feuille de style
+npm run modele       # après chaque export de l'îlot depuis Blender (puis npm run build)
+```
+
+`npm run modele` allège `models/ilot.glb` sans changer le rendu : géométrie réencodée en Draco (encodeur
+officiel, même précision), texture du sol en WebP sans perte. Il ne s'applique qu'à un export de Blender (un
+modèle déjà optimisé n'est pas retraité). Demande `cwebp` (`brew install webp`).
