@@ -7,7 +7,8 @@ _souplesse), que js/hero.js anime avec la même formule que vfx.py ; les brins g
 sommet). Les papillons partent avec leurs réglages (propriétés cx, cy, cz, rad, ph, sp : le site rejoue leurs
 pilotes), le modèle d'aigrette aussi ; le pollen et les aigrettes sont recréés sur le site (particules).
 Usage, sur une copie de hero.blend (le script modifie la scène) :
-  Blender -b copie.blend --python blender/scripts/export_web.py"""
+  Blender -b copie.blend --python blender/scripts/export_web.py
+puis, pour le site : cd outils && npm run modele && npm run build (modèle allégé, nouvelle version)"""
 import bpy, os
 import numpy as np
 
