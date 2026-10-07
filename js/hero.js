@@ -165,6 +165,7 @@ const REVEAL = { wait: 0.3, dur: 3.6, f1: 0.66, f2: 3.8, edge: 3.0, start: -1.6,
 const R0 = REVEAL.start;
 const R1 = REVEAL.rmax + 1.0;                      // fin : tout est découvert, sommets compris
 const uReveal = { value: reduced ? 1e5 : R0 };     // rayon du front (m)
+const uExit = { value: 1e5 };                       // le front du départ (au-delà de 1e4 : pas de départ)
 // bruit du bord du vide, identique à celui du site immersif et du voile des onglets
 const VD_NOISE = `
 float vdHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -218,12 +219,61 @@ function addShaft() {
 addShaft();
 
 // distance au vide (m) : > 0 découvert, < 0 encore dans le blanc. Le bruit ne fait que découvrir en avance.
-const VOID_FRAG = `
-uniform float uReveal; varying vec3 vVoidP;
+// Le même front sert au départ (uExit, plus bas : LÉVITATION) : le vide reprend l'îlot, du bord vers le centre ; il
+// ne reprend pas les objets qui s'envolent (matière marquée userData.lifter).
+const VOID_FN = `
 ${VD_NOISE}
-float voidD() {
-  float n = vdNoise(vVoidP * ${REVEAL.f1.toFixed(2)}) * 0.75 + vdNoise(vVoidP * ${REVEAL.f2.toFixed(2)}) * 0.25;
-  return uReveal - length(vVoidP.xz) - max(vVoidP.y - ${REVEAL.ground.toFixed(2)}, 0.0) / ${REVEAL.rise.toFixed(1)} + n * ${REVEAL.edge.toFixed(1)};
+float vdN(vec3 P) { return vdNoise(P * ${REVEAL.f1.toFixed(2)}) * 0.75 + vdNoise(P * ${REVEAL.f2.toFixed(2)}) * 0.25; }
+float voidAt(float R, vec3 P, float n) {
+  return R - length(P.xz) - max(P.y - ${REVEAL.ground.toFixed(2)}, 0.0) / ${REVEAL.rise.toFixed(1)} + n * ${REVEAL.edge.toFixed(1)};
+}`;
+const VOID_FRAG = `
+uniform float uReveal, uExit; varying vec3 vVoidP;
+${VOID_FN}`;
+const voidDiscard = (exit) => `
+if ( uReveal < 1e4${exit ? ' || uExit < 1e4' : ''} ) {
+  float vn = vdN(vVoidP);
+  if ( ( uReveal < 1e4 && voidAt(uReveal, vVoidP, vn) < 0.0 )${exit ? ' || ( uExit < 1e4 && voidAt(uExit, vVoidP, vn) < 0.0 )' : ''} ) discard;
+}`;
+// l'ombre du ciel sous les objets qui lévitent (plus bas : LÉVITATION). L'ombre du soleil, elle, reste celle de la
+// carte d'ombre : elle suit l'objet dans le sens de la lumière. Mais un objet cache aussi le ciel à ce qui est sous
+// lui : la lumière du ciel (seulement elle : reflectedLight.indirectDiffuse) y baisse, selon la silhouette de l'objet
+// vue de dessus (uFoot : une case par objet, dessinée au chargement), d'autant plus floue et légère que le point est
+// loin sous lui. Au repos (uLiftN = 0), rien n'est calculé.
+const MAX_LIFT = 32;
+// la silhouette des objets vus de dessus : [cases par côté, pixels par case, marge autour de l'objet (m), flou le plus
+// fort (niveau de mipmap : la marge le contient)]
+const FOOT = { grid: 6, px: 256, margin: 0.35, maxLod: 5 };
+// l'ombre du ciel : [force, distance sous l'objet où elle a perdu la moitié de sa force (m), flou (m : au contact,
+//  par m de distance), hauteur de l'objet où elle a toute sa force (m : elle naît doucement)]
+const SKY = { strength: 0.85, reach: 0.4, blur: [0.03, 0.6], born: 0.05 };
+const footRT = new THREE.WebGLRenderTarget(FOOT.grid * FOOT.px, FOOT.grid * FOOT.px, {
+  generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
+const uLift = {
+  uLiftA: { value: Array.from({ length: MAX_LIFT }, () => new THREE.Vector4()) },   // case : coin (x, z), côté (m)
+  uLiftB: { value: Array.from({ length: MAX_LIFT }, () => new THREE.Vector4()) },   // case dans uFoot (u, v), px/m, force
+  uLiftY: { value: new Float32Array(MAX_LIFT) },    // dessous de l'objet : seul ce qui est plus bas est à l'ombre
+  uLiftN: { value: 0 },
+  uFoot: { value: footRT.texture },
+};
+const LIFT_FRAG = `
+uniform vec4 uLiftA[${MAX_LIFT}]; uniform vec4 uLiftB[${MAX_LIFT}]; uniform float uLiftY[${MAX_LIFT}]; uniform int uLiftN;
+uniform sampler2D uFoot;
+float liftSky() {
+  float occ = 0.0;
+  for (int i = 0; i < ${MAX_LIFT}; i++) {
+    if (i >= uLiftN) break;
+    vec4 A = uLiftA[i], B = uLiftB[i];
+    float d = uLiftY[i] - vVoidP.y;                                   // distance sous l'objet (m)
+    if (B.w <= 0.0 || d < 0.0) continue;
+    vec2 q = vec2(vVoidP.x - A.x, A.y + A.z - vVoidP.z) / A.z;         // dans sa case (vue de dessus, nord en haut)
+    if (q.x < 0.0 || q.y < 0.0 || q.x > 1.0 || q.y > 1.0) continue;
+    float blur = ${SKY.blur[0].toFixed(3)} + ${SKY.blur[1].toFixed(3)} * d;
+    float lod = clamp(log2(max(blur * B.z, 1.0)), 0.0, ${FOOT.maxLod.toFixed(1)});
+    float s = textureLod(uFoot, B.xy + q * ${(1 / FOOT.grid).toFixed(6)}, lod).r;
+    occ = max(occ, s * B.w / (1.0 + d * d / ${(SKY.reach * SKY.reach).toFixed(4)}));
+  }
+  return 1.0 - ${SKY.strength.toFixed(3)} * occ;
 }`;
 const voidPatched = new WeakSet();
 // le vide sur un matériau : chaque fragment encore dans le blanc n'est pas dessiné. Le calcul se fait dans le repère
@@ -235,15 +285,18 @@ function voidify(m) {
   m.onBeforeCompile = (sh, r) => {
     prev.call(m, sh, r);
     sh.uniforms.uReveal = uReveal;
+    sh.uniforms.uExit = uExit;
     sh.uniforms.uIslandInv = uIslandInv;
+    Object.assign(sh.uniforms, uLift);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nuniform mat4 uIslandInv;\nvarying vec3 vVoidP;')
       .replace('#include <project_vertex>', 'vVoidP = ( uIslandInv * modelMatrix * vec4( transformed, 1.0 ) ).xyz;\n#include <project_vertex>');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\n' + VOID_FRAG)
-      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif ( uReveal < 1e4 && voidD() < 0.0 ) discard;');
+      .replace('#include <common>', '#include <common>\n' + VOID_FRAG + LIFT_FRAG)
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n' + voidDiscard(!m.userData.lifter))
+      .replace('#include <aomap_fragment>', '#include <aomap_fragment>\nif ( uLiftN > 0 ) reflectedLight.indirectDiffuse *= liftSky();');
   };
-  m.customProgramCacheKey = () => prevKey() + '|vide';
+  m.customProgramCacheKey = () => prevKey() + (m.userData.lifter ? '|vide-objet' : '|vide');
   return m;
 }
 // le même calcul, côté script (aigrettes : rien tant que l'endroit est dans le vide)
@@ -261,10 +314,11 @@ function vdNoise(x, y, z) {
            l(l(h(0, 0, 1), h(1, 0, 1), fx), l(h(0, 1, 1), h(1, 1, 1), fx), fy), fz);
 }
 function voidD(p) {
-  if (uReveal.value > 1e4) return 1;
+  if (uReveal.value > 1e4 && uExit.value > 1e4) return 1;
   const n = vdNoise(p.x * REVEAL.f1, p.y * REVEAL.f1, p.z * REVEAL.f1) * 0.75
     + vdNoise(p.x * REVEAL.f2, p.y * REVEAL.f2, p.z * REVEAL.f2) * 0.25;
-  return uReveal.value - Math.hypot(p.x, p.z) - Math.max(p.y - REVEAL.ground, 0) / REVEAL.rise + n * REVEAL.edge;
+  const d = (R) => R - Math.hypot(p.x, p.z) - Math.max(p.y - REVEAL.ground, 0) / REVEAL.rise + n * REVEAL.edge;
+  return Math.min(uReveal.value > 1e4 ? 1 : d(uReveal.value), uExit.value > 1e4 ? 1 : d(uExit.value));
 }
 
 // ------------------------------------------------------------ le sol : bord net, la page au-delà
@@ -494,6 +548,7 @@ function updateParticles(t) {
     seedAlpha.setX(i, s.alpha * born_(_p));
   }
   seedMesh.instanceMatrix.needsUpdate = true;
+  seedMesh.visible = exitK < 1;
   seedAlpha.needsUpdate = true;
 }
 
@@ -528,11 +583,13 @@ const baseView = new THREE.Matrix4();               // caméra à sa place (sans
 const _ndc = new THREE.Vector3(), _home = new THREE.Vector3(), _vel = new THREE.Vector3(), _look = new THREE.Vector3();
 const _bx = new THREE.Vector3(), _bz = new THREE.Vector3();
 let lifeAt = Infinity;                              // fin de l'apparition : les excursions peuvent commencer
+const statics = [];                                 // l'îlot sans ses objets (sol, flore…) : caché une fois reparti
 
-// un point de l'image (x, y en part de l'écran) à une profondeur donnée (m), dans le monde
-function screenToWorld(sx, sy, depth, out) {
+// un point de l'image (x, y en part de l'écran) à une profondeur donnée (m), dans le monde : vu de la caméra à sa
+// place, ou de la caméra telle qu'elle est à l'instant (`live` : ce qui doit coller à la page)
+function screenToWorld(sx, sy, depth, out, live = false) {
   _ndc.set(sx * 2 - 1, 1 - sy * 2, 0.5).applyMatrix4(camera.projectionMatrixInverse);
-  return out.copy(_ndc).multiplyScalar(depth / -_ndc.z).applyMatrix4(baseView);
+  return out.copy(_ndc).multiplyScalar(depth / -_ndc.z).applyMatrix4(live ? camera.matrixWorld : baseView);
 }
 // la boucle d'un papillon au-dessus de son coin d'herbe, dans le monde
 function homeAt(f, t, out) {
@@ -599,8 +656,529 @@ function flyStep(f, t, h) {
   f.acc.copy(_acc);
 }
 
+// ------------------------------------------------------------ le papillon guide
+// L'un des papillons de l'îlot, l'« aurore » (turquoise et rose), accompagne la lecture de la page. Ce n'est pas une
+// animation au défilement : à chaque image, il regarde ce qu'il y a à l'écran et décide. Il voit les objets qui
+// volent (il les contourne), les bords de l'écran (il y reste), la lecture de l'À propos et les endroits où il peut se
+// poser (js/apropos.js : window.hsPage). Au repos, il vit chez lui comme les autres. Quand les objets décollent, il
+// quitte son coin d'herbe et vole parmi eux ; le vide ne le reprend pas. Quand l'À propos arrive, il va droit au
+// dernier mot du texte (il l'attend au bord de l'écran tant qu'il n'y est pas) et s'y pose. À partir de l'À propos, la
+// page est son sol : il s'y pose à plat, le dos vers nous — on le voit de dessus —, ailes ouvertes qu'il referme de
+// temps en temps ; il s'y couche en douceur à l'approche, s'en relève au départ ; posé, il part avec la page quand elle
+// défile. Il repart quand son perchoir va
+// quitter l'écran, ou simplement quand il en a assez : il vole un moment dans le blanc, se pose ailleurs, revient…
+// même si la page ne bouge plus. S'il ne peut pas rattraper un perchoir (la page défile trop vite), il renonce et vole.
+// En remontant jusqu'à l'îlot, il rentre chez lui. Son vol est celui des autres (poursuite amortie, accélération et
+// vitesse bornées, vol erratique, cap à virage limité), avec un but qui change.
+// [profondeur où il vole près de la page, parmi les objets (part du recul de la caméra), vitesse max, accélération
+//  max, pulsation et amortissement de la poursuite, vol erratique (de côté, en hauteur), marge autour des objets (m)
+//  et anticipation (s), temps pour rattraper un
+//  perchoir (s), zone de l'écran où il reste (x0, y0, x1, y1), taille près de la page (×), distance où il commence
+//  à se coucher sur la page (m), temps pour s'en relever (s), hauteur de vol au-dessus de la page (m), moment où il
+//  rejoint la page (part de l'envol : début, fin)]
+const GUIDE = { species: 'aurore', depth: 0.45, among: 0.85, vmax: 2.2, accel: 6, omega: 2.2, zeta: 0.85,
+  wander: [0.7, 1.4], avoid: 0.5, ahead: 0.4, catchUp: 3, view: [0.06, 0.12, 0.94, 0.9],
+  scale: 1.15, settle: 0.5, rise: 0.45, alt: [0.35, 0.9], page: [0.03, 0.4] };
+// se poser en chemin, près de la page : [distance préférée d'un endroit où se poser (part de la hauteur de l'écran),
+//  tolérance, longueur d'une étape de vol (idem), vitesse sur la courbe d'approche et au contact (m/s), de croisière
+//  (m/s), souplesse de la poursuite (pulsation, 1/s)]
+const PATH_LAND = { reach: 0.24, spread: 0.12, hop: [0.12, 0.3], speed: 0.75, touch: 0.2, cruise: 0.85, omega: 1.5 };
+let guide = null;
+const G = { mode: 'home', target: new THREE.Vector3(), site: null, path: null, timer: 0, until: 0, since: 0, spot: null,
+  fly: null, away: null, fleeDir: new THREE.Vector3(), first: false, posture: 'open', nextAct: 0, restA: null, flick: 0,
+  step: new THREE.Vector2(), stepTo: new THREE.Vector2(),
+  spotAt: 0, last: null, sawEnd: false, wall: 0, liftoff: -9, dist: 1, flat: new THREE.Quaternion(), alt: 0.9,
+  touch: -9, clap: -9, clapAt: new THREE.Vector3() };
+const _gp = new THREE.Vector3(), _gd = new THREE.Vector3(), _ga = new THREE.Vector3(), _gq = new THREE.Quaternion();
+const _wy = new THREE.Vector3(), _wz = new THREE.Vector3(), _wx = new THREE.Vector3();
+// à plat sur la page : le dos vers la caméra, la tête vers le haut de l'écran, tournée de `angle`
+function wallQuat(pos, angle, out) {
+  _wy.subVectors(camera.position, pos).normalize();
+  _wz.setFromMatrixColumn(camera.matrixWorld, 1);
+  _wz.addScaledVector(_wy, -_wz.dot(_wy)).normalize().applyAxisAngle(_wy, angle);
+  _wx.crossVectors(_wy, _wz);
+  return out.setFromRotationMatrix(_m.makeBasis(_wx, _wy, _wz));
+}
+// 0 : parmi les objets, 1 : près de la page. Il ne rejoint la page que quand les objets s'en vont et que le texte
+// arrive (l'envol, flyK) : vu de face parmi eux, il passe peu à peu à vu de dessus en approchant du texte.
+const nearPage = () => smooth(GUIDE.page[0], GUIDE.page[1], flyK);
+// il peut se poser : il a rejoint la page, et il ne reste presque plus d'objets à l'écran (compté chaque image)
+const pageReady = () => nearPage() >= 0.99 && objectsOnScreen <= 1;
+const guideDepth = () => THREE.MathUtils.lerp(GUIDE.among, GUIDE.depth, nearPage()) * baseDist;
+const guideScale = () => THREE.MathUtils.lerp(1, GUIDE.scale, nearPage());
+// À partir de l'À propos, la page est un sol : un plan à guideDepth() de la caméra. En vol, il est au-dessus, à G.alt
+// mètres vers nous (plus haut, il paraît plus grand) ; se poser, c'est descendre jusqu'au plan.
+const airPoint = (sx, sy, out) => screenToWorld(sx, sy, guideDepth() - G.alt * nearPage(), out, true);
+// un perchoir de la page, à l'instant (ou null s'il n'existe plus)
+const perchNow = (id) => window.hsPage?.perches().find((p) => p.id === id) ?? null;
+const inView = (p) => p.y > 0.18 && p.y < 0.85 && p.x > 0.05 && p.x < 0.95;
+// Où se poser : un mot de la page, ou un point du blanc de la page (la page est un sol) ; les deux défilent avec
+// elle. Un endroit sur le blanc est retenu par sa place dans le document (docY), pas à l'écran.
+function siteAt(site) {                             // sa place à l'écran, à l'instant (null s'il n'existe plus)
+  if (site.kind === 'word') { const p = perchNow(site.id); return p && { x: p.x, y: p.yc }; }
+  return { x: site.x, y: (site.docY - window.scrollY) / window.innerHeight };
+}
+const siteWorld = (s, out) => screenToWorld(s.x, s.y, guideDepth(), out, true);   // collé à la page
+const siteOk = (s) => !!s && s.y > 0.12 && s.y < 0.9 && s.x > 0.04 && s.x < 0.96;
+// sa place et sa direction de vol à l'écran (en hauteurs d'écran, pour que les distances soient les mêmes en x et y)
+const _sa = new THREE.Vector3(), _sb = new THREE.Vector3();
+function onScreen(f) {
+  const asp = window.innerWidth / window.innerHeight;
+  _sa.copy(f.pos).project(camera);
+  _sb.copy(f.pos).addScaledVector(f.vel, 0.25).project(camera);
+  let hx = (_sb.x - _sa.x) * asp, hy = -(_sb.y - _sa.y);
+  const n = Math.hypot(hx, hy);
+  if (n < 1e-4) { hx = 0; hy = -1; } else { hx /= n; hy /= n; }
+  return { x: (_sa.x + 1) / 2, y: (1 - _sa.y) / 2, hx, hy, asp };
+}
+// un déplacement à l'écran (en hauteurs d'écran) en direction dans le monde, dans le plan de la page
+function screenDir(dx, dy, out) {
+  _wx.setFromMatrixColumn(camera.matrixWorld, 0);
+  _wz.setFromMatrixColumn(camera.matrixWorld, 1);
+  return out.copy(_wx).multiplyScalar(dx).addScaledVector(_wz, -dy).normalize();
+}
+// choisir où se poser : devant lui, à bonne distance (`reach`, en hauteurs d'écran), plutôt sur un mot, pas là où il
+// était ; un peu de hasard
+function chooseSite(f, reach) {
+  const me = onScreen(f), vh = window.innerHeight, cands = [];
+  for (const p of window.hsPage?.perches() ?? []) cands.push({ kind: 'word', id: p.id, x: p.x, y: p.yc });
+  for (let i = 0; i < 16; i++) {
+    const x = rand(0.1, 0.9), y = rand(0.22, 0.82);
+    cands.push({ kind: 'page', x, y, docY: y * vh + window.scrollY });
+  }
+  let best = null, top = 0;
+  for (const c of cands) {
+    if (!siteOk(c) || (c.kind === 'word' && c.id === G.last)) continue;
+    const dx = (c.x - me.x) * me.asp, dy = c.y - me.y, d = Math.hypot(dx, dy) || 1e-3;
+    const ahead = 0.2 + 0.8 * Math.max(0, (dx * me.hx + dy * me.hy) / d);
+    const score = Math.exp(-(((d - reach) / (0.5 * reach)) ** 2)) * ahead * ahead
+      * (c.kind === 'word' ? 1.3 : 1) * rand(0.75, 1.25);
+    if (score > top) { top = score; best = c; }
+  }
+  return best;
+}
+
+// ------------------------------------------------------------ la souris
+// Il la voit : posé, si le curseur s'approche vivement, il s'envole et s'enfuit ; en vol, il s'en écarte.
+const mouse = { x: -9, y: -9, t: -9, speed: 0 };
+window.addEventListener('pointermove', (e) => {
+  if (e.pointerType !== 'mouse') return;
+  const now = performance.now() / 1000, x = e.clientX / window.innerWidth, y = e.clientY / window.innerHeight;
+  const asp = window.innerWidth / window.innerHeight;
+  mouse.speed = Math.hypot((x - mouse.x) * asp, y - mouse.y) / Math.max(1 / 60, now - mouse.t);
+  Object.assign(mouse, { x, y, t: now });
+}, { passive: true });
+// la page qui défile : sa vitesse (écrans par seconde), lissée, et qui retombe quand on s'arrête. Posé, un
+// défilement brusque l'effraie (BEHAVE.jolt) ; une lecture tranquille, non.
+const scrolling = { y: window.scrollY, yPrev: window.scrollY, t: performance.now() / 1000, v: 0, jolt: -9, dir: 0 };
+window.addEventListener('scroll', () => {
+  const now = performance.now() / 1000, dt = Math.max(1 / 120, now - scrolling.t);
+  const v = (window.scrollY - scrolling.y) / window.innerHeight / Math.max(1 / 60, dt);
+  scrolling.v = scrolling.v * Math.exp(-dt * 20) + v * (1 - Math.exp(-dt * 20));   // lissé sur ~50 ms
+  Object.assign(scrolling, { y: window.scrollY, t: now });
+  // une secousse — un bond de la page, rapide — est retenue un instant, quelle que soit la cadence des images
+  const dy = (window.scrollY - scrolling.yPrev) / window.innerHeight;
+  if (Math.abs(dy) > 0.04 && Math.abs(v) > BEHAVE.jolt) {
+    scrolling.jolt = now; scrolling.dir = Math.sign(dy || scrolling.v);
+  }
+  scrolling.yPrev = window.scrollY;
+}, { passive: true });
+const scrollSpeed = () => scrolling.v * Math.exp(-(performance.now() / 1000 - scrolling.t) * 6);
+const jolted = () => performance.now() / 1000 - scrolling.jolt < 0.4;
+function cursorNear(me, r) {                        // le curseur, s'il a bougé il y a peu et qu'il est près de lui
+  if (performance.now() / 1000 - mouse.t > 0.6) return null;
+  const dx = (me.x - mouse.x) * me.asp, dy = me.y - mouse.y, d = Math.hypot(dx, dy);
+  return d < r ? { dx, dy, d } : null;
+}
+
+// ------------------------------------------------------------ ce qu'il fait : posé, en vol
+// Posé, il reste longtemps (comme les vrais : ils passent plus de temps posés qu'en vol), et ne reste pas figé : il
+// change de posture (ailes grandes ouvertes au soleil, en V, fermées), bat vivement des ailes un instant, pivote sur
+// place, fait quelques pas. En vol, chaque départ a son but : un saut (il se repose tout près), une patrouille (de
+// grandes boucles, plus longue), une exploration (bas, le long du texte), ou une escapade (il sort de l'écran et
+// revient par un autre bord, quelques secondes plus tard) ; jamais deux fois de suite le même, autant que possible.
+// [temps posé (s), la première fois sur le dernier mot (s), un geste toutes les… (s), postures (angle des ailes),
+//  les vols : chances, durée (s), pas (part de la hauteur de l'écran), distance où se poser (idem), hauteur (m) ;
+//  la souris : distance qui l'effraie posé, qui l'écarte en vol (part de la hauteur de l'écran), vitesse du curseur
+//  qui l'effraie (hauteurs d'écran par s), fuite : durée (s), vitesse (m/s) ; défilement qui l'effraie posé (écrans
+//  par s)]
+const BEHAVE = {
+  rest: [8, 30], first: [10, 20], act: [2.5, 7], postures: { open: 0.08, vee: 0.62, closed: 1.3 },
+  flights: {
+    hop: { w: 0.35, dur: [1.5, 4], hop: [0.07, 0.16], reach: 0.13, alt: [0.2, 0.45] },
+    patrol: { w: 0.3, dur: [6, 14], hop: [0.25, 0.45], reach: 0.3, alt: [0.5, 0.9] },
+    explore: { w: 0.2, dur: [4, 8], hop: [0.1, 0.2], reach: 0.18, alt: [0.2, 0.4] },
+    away: { w: 0.08, dur: [2, 6] },
+  },
+  startle: 0.09, shy: 0.13, scare: 0.4, flee: [2, 3.5], fleeSpeed: 1.1, jolt: 1.6,
+};
+// Les gestes (d'après les vidéos à haute vitesse d'insectes qui se posent et décollent) : à l'approche, il freine
+// presque jusqu'au surplace en se redressant, ses battements plus amples et plus vifs ; au contact, il referme les
+// ailes un instant et se tasse un peu, puis prend sa posture. Au départ, il claque les ailes au-dessus du dos et les
+// rouvre d'un coup en s'élançant (le « clap and fling » des papillons), ses premiers battements amples. Posé, ses ailes
+// frémissent à peine et son corps bouge un tout petit peu.
+// Au départ, il bat d'abord des ailes pour s'élever de la page, presque sur place (lift : il ne monte que de `climb`),
+// puis prend de la vitesse peu à peu (ramp) : jamais d'un coup.
+// [distance où il commence à se redresser (m), redressement (rad), ailes fermées au contact (s), tassement (part,
+//  durée en s), claquement (s), envol sur place (s), hauteur prise (m), mise en vitesse (s), battements vifs du
+//  départ (s), frémissement des ailes (rad), du corps (rad)]
+const GESTURE = { flare: 0.3, pitch: 0.45, shut: 0.4, squash: [0.12, 0.35], clap: 0.14, lift: 0.35, climb: 0.15,
+  ramp: 0.8, burst: 0.9, tremble: 0.035, sway: 0.03 };
+function pickFlight() {
+  const kinds = Object.keys(BEHAVE.flights).filter((k) => k !== 'away' || pageReady());
+  const w = kinds.map((k) => BEHAVE.flights[k].w * (k === G.fly ? 0.3 : 1));
+  let r = Math.random() * w.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < kinds.length; i++) if ((r -= w[i]) <= 0) return kinds[i];
+  return kinds[0];
+}
+function startFlight(t, kind) {
+  G.fly = kind;
+  G.spot = null;
+  const B = BEHAVE.flights[kind];
+  G.until = t + rand(...(B?.dur ?? BEHAVE.flee));
+  G.alt = rand(...(B?.alt ?? GUIDE.alt));
+  if (kind === 'away') {                            // par le bord le plus proche
+    const me = onScreen(guide), out = [[-0.15, me.y], [1.15, me.y], [me.x, -0.15], [me.x, 1.15]];
+    const dist = [me.x, 1 - me.x, me.y, 1 - me.y];
+    G.away = { phase: 'out', door: out[dist.indexOf(Math.min(...dist))], back: 0 };
+  }
+}
+function landOn(site, t, first = false) {
+  G.mode = 'land'; G.site = site; G.since = t; G.last = site.kind === 'word' ? site.id : null; G.first = first;
+  G.wall = rand(-0.7, 0.7);                         // l'angle où il se posera, la tête plutôt vers le haut
+  G.path = { u: 0, from: guide.pos.clone(), dir: guide.vel.lengthSq() > 1e-4 ? guide.vel.clone().normalize()
+    : new THREE.Vector3(0, 1, 0), len: 1 };
+}
+function touchDown(t) {
+  G.mode = 'perch';
+  G.touch = t;
+  G.timer = rand(...(G.first ? BEHAVE.first : BEHAVE.rest));
+  G.posture = Math.random() < 0.55 ? 'open' : Math.random() < 0.6 ? 'vee' : 'closed';
+  G.nextAct = t + rand(...BEHAVE.act);
+  G.step.set(0, 0); G.stepTo.set(0, 0); G.flick = 0;
+}
+function takeOff(t, from = null) {
+  G.mode = 'free';
+  G.site = null;
+  G.liftoff = t;                                    // il se relève de la page en quittant son perchoir
+  G.clap = t + GESTURE.clap;                        // d'abord, il claque les ailes, encore posé
+  G.clapAt.copy(guide.pos);
+  // il ne part pas lancé : ses battements le soulèvent d'abord (guideStep, GESTURE.lift)
+  _wy.subVectors(camera.position, guide.pos).normalize();
+  guide.vel.copy(_wy).multiplyScalar(0.05);
+  if (from) {                                       // effrayé : il s'en ira à l'opposé du curseur
+    startFlight(t, 'flee');
+    screenDir(from.dx, from.dy, G.fleeDir).addScaledVector(_wy, 0.3).normalize();
+  } else startFlight(t, pickFlight());
+}
+// la courbe d'approche : elle part dans sa direction de vol, et descend en arc vers son point de pose, où il arrive
+// de biais, par au-dessus (une courbe de Bézier, recalculée à chaque image : le point de pose défile avec la page)
+const _p1 = new THREE.Vector3(), _p2 = new THREE.Vector3(), _end = new THREE.Vector3();
+function approach(u, out) {
+  const L = G.path.len;
+  _p1.copy(G.path.from).addScaledVector(G.path.dir, L * 0.35);
+  camera.getWorldDirection(_gp).negate();           // au-dessus de la page : vers la caméra
+  _p2.copy(_end).addScaledVector(_gp, Math.min(0.45, L * 0.35)).lerp(G.path.from, 0.12);
+  const a = 1 - u;
+  return out.copy(G.path.from).multiplyScalar(a * a * a).addScaledVector(_p1, 3 * a * a * u)
+    .addScaledVector(_p2, 3 * a * u * u).addScaledVector(_end, u * u * u);
+}
+// posé : un geste de temps en temps
+function perchLife(t, dt, s) {
+  if (t >= G.nextAct) {
+    G.nextAct = t + rand(...BEHAVE.act);
+    const r = Math.random();
+    if (r < 0.45) {                                 // une autre posture
+      const others = Object.keys(BEHAVE.postures).filter((k) => k !== G.posture);
+      G.posture = others[(Math.random() * others.length) | 0];
+    } else if (r < 0.65) G.wall += (Math.random() < 0.5 ? -1 : 1) * rand(0.5, 1.6);   // il pivote sur place
+    else if (r < 0.85) {                            // quelques pas, droit devant lui
+      const d = rand(0.01, 0.03), a = G.wall;
+      G.stepTo.x += -Math.sin(a) * d; G.stepTo.y += -Math.cos(a) * d;
+      G.posture = G.posture === 'open' ? 'vee' : G.posture;   // il marche les ailes à demi levées
+    } else G.flick = t + 0.7;                       // un battement vif, un instant
+  }
+  G.step.lerp(G.stepTo, 1 - Math.exp(-dt * 3));     // il marche à petits pas
+  s.x += G.step.x / (window.innerWidth / window.innerHeight);
+  s.y += G.step.y;
+  // juste posé, il garde les ailes fermées un instant ; ensuite sa posture, qui frémit à peine
+  G.restA = t - G.touch < GESTURE.shut ? 1.35 : t < G.flick ? 0.1 + 0.9 * Math.abs(Math.sin(t * 15))
+    : BEHAVE.postures[G.posture] + GESTURE.tremble * (Math.sin(t * 2.3) + 0.6 * Math.sin(t * 5.7 + 1));
+}
+// ce qu'il veut, à l'instant
+function guideThink(t, dt) {
+  const P = course?.LIFT ? THREE.MathUtils.clamp(flyS / course.LIFT, 0, 1) : 0;
+  if (G.mode === 'home') {
+    if (P > 0.05) { G.mode = 'free'; startFlight(t, 'patrol'); }
+    return;
+  }
+  if (P < 0.03 && exitK === 0) { G.mode = 'home'; G.site = null; return; }   // revenu à l'îlot : il rentre
+  const reading = window.hsPage?.reading() ?? null;
+  if (G.mode === 'perch') {
+    const s = siteAt(G.site);
+    G.timer -= dt;
+    // la page part brusquement sous lui : il s'envole, effrayé (du côté où elle file, un peu de biais)
+    if (jolted() && t - G.touch > 0.5) { scrolling.jolt = -9; takeOff(t, { dx: rand(-0.6, 0.6), dy: scrolling.dir }); return; }
+    // son perchoir va quitter l'écran, ou il en a assez : il repart ; le curseur approche vivement : il s'enfuit
+    if (!s || s.y < 0.1 || s.y > 0.93 || G.timer <= 0) { takeOff(t); return; }
+    const scare = mouse.speed > BEHAVE.scare && cursorNear({ x: s.x, y: s.y, asp: window.innerWidth / window.innerHeight }, BEHAVE.startle);
+    if (scare) { takeOff(t, scare); return; }
+    perchLife(t, dt, s);
+    siteWorld(s, G.target);
+    return;
+  }
+  if (G.mode === 'land') {
+    const s = siteAt(G.site);
+    const late = t - G.since > GUIDE.catchUp + (2 * G.path.len) / PATH_LAND.touch;   // il n'y arrive pas (la page file)
+    if (!siteOk(s) || late) { G.mode = 'free'; startFlight(t, 'hop'); }
+    else {
+      siteWorld(s, _end);
+      G.path.len = Math.max(0.2, G.path.from.distanceTo(_end));
+      approach(Math.min(1, G.path.u + 0.05), G.target);   // un peu en avance sur la courbe
+      return;
+    }
+  }
+  // en vol : l'À propos est là, il va au dernier mot (une fois par passage du texte) ; s'il n'est pas encore à
+  // l'écran, il l'attend au bord, de son côté
+  const all = window.hsPage?.perches() ?? [];
+  if (!reading) G.sawEnd = false;                   // le texte reviendra : il ira de nouveau au dernier mot
+  const end = reading && !G.sawEnd && G.fly !== 'away' ? all.find((p) => p.last) : null;
+  if (end) {
+    const s = { kind: 'word', id: end.id, x: end.x, y: end.yc };
+    // il s'y pose quand les objets sont partis ; d'ici là, il l'attend en volant
+    if (pageReady() && siteOk(s) && inView(end)) { G.sawEnd = true; landOn(s, t, true); return; }
+    airPoint(THREE.MathUtils.clamp(end.x, 0.15, 0.85) + 0.03 * Math.sin(t * 0.9),
+      THREE.MathUtils.clamp(end.yc, 0.3, 0.8) + 0.03 * Math.sin(t * 1.3), G.target);
+    return;
+  }
+  const me = onScreen(guide);
+  // la fuite : à l'opposé du curseur, vite, un moment
+  if (G.fly === 'flee') {
+    if (t >= G.until) startFlight(t, pickFlight());
+    else { G.target.copy(guide.pos).addScaledVector(G.fleeDir, 2); return; }
+  }
+  // l'escapade : il sort par un bord, attend dehors, revient par un autre
+  if (G.fly === 'away') {
+    const A = G.away, outside = me.x < -0.05 || me.x > 1.05 || me.y < -0.05 || me.y > 1.05;
+    if (A.phase === 'out' && outside) {
+      A.phase = 'outside'; A.back = t + rand(...BEHAVE.flights.away.dur);
+      // il reviendra par le même bord, ailleurs : en longeant l'extérieur de l'écran, il ne le traverse pas
+      const [dx, dy] = A.door;
+      A.door = dx < 0 || dx > 1 ? [dx, rand(0.25, 0.75)] : [rand(0.2, 0.8), dy];
+    }
+    if (A.phase === 'outside' && t >= A.back) A.phase = 'in';
+    if (A.phase === 'in' && !outside && me.x > 0.1 && me.x < 0.9 && me.y > 0.15 && me.y < 0.85) {
+      startFlight(t, 'patrol'); G.until = t + rand(2, 5);   // rentré : il vole encore un peu avant de se poser
+    } else {
+      const [x, y] = A.phase === 'in' ? [0.5 + (A.door[0] - 0.5) * 0.5, 0.5 + (A.door[1] - 0.5) * 0.5] : A.door;
+      airPoint(x, y, G.target);
+      return;
+    }
+  }
+  // l'heure de se poser : sur son chemin (la page est son sol, l'îlot reparti)
+  const B = BEHAVE.flights[G.fly] ?? BEHAVE.flights.patrol;
+  if (pageReady() && t >= G.until) {
+    const site = chooseSite(guide, B.reach);
+    if (site) { landOn(site, t); return; }
+  }
+  // sinon, il vole : vers un point devant lui, un peu à gauche ou à droite de sa route (en exploration : près d'un
+  // mot, bas), changé quand il l'a atteint ou de temps en temps ; avant que l'îlot ne soit reparti : parmi les objets
+  if (!G.spot || t > G.spotAt || _gp.subVectors(G.target, guide.pos).length() < 0.3) {
+    if (!pageReady()) G.spot = [rand(0.2, 0.8), rand(0.3, 0.7)];
+    else if (G.fly === 'explore' && all.length) {
+      const p = all[(Math.random() * all.length) | 0];
+      G.spot = [THREE.MathUtils.clamp(p.x + rand(-0.06, 0.06), 0.1, 0.9), THREE.MathUtils.clamp(p.yc + rand(-0.05, 0.05), 0.2, 0.82)];
+    } else {
+      const a = Math.atan2(me.hy, me.hx) + rand(-0.9, 0.9), d = rand(...B.hop);
+      G.spot = [THREE.MathUtils.clamp(me.x + (Math.cos(a) * d) / me.asp, 0.1, 0.9),
+        THREE.MathUtils.clamp(me.y + Math.sin(a) * d, 0.2, 0.82)];
+    }
+    G.spotAt = t + rand(2, 5);
+    G.alt = rand(...(B.alt ?? GUIDE.alt));          // à une autre hauteur au-dessus de la page
+  }
+  airPoint(G.spot[0], G.spot[1], G.target);
+}
+// un pas de vol vers son but : comme flyStep, en contournant les objets et en restant à l'écran. Près de la page, il
+// vole plus lentement et plus souplement ; à l'approche, il suit sa courbe en ralentissant jusqu'au contact.
+function guideStep(f, t, h) {
+  const landing = G.mode === 'land', near = nearPage();
+  if (landing) {                                    // il avance sur sa courbe, de moins en moins vite
+    const v = THREE.MathUtils.lerp(PATH_LAND.speed, PATH_LAND.touch, smooth(0.6, 1, G.path.u));
+    G.path.u = Math.min(1, G.path.u + (v * h) / G.path.len);
+    approach(Math.min(1, G.path.u + 0.05), G.target);
+  }
+  // au départ : d'abord il s'élève de la page en battant des ailes, presque sur place
+  const since = t - G.liftoff, lifting = since < GESTURE.clap + GESTURE.lift;
+  if (lifting) {
+    camera.getWorldDirection(_gp).negate();         // au-dessus de la page : vers la caméra
+    G.target.copy(G.clapAt).addScaledVector(_gp, GESTURE.climb);
+  }
+  const dist = _gd.subVectors(G.target, f.pos).length();
+  const w = landing ? 4.5 : THREE.MathUtils.lerp(GUIDE.omega, PATH_LAND.omega, near);
+  _acc.copy(_gd).multiplyScalar(w * w).addScaledVector(f.vel, -2 * GUIDE.zeta * w);
+  // vol erratique, qui s'apaise à l'approche du perchoir
+  const k = (f.gliding ? 0.3 : 1) * (landing ? 0.25 * (1 - G.path.u) : 1), [kh, kv] = GUIDE.wander;
+  _acc.x += k * kh * (Math.sin(t * 0.7 + f.ph * 3) + 0.5 * Math.sin(t * 1.13 + f.ph));
+  _acc.z += k * kh * 0.5 * (Math.sin(t * 0.83 + f.ph * 7) + 0.5 * Math.sin(t * 1.29 + f.ph * 4));
+  _acc.y += k * kv * (Math.sin(t * 2.6 + f.ph * 5) + 0.5 * Math.sin(t * 4.3 + f.ph * 2));
+  if (f.gliding && !landing) _acc.y -= FLIGHT.sink;
+  // il contourne les objets qui volent, et s'écarte du curseur : éviter passe avant son but (qui s'efface d'autant)
+  _ga.set(0, 0, 0);
+  for (const l of lifters) {
+    if (!l.cw || !l.obj.visible) continue;
+    _gp.copy(f.pos).addScaledVector(f.vel, GUIDE.ahead).sub(l.cw);   // là où il sera dans un instant
+    const R = l.r + GUIDE.avoid, d = _gp.length();
+    if (d < R && d > 1e-4) _ga.addScaledVector(_gp, (40 * (R - d)) / d);
+  }
+  if (!landing && near > 0.5) {
+    const c = cursorNear(onScreen(f), BEHAVE.shy);
+    if (c) _ga.addScaledVector(screenDir(c.dx, c.dy, _gp), 12 * (1 - c.d / BEHAVE.shy));
+  }
+  const evade = Math.min(1, _ga.length() / GUIDE.accel);
+  if (evade > 0) _acc.multiplyScalar(1 - evade).add(_ga);
+  // il reste à l'écran (sauf en escapade) : poussé vers le milieu quand il approche d'un bord
+  if (!landing && G.fly !== 'away') {
+    _gp.copy(f.pos).project(camera);
+    const sx = (_gp.x + 1) / 2, sy = (1 - _gp.y) / 2, [x0, y0, x1, y1] = GUIDE.view;
+    const out = Math.max(x0 - sx, sx - x1, y0 - sy, sy - y1, 0);
+    if (out > 0) _acc.addScaledVector(screenToWorld(0.5, 0.5, guideDepth(), _gp).sub(f.pos), 2 + 30 * out);
+  }
+  // puis il prend de la vitesse peu à peu
+  const amax = GUIDE.accel * (1 + evade) * (since < GESTURE.ramp + GESTURE.lift ? 0.25 + 0.75 * smooth(GESTURE.lift, GESTURE.lift + GESTURE.ramp, since) : 1);
+  if (_acc.length() > amax) _acc.setLength(amax);
+  f.vel.addScaledVector(_acc, h);
+  // la vitesse : en croisière près de la page, calme ; à l'approche, celle de sa courbe ; en fuite, plus vive ; dehors,
+  // il peut se presser (on ne le voit pas)
+  const cruise = THREE.MathUtils.lerp(GUIDE.vmax, PATH_LAND.cruise, near);
+  const me = G.fly === 'away' ? onScreen(f) : null;   // dehors pour de vrai : là seulement, il peut se presser
+  const outside = !!me && G.away?.phase === 'outside' && (me.x < -0.03 || me.x > 1.03 || me.y < -0.03 || me.y > 1.03);
+  const vmax = lifting ? 0.35 : landing ? PATH_LAND.speed * 1.4 : G.fly === 'flee' ? BEHAVE.fleeSpeed
+    : outside ? GUIDE.vmax * 1.5 : cruise * (1 + 0.5 * evade);
+  const sp = f.vel.length();
+  if (sp > vmax) f.vel.multiplyScalar(vmax / sp);
+  else if (!landing && !lifting && sp < FLIGHT.vmin) f.vel.addScaledVector(f.head, FLIGHT.vmin - sp);
+  f.pos.addScaledVector(f.vel, h);
+  f.acc.copy(_acc);
+  G.dist = landing ? _gd.subVectors(_end, f.pos).length() : dist;
+  // posé : au bout de sa courbe, au contact
+  if (landing && G.path.u >= 1 && G.dist < 0.05) { touchDown(t); f.vel.set(0, 0, 0); }
+}
+// posé : à plat sur son perchoir (qui part avec la page), le dos vers nous ; il n'en bouge pas d'un pixel (sauf quand
+// il marche) ; il pivote en douceur
+function perchPose(f, dt) {
+  f.pos.copy(G.target);                             // collé à son perchoir : exactement là, à chaque image
+  f.root.position.copy(f.pos);
+  const t = uTime.value, sway = GESTURE.sway * (Math.sin(t * 0.9) + 0.5 * Math.sin(t * 2.1 + 2));   // il bouge à peine
+  f.root.quaternion.slerp(wallQuat(f.pos, G.wall + sway, _gq), 1 - Math.exp(-dt * 5));
+  G.flat.copy(f.root.quaternion);
+  // au contact, il se tasse un peu contre la page, puis se redresse (le long de son dos : vers nous)
+  const k = (t - G.touch) / GESTURE.squash[1], sc = guideScale();
+  f.root.scale.set(sc, sc * (k < 1 ? 1 - GESTURE.squash[0] * Math.sin(Math.PI * k) : 1), sc);
+  f.flap(dt, 0, 0, 1, G.restA ?? null);
+}
+
+// son ombre sur la page : à chaque image, sa silhouette vue de la lumière (ailes comprises, telles qu'elles battent)
+// est dessinée dans une petite image (shadowRT), puis posée sur la page, à l'endroit où la lumière la projette. Au
+// contact, elle est collée à lui, nette et sombre ; quand il monte, elle s'éloigne dans le sens de la lumière, grandit,
+// s'adoucit (mipmaps) et pâlit : c'est ce qui fait voir sa hauteur. La lumière vient d'en haut à gauche, du côté de
+// la caméra. [taille de l'image (px), direction de la lumière (vers la droite, vers le haut de l'écran : sa pente
+// par rapport à la page), force au contact, hauteur où elle a perdu les deux tiers de sa force (m), flou (niveaux de
+// mipmap par m), agrandissement (par m), teinte]
+const SHADOW = { px: 128, light: [-0.3, 0.38], strength: 0.4, fade: 1.1, blur: 3.5, grow: 0.3, color: [0.1, 0.11, 0.18] };
+const SHADOW_LAYER = 8, SHADOW_EYE = 2;
+const shadowRT = new THREE.WebGLRenderTarget(SHADOW.px, SHADOW.px, {
+  generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
+const shadowCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10);
+shadowCam.layers.set(SHADOW_LAYER);
+// sa silhouette : blanche, découpée comme ses ailes (leur image peinte porte leur contour dans son alpha)
+const silhouette = (map) => new THREE.ShaderMaterial({
+  side: THREE.DoubleSide, uniforms: { map: { value: map } },
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`,
+  fragmentShader: map ? `uniform sampler2D map; varying vec2 vUv;
+    void main() { if ( texture2D( map, vUv ).a < 0.5 ) discard; gl_FragColor = vec4( 1.0 ); }`
+    : `void main() { gl_FragColor = vec4( 1.0 ); }`,
+});
+const shadowQuad = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, toneMapped: false,  // derrière lui : il la recouvre (test de profondeur)
+  uniforms: { uMap: { value: shadowRT.texture }, uLod: { value: 0 }, uAlpha: { value: 0 },
+    uColor: { value: new THREE.Vector3(...SHADOW.color) } },
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`,
+  fragmentShader: `uniform sampler2D uMap; uniform float uLod, uAlpha; uniform vec3 uColor; varying vec2 vUv;
+    void main() { float a = textureLod( uMap, vUv, uLod ).r * uAlpha; if ( a < 0.002 ) discard; gl_FragColor = vec4( uColor * a, a ); }`,
+}));
+shadowQuad.frustumCulled = false;
+shadowQuad.renderOrder = 5;
+shadowQuad.visible = false;
+scene.add(shadowQuad);
+const _sn = new THREE.Vector3(), _su = new THREE.Vector3(), _sr = new THREE.Vector3(), _sl = new THREE.Vector3();
+const _shear = new THREE.Matrix4();
+function updateGuideShadow() {
+  const on = !!guide && G.mode !== 'home' && nearPage() > 0.05;
+  shadowQuad.visible = on;
+  if (!on) return;
+  if (!guide.sil) {                                 // une fois : ses pièces dans le calque de l'ombre, leur silhouette
+    guide.sil = [];
+    guide.root.traverse((c) => {
+      if (!c.isMesh) return;
+      c.layers.enable(SHADOW_LAYER);
+      guide.sil.push([c, silhouette(c.material.map ?? null)]);
+    });
+  }
+  const p = guide.pos;
+  camera.getWorldDirection(_sn).negate();           // la normale de la page : vers la caméra
+  _su.setFromMatrixColumn(camera.matrixWorld, 1);   // le haut et la droite de l'écran
+  _sr.setFromMatrixColumn(camera.matrixWorld, 0);
+  _sl.copy(_sn).addScaledVector(_sr, SHADOW.light[0]).addScaledVector(_su, SHADOW.light[1]).normalize();   // vers la lumière
+  // sa hauteur au-dessus de la page, et son ombre : sur la page, à l'opposé de la lumière
+  const h = Math.max(0, guideDepth() - _gp.subVectors(p, camera.position).dot(_sn.clone().negate()));
+  shadowQuad.position.copy(p).addScaledVector(_sl, -h / _sl.dot(_sn)).addScaledVector(_sn, -0.03);   // un rien sous lui
+  // sa silhouette projetée sur la page, dans l'image de l'ombre : vue d'en face (dans le plan de la page), chaque
+  // point décalé dans le sens de la lumière selon sa hauteur au-dessus de lui (projection oblique : un cisaillement)
+  const e = BUTTERFLY.span * guideScale() * 0.75;
+  Object.assign(shadowCam, { left: -e, right: e, top: e, bottom: -e });
+  shadowCam.updateProjectionMatrix();
+  const ln = _sl.dot(_sn);
+  // (la hauteur se compte depuis le papillon, à SHADOW_EYE m devant la caméra de l'ombre)
+  const cx = _sl.dot(_sr) / -ln, cy = _sl.dot(_su) / -ln;
+  _shear.set(1, 0, cx, cx * SHADOW_EYE, 0, 1, cy, cy * SHADOW_EYE, 0, 0, 1, 0, 0, 0, 0, 1);
+  shadowCam.projectionMatrix.multiply(_shear);
+  shadowCam.projectionMatrixInverse.copy(shadowCam.projectionMatrix).invert();
+  shadowCam.position.copy(p).addScaledVector(_sn, SHADOW_EYE);
+  shadowCam.up.copy(_su);
+  shadowCam.lookAt(p);
+  shadowCam.updateMatrixWorld();
+  const clear = renderer.getClearColor(new THREE.Color()), clearA = renderer.getClearAlpha();
+  const autoShadow = renderer.shadowMap.autoUpdate;
+  renderer.shadowMap.autoUpdate = false;
+  for (const it of guide.sil) { const [c, m] = it; it[2] = c.material; c.material = m; }
+  renderer.setRenderTarget(shadowRT);
+  renderer.setClearColor(0x000000, 1);
+  renderer.clear();
+  renderer.render(scene, shadowCam);
+  for (const [c, , m] of guide.sil) c.material = m;
+  renderer.setRenderTarget(null);
+  renderer.setClearColor(clear, clearA);
+  renderer.shadowMap.autoUpdate = autoShadow;
+  // posée à plat sur la page, plus grande, plus floue et plus pâle quand il est haut
+  shadowQuad.quaternion.setFromRotationMatrix(_m.makeBasis(_sr, _su, _sn));
+  shadowQuad.scale.setScalar(2 * e * (1 + SHADOW.grow * h));
+  shadowQuad.material.uniforms.uLod.value = Math.min(5, h * SHADOW.blur);
+  shadowQuad.material.uniforms.uAlpha.value = SHADOW.strength * Math.exp(-h / SHADOW.fade) * nearPage();
+}
+
 function updateButterflies(t, dt) {
   for (const f of flyers) {
+    // le vide a repris l'îlot : seuls le guide reste
+    if (f !== guide) { f.root.visible = exitK < 1; if (!f.root.visible) continue; }
+    if (f === guide) guideThink(t, dt);             // il décide, même chez lui (quand partir)
+    const guided = f === guide && G.mode !== 'home';
+    if (guided && G.mode === 'perch') { perchPose(f, dt); continue; }
+    if (guided && t < G.clap) {                     // le claquement : encore posé, ailes refermées d'un coup
+      f.pos.copy(G.clapAt);
+      f.root.position.copy(f.pos);
+      f.flap(dt, 0, 0, 1, 1.5, true);
+      continue;
+    }
     if (!f.started) {                               // premier pas : il part de sa boucle, déjà lancé
       homeAt(f, t, f.pos);
       homeAt(f, t + 0.1, _tgt);
@@ -608,7 +1186,11 @@ function updateButterflies(t, dt) {
       f.started = true;
     }
     const n = Math.max(1, Math.ceil(dt / 0.02));    // pas fixes : le même vol quelle que soit la cadence
-    for (let i = 0; i < n; i++) flyStep(f, t - dt + ((i + 1) * dt) / n, dt / n);
+    for (let i = 0; i < n; i++) {
+      const ti = t - dt + ((i + 1) * dt) / n;
+      if (guided) { f.u = null; guideStep(f, ti, dt / n); if (G.mode === 'perch') break; } else flyStep(f, ti, dt / n);
+    }
+    if (guided && G.mode === 'perch') { perchPose(f, dt); continue; }
     // le cap : vers sa vitesse à l'horizontale, en tournant à vitesse limitée
     _hv.set(f.vel.x, 0, f.vel.z);
     const yawWanted = _hv.lengthSq() > 1e-6 ? Math.atan2(_hv.x, _hv.z) : f.yaw;
@@ -628,7 +1210,8 @@ function updateButterflies(t, dt) {
       f.gliding = true;
       f.timer = rand(...FLIGHT.glide);
     }
-    const effort = THREE.MathUtils.clamp(0.35 + f.vel.y * 0.8 + Math.abs(yawRate) * 0.15, 0, 1);
+    let effort = THREE.MathUtils.clamp(0.35 + f.vel.y * 0.8 + Math.abs(yawRate) * 0.15, 0, 1);
+    if (guided && t - G.liftoff < GESTURE.burst) effort = 1;   // ses premiers battements, amples et vifs
     // penché dans les virages (accélération de côté), cabré un peu, plus en montée
     const side = f.acc.x * f.head.z - f.acc.z * f.head.x;
     f.bank += (THREE.MathUtils.clamp(-side * 0.1, -0.55, 0.55) - f.bank) * (1 - Math.exp(-dt * 5));
@@ -640,7 +1223,8 @@ function updateButterflies(t, dt) {
     f.root.rotateX(-f.pitch);
     f.root.rotateZ(f.bank);
     // en excursion, il se penche vers l'écran : on voit le dessus de ses ailes, pas sa tranche
-    const show = f.u === null ? 0 : Math.sin(Math.PI * f.u) * 0.9;
+    // le guide près de la page : on le voit plutôt de dessus, comme posé
+    const show = guided ? 0.8 * nearPage() : f.u === null ? 0 : Math.sin(Math.PI * f.u) * 0.9;
     if (show > 0) {
       _look.subVectors(camera.position, f.pos).normalize();
       _m.makeRotationFromQuaternion(f.root.quaternion);
@@ -649,6 +1233,17 @@ function updateButterflies(t, dt) {
       f.root.rotateZ(-show * _look.dot(_bx));
       f.root.rotateX(show * _look.dot(_bz));
     }
+    if (guided && G.mode === 'land') {               // à l'approche, il se couche peu à peu sur la page
+      f.root.quaternion.slerp(wallQuat(f.pos, G.wall, _gq), smooth(0, 1, 1 - G.dist / GUIDE.settle));
+      // il freine en se redressant (la tête vers nous), en battant plus fort ; au contact, il se remet à plat
+      const fl = smooth(0, 1, 1 - G.dist / GESTURE.flare) * (1 - smooth(0.9, 1, G.path.u));
+      f.root.rotateX(-GESTURE.pitch * fl);
+      effort = Math.max(effort, 0.6 + 0.4 * fl);
+      f.gliding = false;
+    } else if (guided && t - G.liftoff < GUIDE.rise) {   // au départ, il s'en relève
+      f.root.quaternion.slerp(G.flat, 1 - smooth(0, 1, (t - G.liftoff) / GUIDE.rise));
+    }
+    if (f === guide) f.root.scale.setScalar(guided ? guideScale() : 1);
     f.flap(dt, f.gliding ? 1 : 0, effort);
   }
 }
@@ -698,7 +1293,7 @@ function spawnEscape(t) {
 }
 
 function updateEscapes(t, dt) {
-  if (t >= nextEscape) {
+  if (t >= nextEscape && uExit.value > 1e4) {
     const n = Math.round(rand(ESCAPE.count[0] - 0.49, ESCAPE.count[1] + 0.49));
     for (let i = 0; i < n; i++) setTimeout(() => spawnEscape(uTime.value), i * rand(400, 1500));
     nextEscape = t + rand(...ESCAPE.every);
@@ -941,7 +1536,7 @@ function pickGustFlowers() {
 
 const DETACH = 0.45;                                 // le temps de se détacher de la fleur (s)
 function updateGusts(t) {
-  if (t >= nextGust && !gust) {
+  if (t >= nextGust && !gust && uExit.value > 1e4) {
     gust = { t0: t, spots: flowerHeads.length ? pickGustFlowers() : [] };
     nextGust = t + RAFALE.cross + rand(...RAFALE.every);
   }
@@ -1070,7 +1665,7 @@ function go(b, flower) {
 function makeBees() {
   const sps = [...new Set(flowerHeads.map((h) => h.sp))];
   for (let i = 0; i < BEE.count; i++) {
-    const m = makeBee(BEE.length);
+    const m = makeBee(BEE.length, voidify);        // elles retournent au vide avec l'îlot
     m.root.visible = false;
     island.add(m.root);
     const b = { ...m, pos: new THREE.Vector3(), vel: new THREE.Vector3(), yaw: Math.random() * 6.3, ph: rand(0, 6.3),
@@ -1113,7 +1708,7 @@ function steer(b, t, dt, speed) {
 }
 
 function updateBees(t, dt) {
-  const on = t > lifeAt;
+  const on = t > lifeAt && exitK < 1;             // reparties avec l'îlot
   for (const b of bees) {
     if (!on) { b.root.visible = false; continue; }
     b.timer -= dt;
@@ -1165,6 +1760,458 @@ function next(b) {
   go(b, n || newPatch(b, b.pos));
 }
 
+// ------------------------------------------------------------ LÉVITATION des objets, au défilement
+// Au début de la course (js/apropos.js : LIFT écrans), les objets des services quittent le sol d'eux-mêmes, l'un
+// après l'autre : les légers d'abord, les lourds ensuite (rang selon leur volume). Chacun fait un seul trajet, de sa
+// place au sol jusqu'au-dessus de l'écran : il monte, s'écarte un peu vers l'extérieur de l'îlot et tourne lentement
+// sur lui-même, sur un axe qui lui est propre — sa rotation ne prend de l'ampleur qu'à mesure qu'il s'élève : il ne
+// touche jamais le sol en tournant —, puis il poursuit dans la même direction en prenant de la vitesse, et sort par le
+// haut pendant que l'À propos arrive (les plus proches de la caméra vont plus loin, plus vite). Le trajet ralentit un
+// peu, sans s'arrêter, le temps que le vide reprenne l'îlot (PATH). Par-dessus, chacun se balance doucement à son
+// rythme (le temps), même quand on ne défile plus. Ce qui est posé sur un autre (l'éponge sur son
+// carton…) part avant son porteur. Les places en l'air sont écartées pour que deux objets ne se touchent pas
+// (sphères qui se repoussent). Son ombre de soleil le suit dans le sens de la lumière (la carte d'ombre, telle
+// quelle) ; sous lui, l'ombre du ciel prend la forme de sa silhouette, floue et légère à mesure qu'il s'éloigne (uLift,
+// liftSky, plus haut). Pendant ce temps, le vide reprend l'îlot et le titre (EXIT). De la terre tombe de la brouette ; quelques brins d'herbe restent accrochés sous les objets,
+// certains se décrochent et tombent ; des pétales et des aigrettes montent avec eux (RISE). Tout se rejoue à l'envers
+// en remontant (la terre et les brins tombés s'enfoncent dans l'herbe ; revenus au sol, les objets les retrouvent).
+// Sur ordinateur seulement, sans mouvement réduit (ailleurs, la course n'a pas de lévitation : js/apropos.js).
+// [hauteur de base (m : le plus léger, le plus lourd), écart de hauteur (m), penché (rad), ce qu'un objet porté a en
+//  plus (m), amorti du défilement (1/s)]
+const LIFT = { height: [0.55, 0.3], vary: 0.05, tilt: [0.03, 0.07], carry: 0.09, ease: 5 };
+// le trajet, sur toute la course (lévitation + envol, de 0 à 1) : [départ du plus lourd, durée d'un trajet (parts de
+// la course) ; part du trajet où il atteint sa place en l'air, où il commence à prendre de la vitesse ; distance de la
+// fin du trajet (m) ; allure pendant que le vide reprend l'îlot (part de l'allure ordinaire)]
+const PATH = { spread: 0.2, dur: 0.8, hover: 0.45, away: 0.4, dist: [12, 18], slow: 0.45 };
+// [hauteur en plus de la base (m), écart vers l'extérieur (m), rotation (rad), balancement (m) et sa période (s),
+//  oscillation (rad), écart gardé entre deux objets (m), plus loin du centre (m), marge au sol en tournant (m)]
+const HOVER = { rise: [0.2, 1.25], spread: [0.15, 0.6], turn: [0.45, 1.2], bob: 0.045, period: [3.4, 5.8], sway: 0.07,
+  gap: 0.1, reach: 6, clear: 0.03 };
+// Une fois les objets en l'air, dans le désordre, le vide reprend l'îlot : l'apparition à l'envers (même bruit, même
+// bord net), du bord vers le centre ; le titre, au fond de l'îlot et plus haut, s'en va le premier (textVoid, plus
+// bas). Les objets restent : ils flottent dans le blanc. [début et fin (part de la lévitation), rayon du front au
+// départ (m : tout est encore là, titre compris) et à la fin (m : plus rien)]
+const EXIT = { span: [0.4, 0.97], from: 14, to: REVEAL.start - REVEAL.edge };
+let exitK = 0;                                      // la part du départ (0 → 1), pour le rai et le titre
+let objectsOnScreen = 0;                            // les objets encore visibles (le guide attend qu'ils soient partis)
+// pétales et aigrettes qui montent : [par seconde au plus fort, au plus en même temps, durée de vie (s), vitesse de
+//  montée (m/s), part de pétales (le reste : aigrettes), taille d'une aigrette (m)]
+const RISE = { rate: 6, max: 40, life: [4, 6.5], speed: [0.16, 0.32], petals: 0.6, seed: 0.1 };
+const risers = [];
+let riseAcc = 0;
+// la terre de la brouette : [mottes, taille (m), moments où elles partent (part du décollage), dispersion (m/s),
+//  temps pour s'enfoncer dans l'herbe (s)]
+const CRUMBS = { count: 18, size: [0.022, 0.045], at: [0.06, 0.75], spread: 0.18, sink: 1.4 };
+// les brins accrochés : [par objet, longueur (m), part qui se décroche, moment où ils se décrochent (part du
+//  décollage), vitesse de chute (m/s), temps pour s'enfoncer (s)]
+const BLADES = { per: [2, 4], length: [0.05, 0.13], drop: 0.45, at: [0.5, 1.0], fall: 0.45, sink: 1.6 };
+const GRAVITY = 9.8;
+const lifters = [];                                 // les objets, dans l'ordre : porteurs d'abord
+const crumbs = [], blades = [];
+let liftRoot = null;
+const easeLift = (u) => u * u * (3 - 2 * u);
+const _lp = new THREE.Vector3(), _lq = new THREE.Quaternion(), _lq2 = new THREE.Quaternion(), _lc = new THREE.Vector3();
+const FOOT_LAYER = 7;
+
+// la silhouette de chaque objet vu de dessus, blanche sur noir, dans sa case de uFoot (caméra orthogonale dans le
+// repère de l'îlot, tournée vers le bas, nord en haut) ; les mipmaps donnent ses versions floues
+function drawFootprints(root) {
+  const cam = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.01, 50);
+  cam.rotation.set(-Math.PI / 2, 0, 0);             // regarde vers le bas, le haut de l'image vers −z
+  cam.layers.set(FOOT_LAYER);
+  root.add(cam);
+  const white = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, fog: false, toneMapped: false });
+  const clear = renderer.getClearColor(new THREE.Color()), clearA = renderer.getClearAlpha();
+  const shadows = renderer.shadowMap.autoUpdate;
+  renderer.shadowMap.autoUpdate = false;            // la carte d'ombre n'a pas à être refaite pour ces dessins
+  scene.overrideMaterial = white;
+  renderer.setRenderTarget(footRT);
+  renderer.setClearColor(0x000000, 1);
+  footRT.scissorTest = false;
+  renderer.clear();
+  footRT.scissorTest = true;
+  lifters.forEach((l, i) => {
+    const gx = i % FOOT.grid, gy = Math.floor(i / FOOT.grid), b = l.box;
+    const side = Math.max(b.max.x - b.min.x, b.max.z - b.min.z) + 2 * FOOT.margin;
+    const cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
+    l.foot = { x0: cx - side / 2, z0: cz - side / 2, side, u: gx / FOOT.grid, v: gy / FOOT.grid };
+    footRT.viewport.set(gx * FOOT.px, gy * FOOT.px, FOOT.px, FOOT.px);
+    footRT.scissor.copy(footRT.viewport);
+    renderer.setRenderTarget(footRT);               // three ne lit la case qu'ici
+    Object.assign(cam, { left: -side / 2, right: side / 2, top: side / 2, bottom: -side / 2, far: b.max.y - b.min.y + 2 });
+    cam.position.set(cx, b.max.y + 1, cz);
+    cam.updateProjectionMatrix();
+    cam.updateMatrixWorld();
+    l.obj.traverse((m) => m.layers.enable(FOOT_LAYER));
+    renderer.render(scene, cam);
+    l.obj.traverse((m) => m.layers.disable(FOOT_LAYER));
+  });
+  footRT.scissorTest = false;
+  scene.overrideMaterial = null;
+  renderer.setRenderTarget(null);
+  renderer.setClearColor(clear, clearA);
+  renderer.shadowMap.autoUpdate = shadows;
+  root.remove(cam);
+}
+
+// un brin d'herbe qui pend : bande effilée, un peu courbée, de sa racine (en haut, à l'origine) vers le bas
+function bladeGeometry(len, color) {
+  const seg = 5, pos = [], col = [], idx = [];
+  const tip = color.clone().offsetHSL(0, 0, 0.08);
+  for (let i = 0; i <= seg; i++) {
+    const s = i / seg, w = 0.0045 * (1 - s) + 0.0006;
+    const y = -len * s, x = 0.3 * len * s * s;
+    pos.push(x - w, y, 0, x + w, y, 0);
+    const c = color.clone().lerp(tip, s);
+    col.push(c.r, c.g, c.b, c.r, c.g, c.b);
+    if (i < seg) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+function makeLevitation(root, floraMesh) {
+  liftRoot = root;
+  const depthLift = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+  depthLift.userData.lifter = true;
+  voidify(depthLift);
+  root.updateMatrixWorld(true);
+  const toRoot = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  for (const obj of root.children.filter((o) => o.userData.service)) {
+    // ses points, dans le repère de l'îlot et dans le sien
+    const box = new THREE.Box3(), pts = [];
+    const toObj = new THREE.Matrix4().copy(obj.matrixWorld).invert();
+    obj.traverse((m) => {
+      if (!m.isMesh) return;
+      const a = new THREE.Matrix4().multiplyMatrices(toRoot, m.matrixWorld);
+      const b = new THREE.Matrix4().multiplyMatrices(toObj, m.matrixWorld);
+      const pos = m.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        _lp.fromBufferAttribute(pos, i);
+        const p = _lp.clone().applyMatrix4(a);
+        box.expandByPoint(p);
+        pts.push({ p, local: _lp.clone().applyMatrix4(b), mesh: m });
+      }
+    });
+    // ses matières (et sa carte d'ombre) ne sont pas reprises par le vide du départ : il s'envole
+    obj.traverse((m) => { if (m.isMesh) { m.material.userData.lifter = true; m.customDepthMaterial = depthLift; } });
+    const size = box.getSize(new THREE.Vector3());
+    lifters.push({ obj, pts, box, carrier: null, carries: false,
+      pos0: obj.position.clone(), q0: obj.quaternion.clone(), center: box.getCenter(new THREE.Vector3()),
+      vol: size.x * size.y * size.z, u: 0, y: 0, rest: true });
+  }
+  // qui est posé sur qui : le dessous de l'un sur le dessus de l'autre, son centre au-dessus de lui
+  for (const a of lifters) {
+    for (const b of lifters) {
+      if (a === b || a.box.min.y < b.box.min.y + 0.05) continue;
+      const gap = a.box.min.y - b.box.max.y;
+      if (gap > -0.1 && gap < 0.05 && a.center.x > b.box.min.x && a.center.x < b.box.max.x
+        && a.center.z > b.box.min.z && a.center.z < b.box.max.z) { a.carrier = b; b.carries = true; break; }
+    }
+  }
+  // l'ordre de départ : les légers d'abord
+  const free = lifters.filter((l) => !l.carrier).sort((a, b) => a.vol - b.vol);
+  free.forEach((l, i) => {
+    l.rank = free.length > 1 ? i / (free.length - 1) : 0;
+    l.start = PATH.spread * l.rank;
+    l.h = THREE.MathUtils.lerp(LIFT.height[0], LIFT.height[1], l.rank) + rand(-LIFT.vary, LIFT.vary);
+    const a = rand(0, Math.PI * 2);
+    l.axis = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+    l.tilt = l.carries ? 0 : rand(...LIFT.tilt);   // un porteur reste droit : ce qu'il porte ne le traverse pas
+  });
+  for (const l of lifters.filter((x) => x.carrier)) {
+    // il part avant son porteur, de sa place sur lui
+    Object.assign(l, { rank: l.carrier.rank, start: Math.max(0, l.carrier.start - 0.05), h: l.carrier.h + LIFT.carry,
+      axis: l.carrier.axis, tilt: 0 });
+  }
+  makeHover();
+  lifters.sort((a, b) => (a.carrier ? 1 : 0) - (b.carrier ? 1 : 0));
+  drawFootprints(root);
+
+  // la terre de la brouette : des mottes partent du bord de son chargement
+  const barrow = lifters.find((l) => /^Brouette/.test(l.obj.name));
+  const soil = barrow?.pts.filter((q) => /^(Terreau|Terre claire)/.test(q.mesh.material?.name || ''));
+  if (soil?.length) {
+    const top = Math.max(...soil.map((q) => q.p.y));
+    const surf = soil.filter((q) => q.p.y > top - 0.05);
+    const cx = surf.reduce((a, q) => a + q.p.x, 0) / surf.length, cz = surf.reduce((a, q) => a + q.p.z, 0) / surf.length;
+    surf.sort((a, b) => Math.hypot(b.p.x - cx, b.p.z - cz) - Math.hypot(a.p.x - cx, a.p.z - cz));
+    const rim = surf.slice(0, Math.max(1, Math.round(surf.length * 0.4)));
+    const geo = new THREE.IcosahedronGeometry(1, 0);
+    const soilMats = new Map();                     // la terre tombée retourne au vide avec l'îlot
+    const ats = Array.from({ length: CRUMBS.count }, () => rand(...CRUMBS.at)).sort((a, b) => a - b);
+    for (const at of ats) {
+      const q = rim[(Math.random() * rim.length) | 0];
+      if (!soilMats.has(q.mesh.material)) {
+        const c = q.mesh.material.clone();
+        c.userData = {};
+        soilMats.set(q.mesh.material, voidify(c));
+      }
+      const mesh = new THREE.Mesh(geo, soilMats.get(q.mesh.material));
+      mesh.visible = false;
+      root.add(mesh);
+      crumbs.push({ mesh, at, local: q.local, r: rand(...CRUMBS.size), state: 0, vel: new THREE.Vector3(), t0: 0,
+        spin: new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize(), turn: rand(4, 9), owner: barrow });
+    }
+  }
+
+  // les brins accrochés sous les objets posés dans l'herbe
+  const greens = [];
+  const col = floraMesh?.geometry.attributes.color;
+  if (col) {
+    const c = new THREE.Color();
+    for (let k = 0; k < 4000 && greens.length < 40; k++) {
+      c.fromBufferAttribute(col, (Math.random() * col.count) | 0);
+      if (c.g > c.r * 1.25 && c.g > c.b * 1.6) greens.push(c.clone());
+    }
+  }
+  if (!greens.length) return;
+  const bladeMat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide,
+    roughness: floraMesh.material.roughness ?? 0.8, metalness: 0 });
+  bladeMat.userData.lifter = true;                  // accrochés aux objets : ils restent avec eux
+  voidify(bladeMat);
+  for (const l of lifters) {
+    if (l.carrier || l.box.min.y > GROUND_Y + 0.06) continue;
+    const low = l.pts.filter((q) => q.p.y < l.box.min.y + 0.012);
+    if (!low.length) continue;
+    const n = Math.round(rand(...BLADES.per));
+    for (let i = 0; i < n; i++) {
+      const q = low[(Math.random() * low.length) | 0];
+      const len = rand(...BLADES.length);
+      const mesh = new THREE.Mesh(bladeGeometry(len, greens[(Math.random() * greens.length) | 0]), bladeMat);
+      // il pend vers le bas de l'îlot, tourné au hasard autour de la verticale
+      const hang = new THREE.Quaternion().copy(l.q0).invert()
+        .multiply(new THREE.Quaternion().setFromAxisAngle(UP, rand(0, Math.PI * 2)));
+      mesh.position.copy(q.local);
+      mesh.quaternion.copy(hang);
+      mesh.visible = false;
+      l.obj.add(mesh);
+      blades.push({ mesh, owner: l, local: q.local.clone(), hang, len, state: 0, t0: 0, sway: rand(1.6, 2.8),
+        ph: rand(0, 6.3), drop: Math.random() < BLADES.drop ? rand(...BLADES.at) : Infinity,
+        vel: new THREE.Vector3() });
+    }
+  }
+}
+
+// en l'air : la place de chacun (écartée des autres), son axe de rotation, son rythme
+function makeHover() {
+  for (const l of lifters) {
+    const size = l.box.getSize(new THREE.Vector3());
+    l.r = size.length() * 0.42;                     // sa sphère (un peu moins que la demi-diagonale)
+    l.half = l.center.y - l.box.min.y;
+    const out = new THREE.Vector3(l.center.x, 0, l.center.z);
+    if (out.lengthSq() < 0.04) out.set(Math.cos(rand(0, 6.3)), 0, Math.sin(rand(0, 6.3)));
+    out.normalize().multiplyScalar(rand(...HOVER.spread));
+    l.o = new THREE.Vector3(out.x, rand(...HOVER.rise), out.z);
+    l.lifted = l.h;                                 // la hauteur de base
+    l.turnAxis = new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize();
+    l.turn = rand(...HOVER.turn) * (Math.random() < 0.5 ? -1 : 1);
+    l.swayAxis = new THREE.Vector3(rand(-1, 1), rand(-0.3, 0.3), rand(-1, 1)).normalize();
+    l.period = rand(...HOVER.period);
+    l.ph = [rand(0, 6.3), rand(0, 6.3)];
+  }
+  // les places finales : les sphères se repoussent
+  const at = (l) => _lc.copy(l.center).add(l.o).setY(l.center.y + l.lifted + l.o.y);
+  const P = lifters.map((l) => at(l).clone());
+  for (let k = 0; k < 80; k++) {
+    for (let i = 0; i < lifters.length; i++) for (let j = i + 1; j < lifters.length; j++) {
+      const a = lifters[i], b = lifters[j], d = P[i].clone().sub(P[j]);
+      const need = a.r + b.r + HOVER.gap, dist = d.length();
+      if (dist >= need) continue;
+      if (dist < 1e-4) d.set(rand(-1, 1), rand(-0.3, 0.3), rand(-1, 1));
+      d.normalize().multiplyScalar((need - dist) / 2);
+      P[i].add(d); P[j].sub(d);
+    }
+    lifters.forEach((l, i) => {
+      const p = P[i];
+      p.y = Math.max(p.y, l.center.y + l.lifted + 0.1);   // jamais plus bas que sa hauteur de base
+      const r = Math.hypot(p.x, p.z);
+      if (r > HOVER.reach) { p.x *= HOVER.reach / r; p.z *= HOVER.reach / r; }
+    });
+  }
+  // le chemin de chacun : de sa place au sol (0) à sa place en l'air (l.o, hauteur comprise) ; son envol, d'autant plus
+  // rapide qu'il est près de la caméra
+  const eye = liftRoot.worldToLocal(basePos.clone());
+  lifters.forEach((l, i) => {
+    l.o.copy(P[i]).sub(l.center);
+    l.par = THREE.MathUtils.clamp((baseDist / P[i].distanceTo(eye)) ** 1.5, 0.6, 1.7) * rand(0.9, 1.1);
+    // la fin du trajet : dans le prolongement de son écart, surtout vers le haut
+    l.away = new THREE.Vector3(l.o.x * 0.35, 1, l.o.z * 0.35).normalize().multiplyScalar(rand(...PATH.dist) * l.par);
+  });
+}
+
+// pétales et aigrettes qui montent avec les objets
+function spawnRiser(t) {
+  const from = lifters.filter((l) => l.y > 0.1);
+  if (!from.length || risers.length >= RISE.max) return;
+  const l = from[(Math.random() * from.length) | 0];
+  let mesh, mat, flap = null;
+  if (Math.random() < RISE.petals || !escapeGeo) {
+    const sp = Object.keys(PETALE)[(Math.random() * Object.keys(PETALE).length) | 0];
+    mat = petalMaterial(PETALE[sp].p.gloss);
+    mesh = new THREE.Mesh(petalGeos[sp] ??= makePetalGeometry(PETALE[sp].p), mat);
+    flap = PETALE[sp].flap * PETALE[sp].p.length * FLEUR;   // l'ondulation : une part de sa longueur (comme updateGusts)
+  } else {
+    mat = new THREE.MeshStandardMaterial({ color: '#fbfaf4', emissive: '#fbfaf4', emissiveIntensity: 0.35,
+      roughness: 0.6, side: THREE.DoubleSide, transparent: true, opacity: 0, depthWrite: false });
+    mesh = new THREE.Mesh(escapeGeo, mat);
+    mesh.scale.setScalar(RISE.seed);
+  }
+  mat.opacity = 0;
+  mesh.frustumCulled = false;
+  // sous l'objet, dans l'herbe ou un peu au-dessus
+  const f = l.foot, s = f.side / 2 - FOOT.margin;
+  mesh.position.set(f.x0 + f.side / 2 + l.o.x * l.k + rand(-s, s), GROUND_Y + rand(0.05, 0.35),
+    f.z0 + f.side / 2 + l.o.z * l.k + rand(-s, s));
+  mesh.quaternion.setFromEuler(new THREE.Euler(rand(0, 6.3), rand(0, 6.3), rand(0, 6.3)));
+  liftRoot.add(mesh);
+  risers.push({ mesh, mat, flap, born: t, life: rand(...RISE.life), up: rand(...RISE.speed), ph: rand(0, 6.3),
+    spin: new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize(), turn: rand(0.3, 0.9) });
+}
+
+let riseK = 0;
+function updateRisers(t, dt, live, K) {
+  riseAcc += RISE.rate * live * dt;
+  const up = 24 * (K - riseK);                      // l'envol les emporte, vers le haut
+  riseK = K;
+  while (riseAcc >= 1) { riseAcc -= 1; spawnRiser(t); }
+  for (let i = risers.length - 1; i >= 0; i--) {
+    const r = risers[i], age = t - r.born, m = r.mesh;
+    if (age >= r.life) { liftRoot.remove(m); r.mat.dispose(); risers.splice(i, 1); continue; }
+    // il monte, lent au départ, en dérivant un peu ; il tourne sur lui-même
+    m.position.y += r.up * Math.min(1, age / 1.2) * dt + up;
+    m.position.x += Math.sin(age * 1.1 + r.ph) * 0.05 * dt;
+    m.position.z += Math.cos(age * 0.9 + r.ph) * 0.05 * dt;
+    m.rotateOnAxis(r.spin, r.turn * dt);
+    if (r.flap !== null) r.mat.userData.flap.value.set(r.flap, age * 6 + r.ph);
+    r.mat.opacity = Math.min(1, age / 0.6) * Math.min(1, (r.life - age) / 1.0);
+  }
+}
+
+function updateLevitation(t, dt) {
+  if (!lifters.length) return;
+  // la course amortie (updateCourse) : la lévitation P (pour le vide), et toute la course g, ralentie (pathAt)
+  const P = course?.LIFT ? THREE.MathUtils.clamp(flyS / course.LIFT, 0, 1) : 0;
+  const g = course ? THREE.MathUtils.clamp(flyS / (course.LIFT + course.LEAVE), 0, 1) : 0, along = pathAt(g);
+  // le vide reprend l'îlot, à vitesse presque constante (comme l'apparition)
+  const x = THREE.MathUtils.clamp((P - EXIT.span[0]) / (EXIT.span[1] - EXIT.span[0]), 0, 1);
+  exitK = x;
+  uExit.value = x <= 0 ? 1e5 : EXIT.from + (EXIT.to - EXIT.from) * (x + (x * x * (3 - 2 * x) - x) * 0.35);
+  textVoid.visible = x > 0 && x < 1;                // fini : il ne peint plus (l'À propos arrive sous la scène)
+  if (textEl) textEl.style.visibility = x >= 1 ? 'hidden' : '';   // parti : il ne reparaît pas sous la scène
+  document.documentElement.classList.toggle('lifted', x > 0);    // la scène passe devant la page (css : .scene)
+  let any = false;
+  lifters.forEach((l, i) => {
+    const u = THREE.MathUtils.clamp((along - l.start) / PATH.dur, 0, 1);
+    const e = easeLift(Math.min(1, u / PATH.hover));                     // vers sa place en l'air
+    const b = Math.max(0, (u - PATH.away) / (1 - PATH.away)) ** 2;       // puis au-delà, en prenant de la vitesse
+    const B = uLift.uLiftB.value[i];
+    l.u = Math.min(1, u / PATH.hover);              // la part du décollage (la terre, les brins)
+    l.k = e;
+    l.y = l.o.y * e + l.away.y * b;                 // sa hauteur au-dessus de sa place
+    if (u <= 0) {
+      if (!l.rest) {                                // revenu au sol : exactement à sa place
+        l.obj.position.copy(l.pos0); l.obj.quaternion.copy(l.q0); l.rest = true;
+      }
+      B.w = 0;
+      return;
+    }
+    l.rest = false;
+    any = true;
+    // sa rotation : autant qu'il a de hauteur pour tourner sans toucher le sol (en tournant, il peut descendre
+    // jusqu'au bas de sa sphère)
+    const room = (l.r - l.half) * Math.abs(l.turn);
+    const rot = room > 0 ? Math.min(e, Math.max(0, (l.y - HOVER.clear) / room)) : e;
+    // en l'air, il se balance et oscille à son rythme
+    const live = smooth(0.35, 1, u), w = (Math.PI * 2) / l.period;
+    const bob = HOVER.bob * live * Math.sin(t * w + l.ph[0]);
+    _lq.setFromAxisAngle(l.turnAxis, l.turn * (rot + 0.5 * b))
+      .multiply(_lq2.setFromAxisAngle(l.swayAxis, HOVER.sway * live * Math.sin(t * w * 0.77 + l.ph[1])))
+      .multiply(_lq2.setFromAxisAngle(l.axis, l.tilt * rot));   // un peu penché, autour de son centre
+    _lc.copy(l.center).addScaledVector(l.o, e).addScaledVector(l.away, b);
+    _lc.y += bob;
+    (l.cw ??= new THREE.Vector3()).copy(_lc).applyMatrix4(island.matrixWorld);   // son centre, pour le guide
+    l.obj.position.copy(l.pos0).sub(l.center).applyQuaternion(_lq).add(_lc);
+    l.obj.quaternion.copy(_lq).multiply(l.q0);
+    l.obj.updateMatrix();
+    // l'ombre du ciel sous lui : elle naît doucement quand il quitte le sol ; elle suit son écart
+    const f = l.foot;
+    uLift.uLiftA.value[i].set(f.x0 + _lc.x - l.center.x, f.z0 + _lc.z - l.center.z, f.side, 0);
+    B.set(f.u, f.v, FOOT.px / f.side, smooth(0, SKY.born, l.y));
+    uLift.uLiftY.value[i] = _lc.y - THREE.MathUtils.lerp(l.half, l.r, Math.min(1, Math.abs(l.turn) * rot));
+  });
+  uLift.uLiftN.value = any ? lifters.length : 0;
+  // l'îlot reparti, on ne dessine plus que ce qui vole encore ; les objets sortis de l'écran non plus
+  for (const o of statics) o.visible = exitK < 1;
+  for (const l of lifters) l.obj.visible = flyK < 1;
+  objectsOnScreen = 0;
+  for (const l of lifters) {
+    if (!l.cw || !l.obj.visible) continue;
+    _gp.copy(l.cw).project(camera);
+    if (Math.abs(_gp.x) < 1 && Math.abs(_gp.y) < 1) objectsOnScreen++;
+  }
+  updateRisers(t, dt, smooth(0.05, 0.3, P) * (1 - smooth(0.6, 0.75, g)), smooth(0.6, 1, g) ** 2);
+
+  // la terre de la brouette
+  for (const c of crumbs) {
+    const m = c.mesh;
+    if (c.state === 0) {
+      if (c.owner.u < c.at) continue;
+      m.position.copy(c.local).applyMatrix4(c.owner.obj.matrix);
+      c.vel.set(rand(-1, 1) * CRUMBS.spread, rand(0, 0.12), rand(-1, 1) * CRUMBS.spread);
+      m.scale.setScalar(c.r);
+      m.visible = true;
+      c.state = 1;
+    } else if (c.state === 1) {                     // elle tombe en tournant
+      c.vel.y -= GRAVITY * dt;
+      m.position.addScaledVector(c.vel, dt);
+      m.rotateOnAxis(c.spin, c.turn * dt);
+      if (m.position.y <= GROUND_Y + c.r * 0.4) { m.position.y = GROUND_Y + c.r * 0.4; c.state = 2; c.t0 = t; }
+    } else if (c.state === 2) {                     // dans l'herbe, elle s'enfonce
+      const k = 1 - (t - c.t0) / CRUMBS.sink;
+      if (c.owner.u === 0) c.back = true;
+      if (k <= 0) { m.visible = false; c.state = c.back ? 0 : 3; c.back = false; }
+      else { m.scale.setScalar(c.r * k); m.position.y = GROUND_Y + c.r * (0.4 * k - (1 - k)); }
+    } else if (c.owner.u === 0) c.state = 0;        // la brouette est revenue au sol : sa terre aussi
+  }
+
+  // les brins accrochés : ils pendent et se balancent un peu ; certains se décrochent
+  for (const b of blades) {
+    const m = b.mesh, l = b.owner;
+    if (b.state === 0) {
+      m.visible = l.y > 0.002;
+      if (!m.visible) continue;
+      _lq.setFromAxisAngle(AX_X, 0.16 * Math.sin(t * b.sway + b.ph) * Math.min(1, l.y * 8));
+      m.quaternion.copy(b.hang).multiply(_lq);
+      if (l.u >= b.drop) {                          // il se décroche : il tombe dans le repère de l'îlot
+        liftRoot.attach(m);
+        b.vel.set(rand(-0.05, 0.05), -BLADES.fall, rand(-0.05, 0.05));
+        b.state = 1;
+      }
+    } else if (b.state === 1) {                     // il descend en voletant
+      m.position.addScaledVector(b.vel, dt);
+      m.position.x += Math.sin(t * 5 + b.ph) * 0.08 * dt;
+      m.rotateOnAxis(AX_Z, Math.sin(t * 3 + b.ph) * 1.5 * dt);
+      if (m.position.y <= GROUND_Y + 0.01) { b.state = 2; b.t0 = t; }
+    } else if (b.state === 2) {
+      const k = 1 - (t - b.t0) / BLADES.sink;
+      if (l.u === 0) b.back = true;
+      if (k <= 0) { m.visible = false; b.state = 3; } else m.position.y = GROUND_Y + 0.01 - (1 - k) * b.len;
+    } else if (l.u === 0 || b.back) {               // l'objet est revenu au sol : le brin reprend sa place dessous
+      b.back = false;
+      l.obj.add(m);
+      m.position.copy(b.local);
+      m.quaternion.copy(b.hang);
+      m.visible = false;
+      b.state = 0;
+    }
+  }
+}
+
 // ------------------------------------------------------------ chargement de l'îlot
 // le décodeur Draco, servi par le site (outils/build.mjs), chargé tout de suite : en même temps que le modèle
 const draco = new DRACOLoader().setDecoderPath('js/draco/');
@@ -1172,7 +2219,7 @@ draco.preload();
 const gltfLoader = new GLTFLoader().setDRACOLoader(draco);
 gltfLoader.load(MODEL, (gltf) => {
   const root = gltf.scene;
-  let seedTemplate = null;
+  let seedTemplate = null, floraMesh = null;
   const drop = [];
   root.traverse((o) => {
     if (o.name.startsWith('Gabarit')) {             // le modèle d'aigrette : il sert aux particules, pas à la scène
@@ -1190,6 +2237,7 @@ gltfLoader.load(MODEL, (gltf) => {
       o.material.map.anisotropy = renderer.capabilities.getMaxAnisotropy();
       blendIntoPage(o.material);
     } else if (wind) {
+      if (!floraMesh && o.geometry.attributes.color) floraMesh = { geometry: o.geometry, material: o.material };
       o.material = windy(o.material.clone());       // le vent ne touche que l'herbe, les fleurs et les fougères
     }
     voidify(o.material);                            // tout, sol compris, sort du vide
@@ -1213,8 +2261,15 @@ gltfLoader.load(MODEL, (gltf) => {
       yaw: 0, bank: 0, pitch: 0.24, gliding: false, timer: rand(...FLIGHT.rest), started: false, u: null });
   });
 
+  // le papillon guide (sur ordinateur) : le vide du départ ne le reprend pas
+  if (desktop && !reduced) {
+    guide = flyers[BUTTERFLY.species.indexOf(GUIDE.species)] ?? null;
+    guide?.root.traverse((c) => { if (c.isMesh) c.material.userData.lifter = true; });
+  }
+
   island.add(root);
   grabbable = root;
+  root.children.forEach((o) => { if (!o.userData.service) statics.push(o); });   // le sol, la flore…
   if (!reduced) {
     if (seedTemplate) makeSeeds(seedTemplate);
     if (seedTemplate && desktop) escapeGeo = makeEscapeGeometry(seedTemplate);
@@ -1237,6 +2292,7 @@ gltfLoader.load(MODEL, (gltf) => {
     });
     flowerHeads = flowerHeads.filter((h) => !hidden_(h));
     if (desktop && flowerHeads.length) makeBees();
+    if (desktop) makeLevitation(root, floraMesh);  // les objets qui décollent au défilement
   }
   animating = !reduced;
   window.__heroReady = true;
@@ -1325,7 +2381,7 @@ function turn(dt) {
 }
 
 // ------------------------------------------------------------ cadrage : l'îlot entier, quelle que soit la fenêtre
-let vfovR = 0, frameF = FRAME.wide, baseDist = 10;
+let vfovR = 0, frameF = FRAME.wide, baseDist = 10, frameW = 1, frameH = 1;
 function resize() {
   const w = host.clientWidth, h = host.clientHeight;
   renderer.setSize(w, h, false);
@@ -1344,8 +2400,13 @@ function resize() {
   basePos.copy(camera.position);
   camera.updateMatrixWorld();
   baseView.copy(camera.matrixWorld);
+  frameW = w; frameH = h;
   camera.setViewOffset(w, h, -(frameF.x - 0.5) * w, -(frameF.y - 0.5) * h, w, h);
   camera.updateProjectionMatrix();
+  // le titre, comme posé au fond de l'îlot : le point de la scène derrière son milieu (pour son départ : textVoid)
+  if (textEl) {
+    screenToWorld(0.5, (textEl.offsetTop + textEl.offsetHeight / 2) / h, baseDist + FIT_RADIUS, textAnchor);
+  }
   tiltUp = maxTiltUp(h);
   scene.fog.near = baseDist + MIST.start;
   scene.fog.far = scene.fog.near + (FIT_RADIUS - MIST.start) / MIST.amount;
@@ -1374,9 +2435,11 @@ if (!reduced) {
 const _right = new THREE.Vector3(), _up = new THREE.Vector3();
 function swayCamera(dt) {
   const k = 1 - Math.exp(-dt * SWAY.ease);
-  sway.x += (sway.tx - sway.x) * k;
-  sway.y += (sway.ty - sway.y) * k;
-  if (Math.abs(sway.tx - sway.x) + Math.abs(sway.ty - sway.y) < 1e-4) return false;
+  // l'îlot parti, la caméra ne suit plus la souris : elle revient à sa place (la page, elle, ne bouge pas)
+  const follow = 1 - exitK;
+  sway.x += (sway.tx * follow - sway.x) * k;
+  sway.y += (sway.ty * follow - sway.y) * k;
+  if (Math.abs(sway.tx * follow - sway.x) + Math.abs(sway.ty * follow - sway.y) < 1e-4) return false;
   camera.position.copy(basePos);
   camera.lookAt(CENTER);
   _right.setFromMatrixColumn(camera.matrix, 0);
@@ -1388,10 +2451,84 @@ function swayCamera(dt) {
   const h = host.clientHeight, fpx = h / (2 * Math.tan(vfovR / 2));
   const g = fpx * (1 / baseDist - 1 / (baseDist + FIT_RADIUS));
   textShift = -sway.y * SWAY.y * g;
-  if (textEl) textEl.style.translate = `${(sway.x * SWAY.x * g).toFixed(2)}px ${textShift.toFixed(2)}px`;
+  if (textEl) {
+    textEl.style.setProperty('--sx', `${(sway.x * SWAY.x * g).toFixed(2)}px`);
+    textEl.style.setProperty('--sy', `${textShift.toFixed(2)}px`);
+  }
   tiltUp = maxTiltUp(h);            // vu d'un peu plus haut, le sol remonte : la bascule s'adapte
   return true;
 }
+
+// ------------------------------------------------------------ la course, au défilement (js/apropos.js)
+// La course est lue dans window.hsCourse (écrans défilés), amortie (flyS) : la lévitation (LIFT écrans, plus haut :
+// les objets décollent, le vide reprend l'îlot et le titre), puis l'envol (LEAVE écrans, flyK de 0 à 1) : la caméra
+// ne bouge pas, les objets sortent par le haut pendant que l'À propos monte du bas de l'écran. Puis l'îlot n'est plus
+// dessiné.
+const course = window.hsCourse;
+const textAnchor = new THREE.Vector3();
+let flyS = 0, flyK = 0;
+
+// le titre part dans le vide avec l'îlot : il est sous la scène (html), et la scène peint, devant lui, la couleur de
+// la page là où le vide l'a repris — sur le plan qui passe par son milieu, au fond de l'îlot, face à la caméra, avec
+// le même front, le même bruit, le même bord net que l'îlot. Les objets, dessinés après, passent devant.
+const textVoid = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+  depthTest: false, depthWrite: false, toneMapped: false,
+  uniforms: { uExit, uIslandInv, uInvProj: { value: camera.projectionMatrixInverse }, uCamWorld: { value: camera.matrixWorld },
+    uPlane: { value: new THREE.Vector4() }, uPaper: { value: new THREE.Color(PAPER).convertLinearToSRGB() } },
+  vertexShader: `varying vec2 vNdc; void main() { vNdc = position.xy; gl_Position = vec4( position.xy, 0.0, 1.0 ); }`,
+  fragmentShader: `
+    uniform float uExit; uniform mat4 uIslandInv, uInvProj, uCamWorld; uniform vec4 uPlane; uniform vec3 uPaper;
+    varying vec2 vNdc;
+    ${VOID_FN}
+    void main() {
+      vec4 v = uInvProj * vec4( vNdc, 1.0, 1.0 );
+      vec3 dir = normalize( ( uCamWorld * vec4( v.xyz / v.w, 0.0 ) ).xyz );
+      vec3 P = cameraPosition + dir * ( ( uPlane.w - dot( uPlane.xyz, cameraPosition ) ) / dot( uPlane.xyz, dir ) );
+      P = ( uIslandInv * vec4( P, 1.0 ) ).xyz;
+      float d = voidAt( uExit, P, vdN( P ) );
+      float aa = max( fwidth( d ), 1e-4 );
+      float a = 1.0 - smoothstep( - aa, aa, d );
+      if ( a <= 0.0 ) discard;
+      gl_FragColor = vec4( uPaper * a, a );          // la couleur exacte de la page (prémultipliée)
+    }`,
+}));
+textVoid.frustumCulled = false;
+textVoid.renderOrder = -10;                         // avant tout : l'îlot et les objets se dessinent par-dessus
+textVoid.visible = false;
+textVoid.onBeforeRender = () => {                   // le plan du titre, face à la caméra
+  const n = camera.getWorldDirection(new THREE.Vector3());
+  textVoid.material.uniforms.uPlane.value.set(n.x, n.y, n.z, n.dot(textAnchor));
+};
+scene.add(textVoid);
+
+// l'allure du trajet sur la course (0 → 1) : ordinaire, sauf le temps que le vide reprenne l'îlot, où elle ralentit
+// un peu (PATH.slow), sans jamais s'arrêter ; tabulée une fois, ramenée à 1 au bout
+const PATH_AT = (() => {
+  const n = 400, lift = course?.LIFT || 1, all = lift + (course?.LEAVE || 1);
+  const a = (EXIT.span[0] * lift) / all, z = (EXIT.span[1] * lift) / all, edge = 0.06;
+  const tab = new Float32Array(n + 1);
+  for (let k = 1; k <= n; k++) {
+    const gm = (k - 0.5) / n;
+    const slow = smooth(a - edge, a + edge, gm) * (1 - smooth(z - edge, z + edge, gm));
+    tab[k] = tab[k - 1] + (1 - (1 - PATH.slow) * slow) / n;
+  }
+  return tab.map((v) => v / tab[n]);
+})();
+function pathAt(g) {
+  const f = g * (PATH_AT.length - 1), k = Math.min(PATH_AT.length - 2, Math.floor(f));
+  return PATH_AT[k] + (PATH_AT[k + 1] - PATH_AT[k]) * (f - k);
+}
+const courseEnd = () => (course ? course.LIFT + course.LEAVE : 0);
+function updateCourse(dt) {
+  const end = courseEnd(), target = course ? Math.min(course.at(), end) : 0;
+  const before = flyS;
+  flyS = reduced ? target : flyS + (target - flyS) * (1 - Math.exp(-dt * LIFT.ease));
+  if (Math.abs(target - flyS) < 1e-4) flyS = target;
+  flyK = course?.LEAVE ? THREE.MathUtils.clamp((flyS - course.LIFT) / course.LEAVE, 0, 1) : 0;
+  return flyS !== before;
+}
+// parti : la course est au-delà de l'envol, et l'amorti l'a rattrapée
+const gone = () => !guide && !!course && course.leave() >= 1 && flyS >= courseEnd() - 1e-4;   // le guide, lui, reste
 
 // la plus forte bascule vers la caméra pour laquelle le bord du sol (cercle de rayon FIT_RADIUS, quelle que soit la
 // rotation) reste sous la description, d'au moins TILT.gap px
@@ -1422,10 +2559,9 @@ function maxTiltUp(h) {
 }
 
 
-// ------------------------------------------------------------ boucle : à l'écran seulement
-// (et pas quand le vert du défilement couvre tout l'écran : html.flooded, posée par js/flood.js)
+// ------------------------------------------------------------ boucle : à l'écran seulement (pas une fois l'îlot parti)
 let dirty = true, visible = true, animating = false, running = false;
-const hidden = () => !visible || document.hidden || document.documentElement.classList.contains('flooded');
+const hidden = () => !visible || document.hidden || gone();
 function start() {
   if (running || hidden()) return;
   running = true;
@@ -1437,14 +2573,17 @@ function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);       // pas de bond au retour d'un onglet
   uTime.value += dt;
-  const moving = swayCamera(dt) | turn(dt);
+  const moving = updateCourse(dt) | swayCamera(dt) | turn(dt);
+  host.style.visibility = gone() ? 'hidden' : '';
   if (animating) {
     updateButterflies(uTime.value, dt);
+    updateGuideShadow();                            // son ombre sur la page, d'après sa pose de l'instant
     if (desktop) updateEscapes(uTime.value, dt);
     if (desktop) updateGusts(uTime.value);
     if (bees.length) updateBees(uTime.value, dt);
+    updateLevitation(uTime.value, dt);
     // le rai se lève dès que l'îlot commence à apparaître
-    uShaft.fade.value = born < 0 ? 0 : smooth(born + REVEAL.wait, born + REVEAL.wait + 1.6, uTime.value);
+    uShaft.fade.value = (born < 0 ? 0 : smooth(born + REVEAL.wait, born + REVEAL.wait + 1.6, uTime.value)) * (1 - smooth(0, 0.2, exitK));   // le rai s'éteint dès que le vide revient : sur le blanc, il se verrait
     reveal(uTime.value);
     updateParticles(uTime.value);
   }
@@ -1461,6 +2600,6 @@ new IntersectionObserver(([e]) => {
   start();
 }).observe(host);
 document.addEventListener('visibilitychange', start);
-window.addEventListener('hs:flood', start);
+window.addEventListener('scroll', () => { if (!gone()) host.style.visibility = ''; start(); }, { passive: true });
 resize();
 start();

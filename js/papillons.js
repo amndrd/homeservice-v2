@@ -284,25 +284,33 @@ export function makeButterfly(species, span, prepare = (m) => m) {
     c.castShadow = true;
     c.customDepthMaterial = c.material === mats.fore ? mats.foreDepth : c.material === mats.hind ? mats.hindDepth : mats.bodyDepth;
   });
-  const st = { phase: Math.random() * 6.3, glide: 0 };
+  const st = { phase: Math.random() * 6.3, glide: 0, perch: 0, bask: Math.random() * 6.3 };
   const wingState = { spread: 1 };                  // ouverture des ailes vue de dessus (1 : à plat, 0 : dressées)
   // le battement, image par image. Le vol (js/hero.js) dit quand planer (`glide`, 0 ou 1) et l'effort (0 à 1 : en
   // montée ou en virage, il bat plus vite et plus ample). Planer : les ailes se figent à demi levées, en V ouvert ;
-  // elles y vont et en repartent en douceur.
-  function flap(dt, glide = 0, effort = 0.4) {
+  // elles y vont et en repartent en douceur. Posé (`perch`, 0 ou 1 : le papillon guide, à plat sur la page) : les
+  // ailes prennent la posture demandée (`rest`, angle au-dessus du dos : 0 à plat, ~0,6 en V, ~1,3 fermées), en
+  // douceur (`quick` : d'un coup, le claquement du départ) ; sans posture demandée, elles s'ouvrent à plat et se
+  // referment de temps en temps.
+  function flap(dt, glide = 0, effort = 0.4, perch = 0, rest = null, quick = false) {
     st.glide += (glide - st.glide) * (1 - Math.exp(-dt * (glide ? 7 : 10)));
-    st.phase += dt * Math.PI * 2 * (5.2 + 2.6 * effort) * (1 - 0.85 * st.glide);
-    const lift = 1 - st.glide, amp = 0.9 + 0.2 * effort;
+    st.perch += (perch - st.perch) * (1 - Math.exp(-dt * (perch ? 6 : 14)));   // il replie vite, repart plus vite encore
+    st.phase += dt * Math.PI * 2 * (5.2 + 2.6 * effort) * (1 - 0.85 * st.glide) * (1 - 0.9 * st.perch);
+    st.bask += dt * (0.45 + 0.2 * Math.sin(st.bask * 0.37));    // les ailes qui se referment, à un rythme irrégulier
+    const want = rest ?? 0.1 + 1.1 * Math.max(0, Math.sin(st.bask)) ** 3;
+    st.rest = (st.rest ?? want) + (want - (st.rest ?? want)) * (1 - Math.exp(-dt * (quick ? 40 : 7)));   // `quick` : d'un coup
+    const lift = 1 - st.glide, amp = 0.9 + 0.2 * effort, restA = st.rest;
     for (const w of wings) {
       const p = st.phase - w.lag;
       const s = Math.sin(p + 0.32 * Math.sin(p));   // la descente (s qui baisse) plus vive que la remontée
-      const a = (0.42 + 1.02 * s) * w.amp * amp * lift + 0.3 * st.glide;
-      w.pivot.rotation.set(0, w.side * (w.fore ? 0.14 : 0.04) * Math.cos(p) * lift, w.side * a);
+      const fly = (0.42 + 1.02 * s) * w.amp * amp * lift + 0.3 * st.glide;
+      const a = fly + (restA * (w.fore ? 1 : 0.96) - fly) * st.perch;
+      w.pivot.rotation.set(0, w.side * (w.fore ? 0.14 : 0.04) * Math.cos(p) * lift * (1 - st.perch), w.side * a);
       if (w.fore && w.side > 0) wingState.spread = Math.abs(Math.cos(a));
     }
-    // le corps monte quand les ailes descendent, retombe un peu à la remontée
-    body.position.y = -0.05 * span * Math.sin(st.phase - 0.4) * lift;
-    body.rotation.x = -0.06 * Math.cos(st.phase) * lift;
+    // le corps monte quand les ailes descendent, retombe un peu à la remontée (posé, il ne bouge plus)
+    body.position.y = -0.05 * span * Math.sin(st.phase - 0.4) * lift * (1 - st.perch);
+    body.rotation.x = -0.06 * Math.cos(st.phase) * lift * (1 - st.perch);
   }
   return { root, flap, wingState };
 }
