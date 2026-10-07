@@ -9,9 +9,9 @@
 <script>try { var v = sessionStorage.getItem('hs-veil'); if (document.prerendering || v) { document.documentElement.classList.add('veil-in'); sessionStorage.removeItem('hs-veil'); } else document.documentElement.classList.add('loading'); } catch (e) { document.documentElement.classList.add('loading'); }</script>
 <!-- chargés tout de suite : la police, le script de l'îlot et son modèle (même version que MODEL dans js/hero.js) -->
 <link rel="preload" href="fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="modulepreload" href="js/hero.min.js?v=c111605233">
+<link rel="modulepreload" href="js/hero.min.js?v=c212ebcbf8">
 <link rel="preload" href="models/ilot.glb?v=fe77098755" as="fetch" crossorigin>
-<link rel="stylesheet" href="css/style.min.css?v=78846ded9a">
+<link rel="stylesheet" href="css/style.min.css?v=98cb62f671">
 </head>
 <body>
 
@@ -45,49 +45,54 @@
 <!-- Le site entier, sur une seule page qu'on fait défiler : accueil, à propos, services, fonctionnement, zone, contact,
      devis. La navbar mène à chaque section. -->
 <main class="page page--hero" id="main">
-  <!-- Accueil, puis À propos. Le hero reste en place (collant) le temps de la course : au fil du défilement, le vert
-       monte du bas de l'écran et le remplit ; l'À propos arrive dessus, reste fixe le temps de ses apparitions, puis
-       défile sur le vert (js/flood.js, qui règle les hauteurs de la course). -->
+  <!-- la scène 3D : l'îlot des services (js/hero.js, models/ilot.glb), on tourne autour à la souris ; fixée derrière
+       la page pendant la lévitation des objets (sur ordinateur), sinon elle défile avec le hero -->
+  <div class="scene" id="hero-scene"></div>
+  <!-- Accueil. Sur ordinateur, le hero reste en place (collant) le temps de la lévitation : les objets décollent, le
+       vide reprend l'îlot et le titre (js/apropos.js règle la course, js/hero.js l'anime). -->
   <div class="hero-track">
   <section class="hero" aria-label="Accueil" data-i18n-aria="hero.label">
-    <!-- l'îlot des services : scène 3D temps réel (js/hero.js, models/ilot.glb), on tourne autour à la souris -->
-    <div class="hero__scene" id="hero-scene"></div>
     <!-- titre et description, repris de l'écran titre du site immersif (homeservice-immersive, .card) -->
     <div class="hero__text">
       <h1 data-i18n="hero.title">Besoin d'un coup<br>de main&nbsp;?</h1>
       <p data-i18n="hero.text">Ménage, désencombrement, montage de meubles, jardinage… On s'occupe de tout,
         <mark>à votre rythme</mark> et <mark>à votre budget</mark>.</p>
     </div>
-    <!-- invitation à faire défiler, reprise du site immersif (homeservice-immersive, .scroll-hint) -->
-    <div class="scroll-hint" aria-hidden="true">
-      <span class="mouse"><span></span></span>
-      <span data-i18n="hint">Faites défiler</span>
-    </div>
   </section>
-  <!-- À propos : posé sur le hero ; il reste fixe dans sa course (.about-track), puis défile -->
-  <div class="about-track">
-  <section class="about" aria-labelledby="a-propos-titre">
+  <!-- invitation à faire défiler, reprise du site immersif (homeservice-immersive, .scroll-hint) -->
+  <div class="scroll-hint" aria-hidden="true">
+    <span class="mouse"><span></span></span>
+    <span data-i18n="hint">Faites défiler</span>
+  </div>
+  <!-- repère de l'accueil dans la navbar : toute la course du hero (placé par js/apropos.js) -->
+  <div class="hero-mark hero-mark--home" id="accueil"></div>
+  </div>
+
+  <!-- À propos : il monte juste sous le hero pendant que les objets s'envolent ; ses mots s'allument au milieu de
+       l'écran (js/apropos.js) -->
+  <section class="about" id="a-propos" aria-labelledby="a-propos-titre">
     <h2 class="sr-only" id="a-propos-titre" data-i18n="nav.about">À propos</h2>
     <div class="about__inner">
-      <div class="about__text"></div>
-      <figure class="about__photo">
-        <img src="images/en-construction.webp" alt="Site en construction" data-i18n-alt="about.photo" loading="lazy">
-      </figure>
+      <div class="about__text">
+        <div data-i18n="about"><p>Vous avez mieux à faire que de gérer les corvées du quotidien.
+          <span class="accent">HomeService intervient chez vous à Bruxelles pour tous vos besoins</span>, on s'occupe de
+          ce que vous n'avez pas le temps de faire, pour que vous puissiez vous concentrer sur ce qui compte vraiment.</p></div>
+      </div>
+      <!-- la photo de l'équipe reviendra ici (js/apropos.js sait l'ouvrir : .about__photo) -->
     </div>
   </section>
-  </div>
-  <!-- le vert reste fixe pendant que l'À propos s'en va et que la section suivante glisse dessus -->
-  <div class="hero-tail" aria-hidden="true"></div>
-  <!-- repères de la navbar dans la course du hero : l'accueil au début, l'À propos pendant qu'il est affiché (placés par js/flood.js) -->
-  <div class="hero-mark hero-mark--home" id="accueil"></div>
-  <div class="hero-mark hero-mark--about" id="a-propos"></div>
-  </div>
+
+  <!-- tout en bas : la suite du site est en construction (clin d'œil provisoire, à retirer avec les sections suivantes) -->
+  <section class="chantier" aria-label="La suite est en construction" data-i18n-aria="chantier.label">
+    <img src="images/en-construction.webp" alt="Site en construction" data-i18n-alt="chantier.photo" width="1300"
+      height="970" loading="lazy">
+  </section>
 </main>
 
 <!-- fichiers construits à partir des sources (js/*.js, css/style.css) : outils/build.mjs -->
-<script src="js/veil.min.js?v=8586458b18"></script>
-<script src="js/i18n.min.js?v=45c45513cc"></script>
-<script src="js/flood.min.js?v=64ac7be3d0"></script>
-<script type="module" src="js/hero.min.js?v=c111605233"></script>
+<script src="js/veil.min.js?v=2ced49a0e4"></script>
+<script src="js/i18n.min.js?v=2c1679e8ee"></script>
+<script src="js/apropos.min.js?v=f93b816c58"></script>
+<script type="module" src="js/hero.min.js?v=c212ebcbf8"></script>
 </body>
 </html>

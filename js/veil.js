@@ -240,5 +240,5 @@
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
-  window.hsVeil = { cover, clear, busy: () => busy, shader: { VERT, FRAG, VEIL_M, EDGE_W } };
+  window.hsVeil = { cover, clear, busy: () => busy };
 })();

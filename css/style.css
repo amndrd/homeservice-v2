@@ -28,24 +28,27 @@ img { display: block; max-width: 100%; }
 .page--hero { padding-top: 0; min-height: 0; }
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-/* le hero reste en place (collant) toute la course : le vert le remplit, l'À propos arrive dessus, reste fixe le
-   temps de ses apparitions, puis défile sur le vert encore fixe (js/flood.js règle les hauteurs) */
+/* sur ordinateur, le hero reste en place (collant) le temps de la lévitation des objets (js/apropos.js règle la
+   hauteur de la course), puis la page reprend son cours */
 .hero-track { position: relative; }
-.hero-tail { height: 100vh; height: 100lvh; }
-/* la section suivante glisse sur le vert, juste derrière l'À propos (elle recouvre la fin de la course) */
-.hero-track + .section { margin-top: -100vh; margin-top: -100lvh; z-index: 5; background: var(--paper); }
 .hero-mark { position: absolute; left: 0; width: 1px; pointer-events: none; }
 .hero { position: sticky; top: 0; height: 100vh; height: 100svh; min-height: 520px; overflow: hidden; background: var(--paper); }
-.hero__scene { position: absolute; inset: 0; z-index: 1; touch-action: pan-y; }   /* devant le titre ; main au survol de l’îlot : js/hero.js */
-.hero__scene canvas { display: block; width: 100%; height: 100%; }
-/* le vert du défilement (js/flood.js), au-dessus de l'îlot et du titre */
-.hero__flood { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; display: block; pointer-events: none; }
-.hero--flat .hero__flood { background: var(--green); opacity: 0; transition: opacity .6s ease; }
-.hero--flat.hero--green .hero__flood { opacity: 1; }
+/* la scène 3D (js/hero.js), de la taille du hero : elle défile avec lui ; pendant la lévitation des objets (html.lifts,
+   sur ordinateur), elle reste fixée à l'écran, pour que les objets s'envolent pendant que la page monte. Au-dessus du
+   hero (les objets passent devant le titre), sous l'À propos ; main au survol de l'îlot */
+.scene { position: absolute; top: 0; left: 0; z-index: 1; width: 100%; height: 100vh; height: 100svh; min-height: 520px;
+  touch-action: pan-y; }
+html.lifts .scene { position: fixed; }
+/* une fois l'îlot reparti dans le vide (html.lifted, js/hero.js), elle passe devant la page : les objets passent
+   devant l'À propos, comme devant le titre ; elle laisse passer les clics */
+html.lifted .scene { z-index: 6; pointer-events: none; }
+.scene canvas { display: block; width: 100%; height: 100%; }
 /* titre et description, centrés en haut ; l'îlot en grand dessous (js/hero.js). Repris de l'écran titre du site
    immersif (homeservice-immersive, style.css : .card h1, .card p, .card mark) */
 .hero__text { position: absolute; left: 50%; top: clamp(104px, 15vh, 160px); transform: translateX(-50%); z-index: 0;
   will-change: opacity, translate;
+  /* la caméra suit un peu la souris (js/hero.js) ; sans scène 3D, il part en défilant (js/apropos.js) */
+  translate: var(--sx, 0px) calc(var(--sy, 0px) - var(--leave, 0px));
   width: min(900px, calc(100% - 40px)); text-align: center; pointer-events: none; }
 /* apparition : le titre puis la description montent en fondu, l'un après l'autre (comme l'écran titre du site
    immersif), quand la page est prête (html.intro, posée par js/veil.js) */
@@ -69,8 +72,9 @@ html.intro .hero__text > p { transition-delay: .72s; }
 }
 
 /* invitation à faire défiler, reprise du site immersif (.scroll-hint, .mouse) : une souris dont la molette descend,
-   en bas de l'écran, blanche comme dans le site immersif ; elle arrive après le titre et part dès qu'on défile. */
-.scroll-hint { position: absolute; left: 50%; bottom: 28px; z-index: 2; transform: translate(-50%, 10px);
+   en bas de l'écran, blanche comme dans le site immersif ; elle arrive après le titre et part dès qu'on défile.
+   Au-dessus de la scène 3D, sur l'herbe. */
+.scroll-hint { position: fixed; left: 50%; bottom: 28px; z-index: 2; transform: translate(-50%, 10px);
   display: flex; flex-direction: column; align-items: center; gap: 8px;
   font: 700 13px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: #fff;
   text-shadow: 0 1px 8px rgba(15, 26, 44, .6); opacity: 0; transition: opacity .6s ease, transform .6s ease;
@@ -95,23 +99,20 @@ html.intro.scrolled .scroll-hint { opacity: 0; transform: translate(-50%, 10px);
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0);
   white-space: nowrap; border: 0; }
 
-/* ---------------------------------------------------------------- À propos (js/flood.js)
-   Posé sur le hero, sans fond : le vert est celui du hero. Repris du plan 1 du site immersif : le texte en Manrope
-   800, tous ses mots là à 16 % qui s'allument un à un au défilement, la partie en couleur qui passe au vert ; la photo qui
-   s'ouvre derrière le bord du vide. Couleurs claires, sur le vert. --arrive : arrivée en fondu (0 → 1). */
-.about-track { position: relative; z-index: 4; margin-top: -100vh; margin-top: -100lvh; pointer-events: none; }
-.about { position: sticky; top: 0; height: 100vh; height: 100svh; display: grid; place-items: center;
-  padding: 96px 5vw 48px; color: #f2f6f1; --arrive: 0; visibility: hidden; }
-.about.about--here { visibility: visible; }
-html.flooded .about { pointer-events: auto; }
-.about__inner { width: min(1240px, 100%); display: grid; grid-template-columns: 1fr 1fr;
+/* ---------------------------------------------------------------- À propos (js/apropos.js)
+   Une section de la page, sans fond : elle monte du bas de l'écran pendant que les objets de l'îlot s'envolent
+   derrière elle. Repris du plan 1 du site immersif : le texte à l'encre en Manrope 800, tous ses mots là à 16 % qui
+   s'allument un à un en passant au milieu de l'écran, la partie en couleur qui passe au vert ; la photo qui s'ouvre
+   derrière le bord du vide. */
+.about { position: relative; z-index: 4; padding: 14vh 5vw 30vh; color: var(--ink); }   /* juste sous le hero */
+/* deux colonnes : le texte à gauche ; à droite, la place de la photo (retirée pour l'instant) */
+.about__inner { width: min(1240px, 100%); margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr;
   gap: clamp(32px, 5vw, 80px); align-items: center; }
-.about__text { opacity: var(--arrive); }
 .about__text p { margin: 0; font: 800 clamp(26px, 2.6vw, 44px)/1.3 var(--title); letter-spacing: -.02em;
   text-wrap: pretty; }
-.about__text .w { opacity: .16; }                 /* allumés au fil du défilement (js/flood.js) */
-.about__text .accent { --lit: 0; color: color-mix(in srgb, #7ee2a8 calc(var(--lit) * 100%), #f2f6f1); }
-.about__photo { position: relative; margin: 0; aspect-ratio: 1300 / 970; }   /* celui de l’image */
+.about__text .w { opacity: .16; }                 /* allumés au fil du défilement (js/apropos.js) */
+.about__text .accent { --lit: 0; color: color-mix(in srgb, var(--green) calc(var(--lit) * 100%), var(--ink)); }
+.about__photo { position: relative; margin: 0; aspect-ratio: 736 / 552; }   /* celui de l’image */
 .about__photo img, .about__photo canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .about__photo img { object-fit: cover; border-radius: 18px; opacity: 0; transition: opacity .6s ease; }
 .about__photo--gl img { visibility: hidden; }
@@ -119,9 +120,15 @@ html.flooded .about { pointer-events: auto; }
   .about { padding: 88px 20px 24px; }
   .about__inner { grid-template-columns: 1fr; gap: 20px; }
   .about__text p { font-size: clamp(20px, 5.4vw, 28px); }
-  .about__photo { max-height: 36svh; justify-self: center; width: min(100%, calc(36svh * 1300 / 970)); }
+  .about__photo { max-height: 36svh; justify-self: center; width: min(100%, calc(36svh * 736 / 552)); }
   .section { padding: 120px 20px 72px; }
 }
+
+/* ---------------------------------------------------------------- tout en bas : la suite est en construction
+   (clin d'œil provisoire) : l'image, centrée, après l'À propos */
+.chantier { position: relative; z-index: 5; display: grid; place-items: center; padding: 12vh 20px 16vh;
+  background: var(--paper); }
+.chantier img { width: min(560px, 100%); height: auto; border-radius: 18px; }
 
 /* ---------------------------------------------------------------- navbar (reprise du site immersif) */
 .header { position: fixed; top: 16px; left: 0; width: 100%; z-index: 80; display: flex; align-items: center;

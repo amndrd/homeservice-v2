@@ -32,7 +32,7 @@ mkdirSync(join(site, 'js/draco'), { recursive: true });
 for (const f of ['draco_decoder.wasm', 'draco_wasm_wrapper.js'])
   copyFileSync(join(three, 'examples/jsm/libs/draco/gltf', f), join(site, 'js/draco', f));
 
-for (const f of ['veil', 'i18n', 'flood'])
+for (const f of ['veil', 'i18n', 'apropos'])
   await build({ entryPoints: [join(site, `js/${f}.js`)], outfile: join(site, `js/${f}.min.js`), minify: true,
     target: 'es2020', legalComments: 'none', logLevel: 'info' });
 await build({ entryPoints: [join(site, 'css/style.css')], outfile: join(site, 'css/style.min.css'), minify: true,
@@ -41,7 +41,7 @@ await build({ entryPoints: [join(site, 'css/style.css')], outfile: join(site, 'c
 // les versions dans index.html
 const page = join(site, 'index.html');
 let html = readFileSync(page, 'utf8');
-for (const f of ['js/hero.min.js', 'js/veil.min.js', 'js/i18n.min.js', 'js/flood.min.js', 'css/style.min.css',
+for (const f of ['js/hero.min.js', 'js/veil.min.js', 'js/i18n.min.js', 'js/apropos.min.js', 'css/style.min.css',
   'models/ilot.glb']) {
   const re = new RegExp(`${f.replace(/\./g, '\\.')}\\?v=[\\w-]+`, 'g');
   if (!re.test(html)) throw new Error(`${f} absent de index.html`);
