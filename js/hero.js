@@ -12,6 +12,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { makeButterfly } from './papillons.js';
 import { makeBee } from './abeilles.js';
+import './stats.js';                                // les chiffres, sous l'À propos (leurs scènes 3D)
 
 const host = document.getElementById('hero-scene');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;

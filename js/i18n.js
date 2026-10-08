@@ -17,7 +17,7 @@
       about: '<p>You have better things to do than deal with everyday chores. <span class="accent">HomeService '
         + 'comes to your home in Brussels for all your needs</span>, we take care of what you don\'t have the time to do, '
         + 'so that you can focus on the things that really matter.</p>',
-      'about.photo': 'The HomeService team',
+      'about.photo': 'The HomeService team', 'stats.label': 'HomeService in numbers',
       'chantier.label': 'The rest is under construction', 'chantier.photo': 'Website under construction',
       'stat.services': '<strong>services combined</strong>\n            No need for several providers, we take care of it all.',
       'stat.communes': '<strong>municipalities served</strong>\n            We work everywhere in the Brussels region.',
@@ -38,7 +38,7 @@
       about: '<p>U hebt wel beters te doen dan u bezig te houden met uw klusjes. <span class="accent">HomeService komt '
         + 'bij u thuis in Brussel voor al uw noden</span>, wij doen waar u zelf geen tijd voor hebt, zodat u zich kunt '
         + 'concentreren op wat echt belangrijk is.</p>',
-      'about.photo': 'Het HomeService-team',
+      'about.photo': 'Het HomeService-team', 'stats.label': 'HomeService in cijfers',
       'chantier.label': 'De rest is in aanbouw', 'chantier.photo': 'Website in aanbouw',
       'stat.services': '<strong>diensten onder één dak</strong>\n            Niet langer meerdere vakmensen zoeken, wij regelen alles.',
       'stat.communes': '<strong>gemeenten bediend</strong>\n            Wij zijn actief in het hele Brusselse Gewest.',

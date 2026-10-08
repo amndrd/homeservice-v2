@@ -9,9 +9,9 @@
 <script>try { var v = sessionStorage.getItem('hs-veil'); if (document.prerendering || v) { document.documentElement.classList.add('veil-in'); sessionStorage.removeItem('hs-veil'); } else document.documentElement.classList.add('loading'); } catch (e) { document.documentElement.classList.add('loading'); }</script>
 <!-- chargés tout de suite : la police, le script de l'îlot et son modèle (même version que MODEL dans js/hero.js) -->
 <link rel="preload" href="fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="modulepreload" href="js/hero.min.js?v=908d5a9217">
+<link rel="modulepreload" href="js/hero.min.js?v=10b3587764">
 <link rel="preload" href="models/ilot.glb?v=fe77098755" as="fetch" crossorigin>
-<link rel="stylesheet" href="css/style.min.css?v=e287d5809d">
+<link rel="stylesheet" href="css/style.min.css?v=22d50e249c">
 </head>
 <body>
 
@@ -78,8 +78,35 @@
           <span class="accent">HomeService intervient chez vous à Bruxelles pour tous vos besoins</span>, on s'occupe de
           ce que vous n'avez pas le temps de faire, pour que vous puissiez vous concentrer sur ce qui compte vraiment.</p></div>
       </div>
-      <!-- la photo de l'équipe reviendra ici (js/apropos.js sait l'ouvrir : .about__photo) -->
+      <!-- la photo de l'équipe, à droite du texte : elle s'ouvre derrière le bord du vide (js/apropos.js) -->
+      <figure class="about__photo">
+        <img src="images/teampic.webp" alt="L'équipe HomeService" data-i18n-alt="about.photo" width="736" height="552"
+          loading="lazy">
+      </figure>
     </div>
+  </section>
+
+  <!-- les chiffres, sous l'À propos, repris du plan 1 du site immersif : chaque chiffre a sa petite scène posée sur la
+       page, à sa gauche (js/stats.js, models/services.glb) ; le chiffre se décompte, les objets surgissent avec lui.
+       data-n : la valeur ; data-suffix : l'unité (en vert) ; <strong> : le titre, le reste : la description -->
+  <section class="stats" aria-label="HomeService en chiffres" data-i18n-aria="stats.label">
+    <ul class="stats__list">
+      <li class="stat" data-n="5" data-scene="services">
+        <span class="stat__num" aria-hidden="true"><span class="stat__count">5</span><span class="stat__unit"></span></span>
+        <p class="stat__text"><span class="sr-only">5 </span><span data-i18n="stat.services"><strong>services réunis</strong>
+          Plus besoin de chercher plusieurs prestataires, on s'occupe de tout.</span></p>
+      </li>
+      <li class="stat" data-n="19" data-scene="communes">
+        <span class="stat__num" aria-hidden="true"><span class="stat__count">19</span><span class="stat__unit"></span></span>
+        <p class="stat__text"><span class="sr-only">19 </span><span data-i18n="stat.communes"><strong>communes desservies</strong>
+          Nous intervenons partout dans la région bruxelloise.</span></p>
+      </li>
+      <li class="stat" data-n="24" data-suffix="h" data-i18n-suffix="stat.devis.suffix" data-scene="devis">
+        <span class="stat__num" aria-hidden="true"><span class="stat__count">24</span><span class="stat__unit">h</span></span>
+        <p class="stat__text"><span class="sr-only">24 h </span><span data-i18n="stat.devis"><strong>pour recevoir votre devis</strong>
+          Réponse rapide garantie dès votre première demande.</span></p>
+      </li>
+    </ul>
   </section>
 
   <!-- tout en bas : la suite du site est en construction (clin d'œil provisoire, à retirer avec les sections suivantes) -->
@@ -91,8 +118,8 @@
 
 <!-- fichiers construits à partir des sources (js/*.js, css/style.css) : outils/build.mjs -->
 <script src="js/veil.min.js?v=2ced49a0e4"></script>
-<script src="js/i18n.min.js?v=2c1679e8ee"></script>
+<script src="js/i18n.min.js?v=f67fcc945b"></script>
 <script src="js/apropos.min.js?v=f93b816c58"></script>
-<script type="module" src="js/hero.min.js?v=908d5a9217"></script>
+<script type="module" src="js/hero.min.js?v=10b3587764"></script>
 </body>
 </html>

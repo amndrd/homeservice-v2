@@ -1,5 +1,5 @@
 // Construction du site : ce que le navigateur charge est produit ici à partir des sources (lisibles, commentées).
-// - js/hero.js et ses modules (papillons, abeilles) + three.js et ses chargeurs → un seul fichier js/hero.min.js,
+// - js/hero.js et ses modules (papillons, abeilles, chiffres) + three.js et ses chargeurs → un seul fichier js/hero.min.js,
 //   minifié, sans les parties de three.js inutilisées (plus de CDN : tout vient du site) ;
 // - le décodeur Draco de three.js → js/draco/ (servi par le site) ;
 // - les autres scripts et la feuille de style → *.min.js, style.min.css ;
@@ -24,7 +24,8 @@ await build({
   outfile: join(site, 'js/hero.min.js'),
   bundle: true, minify: true, format: 'esm', target: 'es2020', legalComments: 'none',
   alias: { 'three/addons': join(three, 'examples/jsm'), three: join(three, 'build/three.module.js') },
-  define: { __MODEL__: JSON.stringify(`models/ilot.glb?v=${version('models/ilot.glb')}`) },
+  define: { __MODEL__: JSON.stringify(`models/ilot.glb?v=${version('models/ilot.glb')}`),
+    __STATS__: JSON.stringify(`models/services.glb?v=${version('models/services.glb')}`) },
   logLevel: 'info',
 });
 
