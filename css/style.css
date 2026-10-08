@@ -72,19 +72,18 @@ html.intro .hero__text > p { transition-delay: .72s; }
 }
 
 /* invitation à faire défiler, reprise du site immersif (.scroll-hint, .mouse) : une souris dont la molette descend,
-   en bas de l'écran, blanche comme dans le site immersif ; elle arrive après le titre et part dès qu'on défile.
+   en bas de l'écran, à l'encre du site (noire) ; elle arrive après le titre et part dès qu'on défile.
    Au-dessus de la scène 3D, sur l'herbe. */
 .scroll-hint { position: fixed; left: 50%; bottom: 28px; z-index: 2; transform: translate(-50%, 10px);
   display: flex; flex-direction: column; align-items: center; gap: 8px;
-  font: 700 13px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: #fff;
-  text-shadow: 0 1px 8px rgba(15, 26, 44, .6); opacity: 0; transition: opacity .6s ease, transform .6s ease;
+  font: 700 13px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--ink);
+  opacity: 0; transition: opacity .6s ease, transform .6s ease;
   pointer-events: none; }
 html.intro .scroll-hint { opacity: 1; transform: translate(-50%, 0); transition-delay: 1.6s; }
 html.intro.scrolled .scroll-hint { opacity: 0; transform: translate(-50%, 10px); transition-delay: 0s; }
-.mouse { width: 24px; height: 38px; border: 2.5px solid #fff; border-radius: 14px; position: relative;
-  box-shadow: 0 2px 10px rgba(15, 26, 44, .35); }
+.mouse { width: 24px; height: 38px; border: 2.5px solid var(--ink); border-radius: 14px; position: relative; }
 .mouse span { position: absolute; left: 50%; top: 7px; width: 4px; height: 8px; margin-left: -2px; border-radius: 2px;
-  background: #fff; animation: wheel 1.6s ease-in-out infinite; }
+  background: var(--ink); animation: wheel 1.6s ease-in-out infinite; }
 @keyframes wheel { 0% { opacity: 0; transform: translateY(-3px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(10px); } }
 @media (prefers-reduced-motion: reduce) { .mouse span { animation: none; opacity: 1; } }
 
