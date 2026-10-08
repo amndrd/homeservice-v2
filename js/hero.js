@@ -64,7 +64,8 @@ if (THREE.ShaderChunk.tonemapping_pars_fragment.includes(AGX_SIGMOID)) {
 // ------------------------------------------------------------ rendu
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+  // (stencil : le rai ne s'ajoute pas sur le plan qui recouvre le titre, voir STENCIL_TEXT)
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, stencil: true, powerPreference: 'high-performance' });
 } catch {
   throw new Error('WebGL indisponible');            // la page reste blanche, sans l'îlot
 }
@@ -140,6 +141,13 @@ scene.add(rai, rai.target);
 // [couleur, intensité, part du faisceau dessinée (depuis le sol), adoucissement du bord, échelle et vitesse de la brume,
 //  hauteur (m) sur laquelle il se fond en approchant du sol]
 const SHAFT = { color: '#fff1d2', strength: 0.22, len: 0.62, soft: 0.55, mist: 0.9, drift: 0.05, feather: 1.1 };
+// Le rai est une lumière ajoutée, × l'alpha de la toile : invisible sur la page. Mais quand le vide reprend le titre,
+// le plan qui le recouvre (textVoid) est peint de la couleur de la page, opaque : le rai s'y verrait (un cône plus
+// blanc que le blanc). Ce plan marque donc ses pixels dans le stencil (STENCIL_TEXT), l'îlot et les objets effacent la
+// marque là où ils passent devant lui, et le rai (et sa poussière) ne s'ajoute pas sur ce qui reste marqué. Ainsi il
+// peut rester allumé pendant que les objets s'envolent : ils gardent leur éclaircie.
+const STENCIL_TEXT = 1;
+const shaftStencil = { stencilWrite: true, stencilWriteMask: 0, stencilRef: STENCIL_TEXT, stencilFunc: THREE.NotEqualStencilFunc };
 const uShaft = {
   apex: { value: rai.position.clone() },
   axis: { value: rai.target.position.clone().sub(rai.position).normalize() },
@@ -184,6 +192,7 @@ function addShaft() {
     // lumière ajoutée à ce qui est déjà dessiné (× l'alpha de la toile : rien sur la page, qui reste de sa couleur)
     transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, blending: THREE.CustomBlending,
     blendSrc: THREE.DstAlphaFactor, blendDst: THREE.OneFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor,
+    ...shaftStencil,
     uniforms: { uTime, uColor: { value: new THREE.Color(SHAFT.color) }, uFade: uShaft.fade,
       uApex: uShaft.apex, uAxis: uShaft.axis, uLen: { value: L }, uGround: { value: GROUND_Y } },   // (îlot à plat : son sol est à GROUND_Y dans le monde)
     vertexShader: `
@@ -281,6 +290,8 @@ const voidPatched = new WeakSet();
 function voidify(m) {
   if (voidPatched.has(m)) return m;
   voidPatched.add(m);
+  // devant le plan du titre, il efface sa marque : le rai s'y ajoute de nouveau (STENCIL_TEXT)
+  Object.assign(m, { stencilWrite: true, stencilRef: 0, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp });
   const prev = m.onBeforeCompile, prevKey = m.customProgramCacheKey.bind(m);
   m.onBeforeCompile = (sh, r) => {
     prev.call(m, sh, r);
@@ -463,6 +474,7 @@ const dustMat = (() => {
   return new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, toneMapped: false, blending: THREE.CustomBlending,
     blendSrc: THREE.DstAlphaFactor, blendDst: THREE.OneFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor,
+    ...shaftStencil,
     uniforms: { uTime, uScale: { value: 1 }, uFade: uShaft.fade, uColor: { value: new THREE.Color(SHAFT.color) },
       uApex: uShaft.apex, uAxis: uShaft.axis, uU: { value: u }, uW: { value: w }, uTan: uShaft.tan,
       uGround: { value: GROUND_Y } },
@@ -2731,6 +2743,8 @@ let flyS = 0, flyK = 0;
 // le même front, le même bruit, le même bord net que l'îlot. Les objets, dessinés après, passent devant.
 const textVoid = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
   depthTest: false, depthWrite: false, toneMapped: false,
+  // il marque ses pixels : le rai ne s'y ajoute pas (STENCIL_TEXT)
+  stencilWrite: true, stencilRef: STENCIL_TEXT, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp,
   uniforms: { uExit, uIslandInv, uInvProj: { value: camera.projectionMatrixInverse }, uCamWorld: { value: camera.matrixWorld },
     uPlane: { value: new THREE.Vector4() }, uPaper: { value: new THREE.Color(PAPER).convertLinearToSRGB() } },
   vertexShader: `varying vec2 vNdc; void main() { vNdc = position.xy; gl_Position = vec4( position.xy, 0.0, 1.0 ); }`,
@@ -2841,7 +2855,7 @@ function frame() {
     if (bees.length) updateBees(uTime.value, dt);
     updateLevitation(uTime.value, dt);
     // le rai se lève dès que l'îlot commence à apparaître
-    uShaft.fade.value = (born < 0 ? 0 : smooth(born + REVEAL.wait, born + REVEAL.wait + 1.6, uTime.value)) * (1 - smooth(0, 0.2, exitK));   // le rai s'éteint dès que le vide revient : sur le blanc, il se verrait
+    uShaft.fade.value = (born < 0 ? 0 : smooth(born + REVEAL.wait, born + REVEAL.wait + 1.6, uTime.value)) * (1 - smooth(0.55, 0.9, flyK));   // il reste allumé pendant l'envol (les objets gardent leur éclaircie), s'éteint quand ils sont partis
     reveal(uTime.value);
     updateParticles(uTime.value);
   }
@@ -2861,6 +2875,7 @@ document.addEventListener('visibilitychange', start);
 window.addEventListener('scroll', () => { if (!gone()) host.style.visibility = ''; start(); }, { passive: true });
 resize();
 start();
+
 
 
 
