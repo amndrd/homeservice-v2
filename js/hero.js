@@ -661,15 +661,15 @@ function flyStep(f, t, h) {
 // animation au défilement : à chaque image, il regarde ce qu'il y a à l'écran et décide. Il voit les objets qui
 // volent (il les contourne), les bords de l'écran (il y reste), la lecture de l'À propos et les endroits où il peut se
 // poser (js/apropos.js : window.hsPage). Au repos, il vit chez lui comme les autres. Quand les objets décollent, il
-// quitte son coin d'herbe et vole parmi eux ; le vide ne le reprend pas. Quand l'À propos arrive, il va droit au
-// dernier mot du texte (il l'attend au bord de l'écran tant qu'il n'y est pas) et s'y pose. À partir de l'À propos, la
-// page est son sol : il s'y pose à plat, le dos vers nous — on le voit de dessus —, ailes ouvertes qu'il referme de
-// temps en temps ; il s'y couche en douceur à l'approche, s'en relève au départ ; posé, il part avec la page quand elle
-// défile. Il repart quand son perchoir va
-// quitter l'écran, ou simplement quand il en a assez : il vole un moment dans le blanc, se pose ailleurs, revient…
-// même si la page ne bouge plus. S'il ne peut pas rattraper un perchoir (la page défile trop vite), il renonce et vole.
-// En remontant jusqu'à l'îlot, il rentre chez lui. Son vol est celui des autres (poursuite amortie, accélération et
-// vitesse bornées, vol erratique, cap à virage limité), avec un but qui change.
+// quitte son coin d'herbe et vole parmi eux ; le vide ne le reprend pas. À partir de l'À propos, la page est son sol :
+// il vole au-dessus d'elle par trajets (ROUTES : une traversée, un tour du texte, une exploration le long des lignes,
+// un survol de mots, une sortie de l'écran), tracés d'avance en courbe ; le défilement ne les interrompt pas. Il ne se
+// pose que si on lit (LAND : la page arrêtée depuis quelques secondes, de plus en plus volontiers), d'abord sur le
+// dernier mot du texte, souvent après un ou deux passages d'inspection. Posé à plat, le dos vers nous — on le voit de
+// dessus —, il part avec la page ; il s'envole quand on reprend le défilement, quand son perchoir quitte l'écran, ou
+// quand il en a assez (après s'être réveillé, s'il est resté longtemps). En remontant jusqu'à l'îlot, il rentre chez
+// lui. Son vol est celui des autres (poursuite amortie, accélération et vitesse bornées, vol erratique), son cap se
+// prend dans le plan de la page (guideHeading).
 // [profondeur où il vole près de la page, parmi les objets (part du recul de la caméra), vitesse max, accélération
 //  max, pulsation et amortissement de la poursuite, vol erratique (de côté, en hauteur), marge autour des objets (m)
 //  et anticipation (s), temps pour rattraper un
@@ -682,13 +682,33 @@ const GUIDE = { species: 'aurore', depth: 0.45, among: 0.85, vmax: 2.2, accel: 6
 // se poser en chemin, près de la page : [distance préférée d'un endroit où se poser (part de la hauteur de l'écran),
 //  tolérance, longueur d'une étape de vol (idem), vitesse sur la courbe d'approche et au contact (m/s), de croisière
 //  (m/s), souplesse de la poursuite (pulsation, 1/s)]
-const PATH_LAND = { reach: 0.24, spread: 0.12, hop: [0.12, 0.3], speed: 0.75, touch: 0.2, cruise: 0.85, omega: 1.5 };
+// en retard sur la page (on a défilé vite, il est resté au fond) : [retard (m) en deçà duquel il l'a rejointe, au-delà
+//  duquel il pique vers elle à pleine vitesse], vitesse du piqué (m/s), part du temps où il bat des ailes en piqué
+const CATCH = { late: [0.3, 1.5], dive: 4.5, beat: 0.3 };
+const PATH_LAND = { reach: 0.24, spread: 0.12, hop: [0.12, 0.3], speed: 1.6, touch: 0.3, cruise: 2.2, omega: 2.6 };
+// ses trajets au-dessus de la page : [chances (0 : jamais tiré au sort), allure (m/s), hauteur au-dessus de la page (m)]
+// L'allure se juge à ses battements : un papillon avance de plusieurs envergures par battement ; à ~6 battements/s et
+// 0,23 m d'envergure, moins de ~1,5 m/s paraît au ralenti (on était à 0,8 : un quart d'envergure par battement).
+const ROUTES = {
+  traverse: { w: 0.25, speed: 2.6, alt: [0.5, 0.9] },    // d'un côté de l'écran à l'autre, en arc
+  tour: { w: 0.2, speed: 2.2, alt: [0.4, 0.8] },         // une grande boucle autour du texte
+  explore: { w: 0.2, speed: 1.5, alt: [0.2, 0.4] },      // en zigzag, bas, le long des lignes
+  words: { w: 0.15, speed: 1.6, alt: [0.25, 0.45] },     // de mot en mot, sans s'y poser
+  away: { w: 0.2, speed: 3.0, alt: [0.5, 0.9] },         // il sort de l'écran, et reviendra par un autre bord
+  enter: { w: 0, speed: 2.4, alt: [0.4, 0.8] },          // il rentre
+  hop: { w: 0, speed: 1.5, alt: [0.3, 0.6] },            // un petit saut (approche abandonnée)
+  inspect: { w: 0, speed: 1.6, alt: [0.2, 0.35] },       // il passe au-dessus d'un perchoir avant de s'y poser
+};
+// se poser : [lecture (s sans défiler) à partir de laquelle il peut le vouloir, où l'envie est au plus fort ; chance
+//  de se poser à la fin d'un trajet (au début, au plus fort) ; envie d'abréger son trajet pour se poser, au plus fort
+//  (par s) ; chance d'une inspection avant, d'une seconde ; temps dehors en sortie (s)]
+const LAND = { read: [2, 6], chance: [0.35, 0.95], early: 0.25, inspect: 0.65, again: 0.35, out: [5, 20] };
 let guide = null;
 const G = { mode: 'home', target: new THREE.Vector3(), site: null, path: null, timer: 0, until: 0, since: 0, spot: null,
   fly: null, away: null, fleeDir: new THREE.Vector3(), first: false, posture: 'open', nextAct: 0, restA: null, flick: 0,
   step: new THREE.Vector2(), stepTo: new THREE.Vector2(),
   spotAt: 0, last: null, sawEnd: false, wall: 0, liftoff: -9, dist: 1, flat: new THREE.Quaternion(), alt: 0.9,
-  touch: -9, clap: -9, clapAt: new THREE.Vector3() };
+  touch: -9, clap: -9, clapAt: new THREE.Vector3(), scrollY: 0, route: null, recent: [], wake: null };
 const _gp = new THREE.Vector3(), _gd = new THREE.Vector3(), _ga = new THREE.Vector3(), _gq = new THREE.Quaternion();
 const _wy = new THREE.Vector3(), _wz = new THREE.Vector3(), _wx = new THREE.Vector3();
 // à plat sur la page : le dos vers la caméra, la tête vers le haut de l'écran, tournée de `angle`
@@ -702,9 +722,21 @@ function wallQuat(pos, angle, out) {
 // 0 : parmi les objets, 1 : près de la page. Il ne rejoint la page que quand les objets s'en vont et que le texte
 // arrive (l'envol, flyK) : vu de face parmi eux, il passe peu à peu à vu de dessus en approchant du texte.
 const nearPage = () => smooth(GUIDE.page[0], GUIDE.page[1], flyK);
-// il peut se poser : il a rejoint la page, et il ne reste presque plus d'objets à l'écran (compté chaque image)
-const pageReady = () => nearPage() >= 0.99 && objectsOnScreen <= 1;
 const guideDepth = () => THREE.MathUtils.lerp(GUIDE.among, GUIDE.depth, nearPage()) * baseDist;
+// son retard sur la page (m) : de combien il est plus loin de nous que sa hauteur de vol au-dessus d'elle. La page
+// arrive avec le défilement, lui la rejoint en volant : défilé vite, il est encore au fond (petit à l'écran).
+const _gl = new THREE.Vector3(), _gm = new THREE.Vector3();
+function guideLag() {
+  camera.getWorldDirection(_gl);
+  return _gl.dot(_gm.subVectors(guide.pos, camera.position)) - (guideDepth() - G.alt * nearPage());
+}
+// 0 : il est à sa hauteur au-dessus de la page ; 1 : très en retard, il pique vers elle
+const catching = () => nearPage() * smooth(CATCH.late[0], CATCH.late[1], guideLag());
+// il peut se poser : il a rejoint la page (pour de vrai, pas seulement le défilement), et il ne reste presque plus
+// d'objets à l'écran (compté chaque image) — ou on lit déjà : arrêté en pleine envolée, les objets restent en l'air
+// au-dessus du texte, et ne doivent pas l'empêcher de se poser
+const pageReady = () => nearPage() >= 0.99 && guideLag() < CATCH.late[0]
+  && (objectsOnScreen <= 1 || readFor() > LAND.read[0]);
 const guideScale = () => THREE.MathUtils.lerp(1, GUIDE.scale, nearPage());
 // À partir de l'À propos, la page est un sol : un plan à guideDepth() de la caméra. En vol, il est au-dessus, à G.alt
 // mètres vers nous (plus haut, il paraît plus grand) ; se poser, c'est descendre jusqu'au plan.
@@ -759,7 +791,7 @@ function chooseSite(f, reach) {
 }
 
 // ------------------------------------------------------------ la souris
-// Il la voit : posé, si le curseur s'approche vivement, il s'envole et s'enfuit ; en vol, il s'en écarte.
+// Il la voit quand il est posé : si le curseur s'approche vivement, il s'envole et s'enfuit. En vol, il l'ignore.
 const mouse = { x: -9, y: -9, t: -9, speed: 0 };
 window.addEventListener('pointermove', (e) => {
   if (e.pointerType !== 'mouse') return;
@@ -792,26 +824,25 @@ function cursorNear(me, r) {                        // le curseur, s'il a bougé
 }
 
 // ------------------------------------------------------------ ce qu'il fait : posé, en vol
-// Posé, il reste longtemps (comme les vrais : ils passent plus de temps posés qu'en vol), et ne reste pas figé : il
-// change de posture (ailes grandes ouvertes au soleil, en V, fermées), bat vivement des ailes un instant, pivote sur
-// place, fait quelques pas. En vol, chaque départ a son but : un saut (il se repose tout près), une patrouille (de
-// grandes boucles, plus longue), une exploration (bas, le long du texte), ou une escapade (il sort de l'écran et
-// revient par un autre bord, quelques secondes plus tard) ; jamais deux fois de suite le même, autant que possible.
-// [temps posé (s), la première fois sur le dernier mot (s), un geste toutes les… (s), postures (angle des ailes),
-//  les vols : chances, durée (s), pas (part de la hauteur de l'écran), distance où se poser (idem), hauteur (m) ;
-//  la souris : distance qui l'effraie posé, qui l'écarte en vol (part de la hauteur de l'écran), vitesse du curseur
-//  qui l'effraie (hauteurs d'écran par s), fuite : durée (s), vitesse (m/s) ; défilement qui l'effraie posé (écrans
-//  par s)]
+// Posé, il reste longtemps et ne reste pas figé : il change de posture (ailes grandes ouvertes au soleil, en V,
+// fermées), bat vivement des ailes un instant, pivote un peu, fait quelques pas. Resté longtemps, il se réveille avant
+// de repartir : il ouvre et referme lentement les ailes, deux ou trois fois.
+// [temps posé (s), la première fois sur le dernier mot (s), un geste toutes les… (s), postures (angle des ailes) ;
+//  la souris : distance qui l'effraie posé (part de la hauteur de l'écran), vitesse du curseur qui l'effraie (hauteurs
+//  d'écran par s), fuite : durée (s), vitesse (m/s) ; défilement qui l'effraie posé (écrans par s), défilement qui le
+//  fait repartir (part de la hauteur de l'écran) ; le réveil : après combien de temps posé (s), durée (s), un
+//  battement lent (s)]
 const BEHAVE = {
   rest: [8, 30], first: [10, 20], act: [2.5, 7], postures: { open: 0.08, vee: 0.62, closed: 1.3 },
-  flights: {
-    hop: { w: 0.35, dur: [1.5, 4], hop: [0.07, 0.16], reach: 0.13, alt: [0.2, 0.45] },
-    patrol: { w: 0.3, dur: [6, 14], hop: [0.25, 0.45], reach: 0.3, alt: [0.5, 0.9] },
-    explore: { w: 0.2, dur: [4, 8], hop: [0.1, 0.2], reach: 0.18, alt: [0.2, 0.4] },
-    away: { w: 0.08, dur: [2, 6] },
-  },
-  startle: 0.09, shy: 0.13, scare: 0.4, flee: [2, 3.5], fleeSpeed: 1.1, jolt: 1.6,
+  startle: 0.09, scare: 0.4, flee: [1.2, 2], fleeSpeed: 3, jolt: 1.6, resume: 0.01,
+  wake: { after: 12, dur: [1.8, 2.8], beat: 0.9 },
 };
+// depuis combien de temps on lit (s) : la page n'a pas bougé
+const readFor = () => performance.now() / 1000 - scrolling.t;
+// l'envie de se poser à la fin d'un trajet : nulle tant qu'on défile, de plus en plus forte à mesure qu'on lit
+const landChance = (read) => read < LAND.read[0] ? 0 : THREE.MathUtils.lerp(LAND.chance[0], LAND.chance[1], smooth(LAND.read[0], LAND.read[1], read));
+// posé ou sur le point de l'être, la page a bougé (au-delà d'un frémissement) depuis qu'il a choisi son perchoir
+const scrolledSince = () => Math.abs(window.scrollY - G.scrollY) > BEHAVE.resume * window.innerHeight;
 // Les gestes (d'après les vidéos à haute vitesse d'insectes qui se posent et décollent) : à l'approche, il freine
 // presque jusqu'au surplace en se redressant, ses battements plus amples et plus vifs ; au contact, il referme les
 // ailes un instant et se tasse un peu, puis prend sa posture. Au départ, il claque les ailes au-dessus du dos et les
@@ -824,28 +855,124 @@ const BEHAVE = {
 //  départ (s), frémissement des ailes (rad), du corps (rad)]
 const GESTURE = { flare: 0.3, pitch: 0.45, shut: 0.4, squash: [0.12, 0.35], clap: 0.14, lift: 0.35, climb: 0.15,
   ramp: 0.8, burst: 0.9, tremble: 0.035, sway: 0.03 };
-function pickFlight() {
-  const kinds = Object.keys(BEHAVE.flights).filter((k) => k !== 'away' || pageReady());
-  const w = kinds.map((k) => BEHAVE.flights[k].w * (k === G.fly ? 0.3 : 1));
+// le prochain trajet : au sort, pas l'un des deux derniers (autant que possible) ; quand on défile, il sort plus
+// volontiers de l'écran
+function pickRoute() {
+  const kinds = Object.keys(ROUTES).filter((k) => ROUTES[k].w > 0 && (k !== 'words' || visiblePerches().length >= 2));
+  const w = kinds.map((k) => ROUTES[k].w * (G.recent.includes(k) ? 0.25 : 1) * (k === 'away' && readFor() < 1.5 ? 2 : 1));
   let r = Math.random() * w.reduce((a, b) => a + b, 0);
   for (let i = 0; i < kinds.length; i++) if ((r -= w[i]) <= 0) return kinds[i];
   return kinds[0];
 }
-function startFlight(t, kind) {
+const visiblePerches = () => (window.hsPage?.perches() ?? []).filter(inView);
+const inside = (x, y) => [THREE.MathUtils.clamp(x, 0.1, 0.9), THREE.MathUtils.clamp(y, 0.2, 0.8)];
+// les portes hors de l'écran, par bord (gauche, droite, haut, bas) : assez loin pour que son ombre n'y paraisse pas
+const DOOR = 0.2;
+const doorOn = (e, a) => [[-DOOR, a], [1 + DOOR, a], [a, -DOOR], [a, 1 + DOOR]][e];
+// Un trajet : des points de l'écran (x, y en part de l'écran), tracés d'avance ; une courbe douce (Catmull-Rom) passe
+// par eux, au-dessus de la page, et il la suit à son allure (guideThink). Il part de là où il est, dans le sens où il
+// va : jamais de demi-tour au départ.
+function planRoute(t, kind, site = null, extra = {}) {
+  const R = ROUTES[kind], me = onScreen(guide), asp = me.asp;
   G.fly = kind;
-  G.spot = null;
-  const B = BEHAVE.flights[kind];
-  G.until = t + rand(...(B?.dur ?? BEHAVE.flee));
-  G.alt = rand(...(B?.alt ?? GUIDE.alt));
-  if (kind === 'away') {                            // par le bord le plus proche
-    const me = onScreen(guide), out = [[-0.15, me.y], [1.15, me.y], [me.x, -0.15], [me.x, 1.15]];
+  G.alt = rand(...R.alt);
+  const P = [];
+  const toward = (a, b, f, side = 0) => {           // de a vers b, une part f du chemin, écarté de côté (hauteurs d'écran)
+    const dx = (b[0] - a[0]) * asp, dy = b[1] - a[1], n = Math.hypot(dx, dy) || 1;
+    return [a[0] + (dx * f - (dy / n) * side) / asp, a[1] + dy * f + (dx / n) * side];
+  };
+  const at = [me.x, me.y];
+  if (kind === 'traverse') {                         // vers l'autre côté, en arc
+    const s = me.x < 0.5 ? 1 : -1, end = [0.5 + s * rand(0.22, 0.38), rand(0.25, 0.75)];
+    P.push(inside(...toward(at, end, 0.5, (Math.random() < 0.5 ? -1 : 1) * rand(0.08, 0.18))), inside(...end));
+  } else if (kind === 'tour') {                     // autour du texte, un tour ou un peu plus, dans un sens ou l'autre
+    const cx = 0.5 + rand(-0.08, 0.08), cy = 0.5 + rand(-0.05, 0.05), rx = rand(0.26, 0.36), ry = rand(0.2, 0.27);
+    const a0 = Math.atan2((me.y - cy) / ry, (me.x - cx) / rx), dir = Math.random() < 0.5 ? -1 : 1;
+    const turns = rand(0.8, 1.25), n = Math.round(6 * turns) + 1;
+    for (let k = 1; k <= n; k++) {
+      const a = a0 + (dir * 2 * Math.PI * turns * k) / n, r = rand(0.88, 1.12);
+      P.push(inside(cx + rx * r * Math.cos(a), cy + ry * r * Math.sin(a)));
+    }
+  } else if (kind === 'explore') {                  // le long des lignes, d'un bord du texte à l'autre
+    let left = me.x > 0.5, y = me.y;
+    const dy = (me.y < 0.5 ? 1 : -1) * rand(0.06, 0.1);
+    for (let k = 0, n = 3 + ((Math.random() * 3) | 0); k < n; k++) {
+      y += dy;
+      P.push(inside(left ? rand(0.14, 0.3) : rand(0.7, 0.86), y));
+      left = !left;
+    }
+  } else if (kind === 'words') {                    // deux ou trois mots, du plus proche au suivant
+    let pool = visiblePerches().filter((q) => Math.hypot((q.x - me.x) * asp, q.yc - me.y) > 0.15), from = at;
+    for (let k = 0, n = 2 + (Math.random() < 0.5 ? 1 : 0); k < n && pool.length; k++) {
+      pool.sort((a, b) => Math.hypot((a.x - from[0]) * asp, a.yc - from[1]) - Math.hypot((b.x - from[0]) * asp, b.yc - from[1]));
+      const p = pool[Math.min(pool.length - 1, (Math.random() * 2) | 0)];
+      pool = pool.filter((q) => q !== p && Math.hypot((q.x - p.x) * asp, q.yc - p.yc) > 0.18);   // pas de crochets serrés
+      from = inside(p.x + rand(-0.03, 0.03), p.yc - 0.03);
+      P.push(from);
+    }
+    if (!P.length) P.push(inside(1 - me.x, me.y));  // plus de mots assez loin : il traverse
+  } else if (kind === 'away') {                     // par un bord proche, en arc
     const dist = [me.x, 1 - me.x, me.y, 1 - me.y];
-    G.away = { phase: 'out', door: out[dist.indexOf(Math.min(...dist))], back: 0 };
+    const order = [0, 1, 2, 3].sort((a, b) => dist[a] - dist[b]);
+    const edge = order[Math.random() < 0.7 ? 0 : 1];
+    const door = doorOn(edge, edge < 2 ? THREE.MathUtils.clamp(me.y + rand(-0.25, 0.25), 0.15, 0.85)
+      : THREE.MathUtils.clamp(me.x + rand(-0.25, 0.25), 0.15, 0.85));
+    P.push(toward(at, door, 0.5, (Math.random() < 0.5 ? -1 : 1) * rand(0.05, 0.12)), door);
+    G.away = { phase: 'out', edge, door, back: 0 };
+  } else if (kind === 'enter') {                    // de la porte vers l'intérieur, en arc
+    const end = [rand(0.25, 0.75), rand(0.3, 0.7)];
+    P.push(toward(at, end, 0.55, (Math.random() < 0.5 ? -1 : 1) * rand(0.05, 0.12)), inside(...end));
+  } else if (kind === 'hop') {                      // tout près, plutôt devant lui
+    const a = Math.atan2(me.hy, me.hx) + rand(-0.8, 0.8), d = rand(0.08, 0.16);
+    P.push(inside(me.x + (Math.cos(a) * d) / asp, me.y + Math.sin(a) * d));
+  } else if (kind === 'inspect') {
+    // un circuit : il passe au-dessus du perchoir, file au-delà, fait demi-tour en un large arc sur un côté, et
+    // revient face à lui — c'est de là qu'il se posera, sans crochet (d : le sens du passage, n : le côté)
+    const c = siteAt(site), sd = Math.random() < 0.5 ? -1 : 1;
+    let dx = (c.x - me.x) * asp, dy = c.y - me.y;
+    const D = Math.hypot(dx, dy);
+    if (D < 0.06) { dx = me.hx; dy = me.hy; } else { dx /= D; dy /= D; }   // déjà dessus : dans le sens où il va
+    const nx = -dy * sd, ny = dx * sd;
+    const pt = (a, b) => inside(c.x + (dx * a + nx * b) / asp, c.y + dy * a + ny * b);
+    P.push(pt(0, 0.03), pt(0.2, 0.07), pt(0.3, 0.2), pt(0.22, 0.28), pt(0.2, 0.12), pt(0.12, 0.04));
   }
+  // dans le monde : au-dessus de la page, à sa hauteur de vol ; le départ dans le sens de son vol (ou de sa tête)
+  const pts = [guide.pos.clone()];
+  if (guide.vel.lengthSq() > 0.04) pts.push(guide.pos.clone().addScaledVector(guide.vel, 0.4));
+  else pts.push(guide.pos.clone().addScaledVector(guide.head, 0.35));   // juste envolé : d'abord droit devant lui
+  for (const [x, y] of P) pts.push(airPoint(x, y, new THREE.Vector3()));
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+  G.route = { kind, curve, len: Math.max(0.05, curve.getLength()), u: 0, speed: R.speed, site, ...extra };
+  if (R.w > 0) G.recent = [kind, ...G.recent].slice(0, 2);
+  G.spot = null;
+}
+// il a choisi un perchoir : d'abord, souvent, un ou deux passages au-dessus ; sinon, il y va
+// le perchoir n'est pas devant lui (à plus de ~70° de sa direction de vol) : se poser là, ce serait reculer
+function siteBehind(site) {
+  const s = siteAt(site);
+  if (!s) return false;
+  const me = onScreen(guide), dx = (s.x - me.x) * me.asp, dy = s.y - me.y;
+  return dx * me.hx + dy * me.hy < 0.35 * Math.hypot(dx, dy);
+}
+function decideLand(site, t, first) {
+  G.scrollY = window.scrollY;
+  if (first) G.sawEnd = true;
+  // derrière lui, il ne fait pas de crochet : il passe d'abord au-dessus, et revient face à lui
+  if (siteBehind(site) || Math.random() < LAND.inspect) planRoute(t, 'inspect', site, { first, passes: Math.random() < LAND.again ? 2 : 1 });
+  else landOn(site, t, first);
+}
+// la fuite : à l'opposé du curseur, vite, un moment
+function startFlee(t) {
+  G.fly = 'flee';
+  G.route = null;
+  G.until = t + rand(...BEHAVE.flee);
+  G.alt = rand(...GUIDE.alt);
 }
 function landOn(site, t, first = false) {
+  G.scrollY = window.scrollY;                       // la page où il a choisi de se poser : si elle repart, il renonce
   G.mode = 'land'; G.site = site; G.since = t; G.last = site.kind === 'word' ? site.id : null; G.first = first;
-  G.wall = rand(-0.7, 0.7);                         // l'angle où il se posera, la tête plutôt vers le haut
+  G.wall = (guide.psi ?? 0) + rand(-0.15, 0.15);    // il se posera dans l'axe de son arrivée (pas de pivot au contact)
+  G.route = null;
   G.path = { u: 0, from: guide.pos.clone(), dir: guide.vel.lengthSq() > 1e-4 ? guide.vel.clone().normalize()
     : new THREE.Vector3(0, 1, 0), len: 1 };
 }
@@ -856,6 +983,7 @@ function touchDown(t) {
   G.posture = Math.random() < 0.55 ? 'open' : Math.random() < 0.6 ? 'vee' : 'closed';
   G.nextAct = t + rand(...BEHAVE.act);
   G.step.set(0, 0); G.stepTo.set(0, 0); G.flick = 0;
+  G.wake = null;
 }
 function takeOff(t, from = null) {
   G.mode = 'free';
@@ -866,10 +994,12 @@ function takeOff(t, from = null) {
   // il ne part pas lancé : ses battements le soulèvent d'abord (guideStep, GESTURE.lift)
   _wy.subVectors(camera.position, guide.pos).normalize();
   guide.vel.copy(_wy).multiplyScalar(0.05);
+  guide.psi = G.wall;                               // il part dans l'axe où il était posé
+  G.route = null;
   if (from) {                                       // effrayé : il s'en ira à l'opposé du curseur
-    startFlight(t, 'flee');
+    startFlee(t);
     screenDir(from.dx, from.dy, G.fleeDir).addScaledVector(_wy, 0.3).normalize();
-  } else startFlight(t, pickFlight());
+  } else G.fly = 'free';                            // son trajet se décidera une fois envolé
 }
 // la courbe d'approche : elle part dans sa direction de vol, et descend en arc vers son point de pose, où il arrive
 // de biais, par au-dessus (une courbe de Bézier, recalculée à chaque image : le point de pose défile avec la page)
@@ -885,13 +1015,20 @@ function approach(u, out) {
 }
 // posé : un geste de temps en temps
 function perchLife(t, dt, s) {
+  if (G.wake !== null) {                            // il se réveille : il ouvre et referme lentement les ailes
+    const k = (t - G.wake) / BEHAVE.wake.beat;
+    G.restA = BEHAVE.postures.open + (BEHAVE.postures.closed - 0.2) * (0.5 - 0.5 * Math.cos(2 * Math.PI * k));
+    s.x += G.step.x / (window.innerWidth / window.innerHeight);
+    s.y += G.step.y;
+    return;
+  }
   if (t >= G.nextAct) {
     G.nextAct = t + rand(...BEHAVE.act);
     const r = Math.random();
     if (r < 0.45) {                                 // une autre posture
       const others = Object.keys(BEHAVE.postures).filter((k) => k !== G.posture);
       G.posture = others[(Math.random() * others.length) | 0];
-    } else if (r < 0.65) G.wall += (Math.random() < 0.5 ? -1 : 1) * rand(0.5, 1.6);   // il pivote sur place
+    } else if (r < 0.65) G.wall += (Math.random() < 0.5 ? -1 : 1) * rand(0.25, 0.7);   // il pivote un peu, sur place
     else if (r < 0.85) {                            // quelques pas, droit devant lui
       const d = rand(0.01, 0.03), a = G.wall;
       G.stepTo.x += -Math.sin(a) * d; G.stepTo.y += -Math.cos(a) * d;
@@ -909,7 +1046,7 @@ function perchLife(t, dt, s) {
 function guideThink(t, dt) {
   const P = course?.LIFT ? THREE.MathUtils.clamp(flyS / course.LIFT, 0, 1) : 0;
   if (G.mode === 'home') {
-    if (P > 0.05) { G.mode = 'free'; startFlight(t, 'patrol'); }
+    if (P > 0.05) { G.mode = 'free'; G.fly = 'free'; G.route = null; G.spot = null; }
     return;
   }
   if (P < 0.03 && exitK === 0) { G.mode = 'home'; G.site = null; return; }   // revenu à l'îlot : il rentre
@@ -919,8 +1056,15 @@ function guideThink(t, dt) {
     G.timer -= dt;
     // la page part brusquement sous lui : il s'envole, effrayé (du côté où elle file, un peu de biais)
     if (jolted() && t - G.touch > 0.5) { scrolling.jolt = -9; takeOff(t, { dx: rand(-0.6, 0.6), dy: scrolling.dir }); return; }
-    // son perchoir va quitter l'écran, ou il en a assez : il repart ; le curseur approche vivement : il s'enfuit
-    if (!s || s.y < 0.1 || s.y > 0.93 || G.timer <= 0) { takeOff(t); return; }
+    // on reprend la lecture plus loin : il s'envole, tranquillement
+    if (scrolledSince()) { takeOff(t); return; }
+    // son perchoir va quitter l'écran : il repart ; il en a assez : il repart (s'il est resté longtemps, après s'être
+    // réveillé) ; le curseur approche vivement : il s'enfuit
+    if (!s || s.y < 0.1 || s.y > 0.93) { takeOff(t); return; }
+    if (G.timer <= 0) {
+      if (G.wake === null && t - G.touch > BEHAVE.wake.after) { G.wake = t; G.timer = rand(...BEHAVE.wake.dur); }
+      else { takeOff(t); return; }
+    }
     const scare = mouse.speed > BEHAVE.scare && cursorNear({ x: s.x, y: s.y, asp: window.innerWidth / window.innerHeight }, BEHAVE.startle);
     if (scare) { takeOff(t, scare); return; }
     perchLife(t, dt, s);
@@ -930,7 +1074,11 @@ function guideThink(t, dt) {
   if (G.mode === 'land') {
     const s = siteAt(G.site);
     const late = t - G.since > GUIDE.catchUp + (2 * G.path.len) / PATH_LAND.touch;   // il n'y arrive pas (la page file)
-    if (!siteOk(s) || late) { G.mode = 'free'; startFlight(t, 'hop'); }
+    if (!siteOk(s) || late || scrolledSince()) {
+      if (G.first) G.sawEnd = false;                // le dernier mot : il y retournera à la prochaine pause
+      // (il ne renonce que si on défile, si le perchoir quitte l'écran, ou s'il ne peut vraiment pas le rattraper)
+      G.mode = 'free'; planRoute(t, 'hop');
+    }
     else {
       siteWorld(s, _end);
       G.path.len = Math.max(0.2, G.path.from.distanceTo(_end));
@@ -938,65 +1086,81 @@ function guideThink(t, dt) {
       return;
     }
   }
-  // en vol : l'À propos est là, il va au dernier mot (une fois par passage du texte) ; s'il n'est pas encore à
-  // l'écran, il l'attend au bord, de son côté
-  const all = window.hsPage?.perches() ?? [];
-  if (!reading) G.sawEnd = false;                   // le texte reviendra : il ira de nouveau au dernier mot
-  const end = reading && !G.sawEnd && G.fly !== 'away' ? all.find((p) => p.last) : null;
-  if (end) {
-    const s = { kind: 'word', id: end.id, x: end.x, y: end.yc };
-    // il s'y pose quand les objets sont partis ; d'ici là, il l'attend en volant
-    if (pageReady() && siteOk(s) && inView(end)) { G.sawEnd = true; landOn(s, t, true); return; }
-    airPoint(THREE.MathUtils.clamp(end.x, 0.15, 0.85) + 0.03 * Math.sin(t * 0.9),
-      THREE.MathUtils.clamp(end.yc, 0.3, 0.8) + 0.03 * Math.sin(t * 1.3), G.target);
+  // en vol. La fuite : à l'opposé du curseur, vite, un moment
+  if (G.fly === 'flee') {
+    if (t < G.until) { G.target.copy(guide.pos).addScaledVector(G.fleeDir, 2); return; }
+    G.fly = 'free';
+  }
+  // parmi les objets, ou encore loin de la page (on a défilé vite) : vers un point au hasard, changé de temps en temps
+  if (nearPage() < 0.99 || guideLag() > CATCH.late[1]) {
+    G.route = null;
+    if (!G.spot || t > G.spotAt || _gp.subVectors(G.target, guide.pos).length() < 0.3) {
+      G.spot = [rand(0.2, 0.8), rand(0.3, 0.7)];
+      G.spotAt = t + rand(2, 5);
+      G.alt = rand(...GUIDE.alt);
+    }
+    airPoint(G.spot[0], G.spot[1], G.target);
     return;
   }
-  const me = onScreen(guide);
-  // la fuite : à l'opposé du curseur, vite, un moment
-  if (G.fly === 'flee') {
-    if (t >= G.until) startFlight(t, pickFlight());
-    else { G.target.copy(guide.pos).addScaledVector(G.fleeDir, 2); return; }
-  }
-  // l'escapade : il sort par un bord, attend dehors, revient par un autre
-  if (G.fly === 'away') {
-    const A = G.away, outside = me.x < -0.05 || me.x > 1.05 || me.y < -0.05 || me.y > 1.05;
-    if (A.phase === 'out' && outside) {
-      A.phase = 'outside'; A.back = t + rand(...BEHAVE.flights.away.dur);
-      // il reviendra par le même bord, ailleurs : en longeant l'extérieur de l'écran, il ne le traverse pas
-      const [dx, dy] = A.door;
-      A.door = dx < 0 || dx > 1 ? [dx, rand(0.25, 0.75)] : [rand(0.2, 0.8), dy];
+  // dehors, en sortie : il attend, invisible, puis revient par un autre bord (on ne le voit pas changer de bord)
+  if (G.fly === 'away' && G.away?.phase === 'outside') {
+    // on s'est mis à lire : il ne tarde plus (mais reste dehors au moins le minimum)
+    if (readFor() > 4 && !G.away.soon) {
+      G.away.soon = true;
+      G.away.back = Math.min(G.away.back, Math.max(G.away.since + LAND.out[0], t + rand(0.5, 2.5)));
     }
-    if (A.phase === 'outside' && t >= A.back) A.phase = 'in';
-    if (A.phase === 'in' && !outside && me.x > 0.1 && me.x < 0.9 && me.y > 0.15 && me.y < 0.85) {
-      startFlight(t, 'patrol'); G.until = t + rand(2, 5);   // rentré : il vole encore un peu avant de se poser
-    } else {
-      const [x, y] = A.phase === 'in' ? [0.5 + (A.door[0] - 0.5) * 0.5, 0.5 + (A.door[1] - 0.5) * 0.5] : A.door;
-      airPoint(x, y, G.target);
-      return;
+    if (t < G.away.back) { airPoint(...G.away.door, G.target); return; }
+    const edges = [0, 1, 2, 3].filter((e) => e !== G.away.edge), e = edges[(Math.random() * edges.length) | 0];
+    const door = doorOn(e, rand(0.25, 0.75));
+    G.alt = rand(...ROUTES.enter.alt);
+    airPoint(...door, guide.pos);
+    screenDir(0.5 - door[0], door[1] - 0.5, guide.vel).multiplyScalar(0.6);
+    G.away = { phase: 'in', edge: e, door, back: 0 };
+    planRoute(t, 'enter');
+  }
+  if (!G.route) planRoute(t, pickRoute());
+  // il suit son trajet, à son allure, sans laisser son but filer devant lui
+  const R = G.route, lag = _gp.subVectors(G.target, guide.pos).length();
+  const lead = 0.15 + 0.25 * R.speed;               // son but, un peu devant lui sur la courbe
+  R.u = Math.min(1, R.u + (R.speed * (1 - smooth(lead + 0.1, lead + 0.6, lag)) * dt) / R.len);
+  R.curve.getPointAt(Math.min(1, R.u + lead / R.len), G.target);
+  // fini quand il est vraiment arrivé au bout (pas seulement son but) : sinon il est encore dans son virage
+  const done = R.u >= 1 && guide.pos.distanceTo(R.curve.points[R.curve.points.length - 1]) < 0.3;
+  // le texte : se poser, d'abord sur le dernier mot (une fois par passage du texte), seulement si on lit
+  const read = readFor(), canLand = pageReady() && read >= LAND.read[0];
+  if (!reading) G.sawEnd = false;                   // le texte reviendra : il ira de nouveau au dernier mot
+  const endP = reading && !G.sawEnd ? (window.hsPage?.perches() ?? []).find((p) => p.last) : null;
+  const end = endP && inView(endP) ? { kind: 'word', id: endP.id, x: endP.x, y: endP.yc } : null;
+  if (R.kind === 'inspect') {                        // en inspection : on défile, il renonce ; au bout, il se décide
+    if (scrolledSince() || !siteOk(siteAt(R.site))) {
+      if (R.first) G.sawEnd = false;
+      planRoute(t, pickRoute());
+    } else if (done) {
+      // décidé : il s'y pose (il ne change pas d'avis) — face à lui ; si le perchoir est encore derrière lui, il refait
+      // un passage pour revenir face à lui (deux fois au plus), plutôt que de reculer vers lui
+      const again = R.passes > 1 || (siteBehind(R.site) && (R.retry ?? 0) < 2);
+      if (again) planRoute(t, 'inspect', R.site, { first: R.first, passes: Math.max(1, R.passes - 1), retry: (R.retry ?? 0) + (R.passes > 1 ? 0 : 1) });
+      else landOn(R.site, t, R.first);
     }
+    return;
   }
-  // l'heure de se poser : sur son chemin (la page est son sol, l'îlot reparti)
-  const B = BEHAVE.flights[G.fly] ?? BEHAVE.flights.patrol;
-  if (pageReady() && t >= G.until) {
-    const site = chooseSite(guide, B.reach);
-    if (site) { landOn(site, t); return; }
+  const free = R.kind !== 'away' && R.kind !== 'enter';
+  // on lit : le dernier mot l'attire tout de suite ; ailleurs, il abrège parfois son trajet, d'autant plus qu'on lit
+  // depuis longtemps
+  if (canLand && free && end && siteOk(end)) { decideLand(end, t, true); return; }
+  if (canLand && free && R.u > 0.35 && Math.random() < dt * LAND.early * smooth(LAND.read[0], LAND.read[1], read)) {
+    const site = chooseSite(guide, PATH_LAND.reach);
+    if (site) { decideLand(site, t, false); return; }
   }
-  // sinon, il vole : vers un point devant lui, un peu à gauche ou à droite de sa route (en exploration : près d'un
-  // mot, bas), changé quand il l'a atteint ou de temps en temps ; avant que l'îlot ne soit reparti : parmi les objets
-  if (!G.spot || t > G.spotAt || _gp.subVectors(G.target, guide.pos).length() < 0.3) {
-    if (!pageReady()) G.spot = [rand(0.2, 0.8), rand(0.3, 0.7)];
-    else if (G.fly === 'explore' && all.length) {
-      const p = all[(Math.random() * all.length) | 0];
-      G.spot = [THREE.MathUtils.clamp(p.x + rand(-0.06, 0.06), 0.1, 0.9), THREE.MathUtils.clamp(p.yc + rand(-0.05, 0.05), 0.2, 0.82)];
-    } else {
-      const a = Math.atan2(me.hy, me.hx) + rand(-0.9, 0.9), d = rand(...B.hop);
-      G.spot = [THREE.MathUtils.clamp(me.x + (Math.cos(a) * d) / me.asp, 0.1, 0.9),
-        THREE.MathUtils.clamp(me.y + Math.sin(a) * d, 0.2, 0.82)];
-    }
-    G.spotAt = t + rand(2, 5);
-    G.alt = rand(...(B.alt ?? GUIDE.alt));          // à une autre hauteur au-dessus de la page
+  if (!done) return;
+  // la fin du trajet : la sortie se poursuit dehors ; sinon, se poser si on lit (de plus en plus volontiers), ou un
+  // autre trajet
+  if (R.kind === 'away') { Object.assign(G.away, { phase: 'outside', since: t, back: t + rand(...LAND.out) }); return; }
+  if (canLand && Math.random() < landChance(read)) {
+    const site = chooseSite(guide, PATH_LAND.reach);
+    if (site) { decideLand(site, t, false); return; }
   }
-  airPoint(G.spot[0], G.spot[1], G.target);
+  planRoute(t, pickRoute());
 }
 // un pas de vol vers son but : comme flyStep, en contournant les objets et en restant à l'écran. Près de la page, il
 // vole plus lentement et plus souplement ; à l'approche, il suit sa courbe en ralentissant jusqu'au contact.
@@ -1009,6 +1173,7 @@ function guideStep(f, t, h) {
   }
   // au départ : d'abord il s'élève de la page en battant des ailes, presque sur place
   const since = t - G.liftoff, lifting = since < GESTURE.clap + GESTURE.lift;
+  const late = landing || lifting ? 0 : catching();   // en retard : il pique vers la page
   if (lifting) {
     camera.getWorldDirection(_gp).negate();         // au-dessus de la page : vers la caméra
     G.target.copy(G.clapAt).addScaledVector(_gp, GESTURE.climb);
@@ -1018,11 +1183,21 @@ function guideStep(f, t, h) {
   _acc.copy(_gd).multiplyScalar(w * w).addScaledVector(f.vel, -2 * GUIDE.zeta * w);
   // vol erratique, qui s'apaise à l'approche du perchoir
   const k = (f.gliding ? 0.3 : 1) * (landing ? 0.25 * (1 - G.path.u) : 1), [kh, kv] = GUIDE.wander;
-  _acc.x += k * kh * (Math.sin(t * 0.7 + f.ph * 3) + 0.5 * Math.sin(t * 1.13 + f.ph));
-  _acc.z += k * kh * 0.5 * (Math.sin(t * 0.83 + f.ph * 7) + 0.5 * Math.sin(t * 1.29 + f.ph * 4));
-  _acc.y += k * kv * (Math.sin(t * 2.6 + f.ph * 5) + 0.5 * Math.sin(t * 4.3 + f.ph * 2));
-  if (f.gliding && !landing) _acc.y -= FLIGHT.sink;
-  // il contourne les objets qui volent, et s'écarte du curseur : éviter passe avant son but (qui s'efface d'autant)
+  const wx = k * kh * (Math.sin(t * 0.7 + f.ph * 3) + 0.5 * Math.sin(t * 1.13 + f.ph));
+  const wz = k * kh * 0.5 * (Math.sin(t * 0.83 + f.ph * 7) + 0.5 * Math.sin(t * 1.29 + f.ph * 4));
+  const wy = k * kv * (Math.sin(t * 2.6 + f.ph * 5) + 0.5 * Math.sin(t * 4.3 + f.ph * 2));
+  // parmi les objets : de côté et en hauteur, dans le monde. Près de la page, son sol : le sautillement se fait en
+  // hauteur au-dessus d'elle (vers nous), et de côté dans la page, plus doux (sinon son cap suit chaque à-coup)
+  _acc.x += wx * (1 - near); _acc.z += wz * (1 - near); _acc.y += wy * (1 - near);
+  if (near > 0) {
+    camera.getWorldDirection(_gp).negate();
+    _acc.addScaledVector(_gp, wy * 0.6 * near);
+    _wx.setFromMatrixColumn(camera.matrixWorld, 0);
+    _wz.setFromMatrixColumn(camera.matrixWorld, 1);
+    _acc.addScaledVector(_wx, wx * 0.45 * near).addScaledVector(_wz, wz * 0.45 * near);
+  }
+  if (f.gliding && !landing && !late) _acc.y -= FLIGHT.sink;
+  // il contourne les objets qui volent : éviter passe avant son but (qui s'efface d'autant)
   _ga.set(0, 0, 0);
   for (const l of lifters) {
     if (!l.cw || !l.obj.visible) continue;
@@ -1030,30 +1205,42 @@ function guideStep(f, t, h) {
     const R = l.r + GUIDE.avoid, d = _gp.length();
     if (d < R && d > 1e-4) _ga.addScaledVector(_gp, (40 * (R - d)) / d);
   }
-  if (!landing && near > 0.5) {
-    const c = cursorNear(onScreen(f), BEHAVE.shy);
-    if (c) _ga.addScaledVector(screenDir(c.dx, c.dy, _gp), 12 * (1 - c.d / BEHAVE.shy));
-  }
   const evade = Math.min(1, _ga.length() / GUIDE.accel);
   if (evade > 0) _acc.multiplyScalar(1 - evade).add(_ga);
   // il reste à l'écran (sauf en escapade) : poussé vers le milieu quand il approche d'un bord
-  if (!landing && G.fly !== 'away') {
+  if (!landing && G.fly !== 'away' && G.fly !== 'enter') {
     _gp.copy(f.pos).project(camera);
     const sx = (_gp.x + 1) / 2, sy = (1 - _gp.y) / 2, [x0, y0, x1, y1] = GUIDE.view;
     const out = Math.max(x0 - sx, sx - x1, y0 - sy, sy - y1, 0);
     if (out > 0) _acc.addScaledVector(screenToWorld(0.5, 0.5, guideDepth(), _gp).sub(f.pos), 2 + 30 * out);
   }
   // puis il prend de la vitesse peu à peu
-  const amax = GUIDE.accel * (1 + evade) * (since < GESTURE.ramp + GESTURE.lift ? 0.25 + 0.75 * smooth(GESTURE.lift, GESTURE.lift + GESTURE.ramp, since) : 1);
+  const amax = THREE.MathUtils.lerp(GUIDE.accel, PAGE_FLY.accel, near) * (1 + evade) * (since < GESTURE.ramp + GESTURE.lift ? 0.25 + 0.75 * smooth(GESTURE.lift, GESTURE.lift + GESTURE.ramp, since) : 1);
   if (_acc.length() > amax) _acc.setLength(amax);
   f.vel.addScaledVector(_acc, h);
   // la vitesse : en croisière près de la page, calme ; à l'approche, celle de sa courbe ; en fuite, plus vive ; dehors,
-  // il peut se presser (on ne le voit pas)
-  const cruise = THREE.MathUtils.lerp(GUIDE.vmax, PATH_LAND.cruise, near);
+  // il peut se presser (on ne le voit pas) ; en retard sur la page, il pique vers elle (et ralentit en la rejoignant)
+  const cruise = THREE.MathUtils.lerp(GUIDE.vmax, G.route ? G.route.speed * 1.25 : PATH_LAND.cruise, near);
   const me = G.fly === 'away' ? onScreen(f) : null;   // dehors pour de vrai : là seulement, il peut se presser
   const outside = !!me && G.away?.phase === 'outside' && (me.x < -0.03 || me.x > 1.03 || me.y < -0.03 || me.y > 1.03);
   const vmax = lifting ? 0.35 : landing ? PATH_LAND.speed * 1.4 : G.fly === 'flee' ? BEHAVE.fleeSpeed
-    : outside ? GUIDE.vmax * 1.5 : cruise * (1 + 0.5 * evade);
+    : outside ? Math.max(GUIDE.vmax, G.route?.speed ?? 0) * 1.5 : Math.max(cruise * (1 + 0.5 * evade), CATCH.dive * late);
+  // au-dessus de la page, jamais à reculons : sa vitesse reste dans l'axe de sa tête, à un dérapage près — c'est sa tête
+  // qui tourne (guideHeading) et l'entraîne (à la descente finale, il bouge à peine dans la page). Pas en s'élevant
+  if (near > 0.5 && !lifting) {
+    _wx.setFromMatrixColumn(camera.matrixWorld, 0);
+    _wz.setFromMatrixColumn(camera.matrixWorld, 1);
+    const vx = f.vel.dot(_wx), vy = f.vel.dot(_wz), fx = f.head.dot(_wx), fy = f.head.dot(_wz);
+    const vs = Math.hypot(vx, vy), fs = Math.hypot(fx, fy);
+    if (vs > 0.15 && fs > 0.5) {
+      const a = Math.atan2(fx * vy - fy * vx, fx * vx + fy * vy);
+      if (Math.abs(a) > PAGE_FLY.slip) {
+        const b = Math.atan2(fy, fx) + Math.sign(a) * PAGE_FLY.slip;
+        const k = vs * Math.max(0.35, Math.cos(Math.abs(a) - PAGE_FLY.slip));   // il freine plutôt que de déraper
+        f.vel.addScaledVector(_wx, Math.cos(b) * k - vx).addScaledVector(_wz, Math.sin(b) * k - vy);
+      }
+    }
+  }
   const sp = f.vel.length();
   if (sp > vmax) f.vel.multiplyScalar(vmax / sp);
   else if (!landing && !lifting && sp < FLIGHT.vmin) f.vel.addScaledVector(f.head, FLIGHT.vmin - sp);
@@ -1069,7 +1256,7 @@ function perchPose(f, dt) {
   f.pos.copy(G.target);                             // collé à son perchoir : exactement là, à chaque image
   f.root.position.copy(f.pos);
   const t = uTime.value, sway = GESTURE.sway * (Math.sin(t * 0.9) + 0.5 * Math.sin(t * 2.1 + 2));   // il bouge à peine
-  f.root.quaternion.slerp(wallQuat(f.pos, G.wall + sway, _gq), 1 - Math.exp(-dt * 5));
+  f.root.quaternion.slerp(wallQuat(f.pos, G.wall + sway, _gq), 1 - Math.exp(-dt * 2.5));
   G.flat.copy(f.root.quaternion);
   // au contact, il se tasse un peu contre la page, puis se redresse (le long de son dos : vers nous)
   const k = (t - G.touch) / GESTURE.squash[1], sc = guideScale();
@@ -1166,6 +1353,42 @@ function updateGuideShadow() {
   shadowQuad.material.uniforms.uAlpha.value = SHADOW.strength * Math.exp(-h / SHADOW.fade) * nearPage();
 }
 
+// Près de la page, le guide vole dans le plan de la page, face à nous : son cap se prend dans ce plan, d'après sa
+// direction à l'écran (psi : l'angle de sa tête depuis le haut de l'écran, comme wallQuat), et non à l'horizontale du
+// monde — où monter ou descendre à l'écran n'a pas de cap, et le moindre écart le retournait. Au ralenti ou en
+// surplace, il garde son cap ; il tourne à vitesse bornée.
+// Son cap suit sa direction moyenne (lissée), pas chaque à-coup de son vol erratique : il dérape un peu, comme les vrais.
+// [vitesse dans le plan (m/s) en deçà de laquelle il garde son cap, au-delà de laquelle il le suit pleinement ;
+//  virage max (rad/s) ; lissage de la direction (s) ; dérapage max de sa vitesse par rapport à sa tête (rad) ;
+//  accélération max au-dessus de la page (m/s²)]
+const PAGE_FLY = { hold: [0.08, 0.3], turn: 4, smooth: 0.2, slip: 0.6, accel: 14 };
+const _pn = new THREE.Vector3(), _pr = new THREE.Vector3(), _pu = new THREE.Vector3(), _pf = new THREE.Vector3();
+const _hx = new THREE.Vector3(), _hq = new THREE.Quaternion();
+function guideHeading(f, dt) {
+  camera.getWorldDirection(_pn).negate();           // la normale de la page : vers nous
+  _pr.setFromMatrixColumn(camera.matrixWorld, 0);
+  _pu.setFromMatrixColumn(camera.matrixWorld, 1);
+  const a = 1 - Math.exp(-dt / PAGE_FLY.smooth);
+  f.vsx = (f.vsx ?? 0) + (f.vel.dot(_pr) - (f.vsx ?? 0)) * a;
+  f.vsy = (f.vsy ?? 0) + (f.vel.dot(_pu) - (f.vsy ?? 0)) * a;
+  const vx = f.vsx, vy = f.vsy;
+  if (!(f.pgOn > 0)) {                              // il arrive au-dessus de la page : il garde le cap qu'il avait
+    _pf.set(0, 0, 1).applyQuaternion(f.root.quaternion);   // l'avant de son corps, tel qu'on le voit
+    f.psi = Math.atan2(-_pf.dot(_pr), _pf.dot(_pu));
+    f.vsx = f.vel.dot(_pr); f.vsy = f.vel.dot(_pu);
+  }
+  f.pgOn = 1;
+  const want = Math.atan2(-vx, vy);
+  const d = Math.atan2(Math.sin(want - f.psi), Math.cos(want - f.psi));
+  // en approche, il garde son cap pendant la descente finale (il s'est aligné avant de descendre)
+  const max = G.mode === 'land' && G.path.u > 0.92 ? 0 : PAGE_FLY.turn * dt * smooth(PAGE_FLY.hold[0], PAGE_FLY.hold[1], Math.hypot(vx, vy));
+  const turn = THREE.MathUtils.clamp(d, -max, max);
+  f.psi += turn;
+  _pf.copy(_pu).multiplyScalar(Math.cos(f.psi)).addScaledVector(_pr, -Math.sin(f.psi));   // l'avant, dans la page
+  _hx.crossVectors(_pn, _pf);                       // sa droite (l'axe x de wallQuat)
+  return turn / Math.max(dt, 1e-3);
+}
+
 function updateButterflies(t, dt) {
   for (const f of flyers) {
     // le vide a repris l'îlot : seuls le guide reste
@@ -1200,18 +1423,38 @@ function updateButterflies(t, dt) {
     const turn = THREE.MathUtils.clamp(dy, -maxTurn, maxTurn);
     f.yaw += turn;
     f.head.set(Math.sin(f.yaw), 0, Math.cos(f.yaw));
-    const yawRate = turn / Math.max(dt, 1e-3);
+    let yawRate = turn / Math.max(dt, 1e-3);
+    // le guide près de la page : virage et montée se comptent dans le plan de la page (monter : s'en éloigner)
+    const pg = guided ? nearPage() : 0;
+    let climb = f.vel.y;
+    if (pg <= 0) f.pgOn = 0;
+    if (pg > 0) {
+      const psiRate = guideHeading(f, dt);
+      yawRate = THREE.MathUtils.lerp(yawRate, psiRate, pg);
+      climb = THREE.MathUtils.lerp(climb, f.vel.dot(_pn), pg);
+    }
     // planer : en vol rapide, à peu près droit et sans monter ; il reprend ses battements pour monter ou tourner
     const speed = f.vel.length();
     f.timer -= dt;
     if (f.gliding) {
-      if (f.timer <= 0 || f.vel.y > 0.35 || Math.abs(yawRate) > 2.2) { f.gliding = false; f.timer = rand(...FLIGHT.rest); }
-    } else if (f.timer <= 0 && speed > 0.45 && f.vel.y < 0.1 && Math.abs(yawRate) < 0.9 && Math.random() < dt * 1.2) {
+      if (f.timer <= 0 || climb > 0.35 || Math.abs(yawRate) > 2.2) { f.gliding = false; f.timer = rand(...FLIGHT.rest); }
+    } else if (f.timer <= 0 && speed > 0.45 && climb < 0.1 && Math.abs(yawRate) < 0.9 && Math.random() < dt * 1.2) {
       f.gliding = true;
       f.timer = rand(...FLIGHT.glide);
     }
-    let effort = THREE.MathUtils.clamp(0.35 + f.vel.y * 0.8 + Math.abs(yawRate) * 0.15, 0, 1);
+    let effort = THREE.MathUtils.clamp(0.35 + climb * 0.8 + Math.abs(yawRate) * 0.15, 0, 1);
     if (guided && t - G.liftoff < GESTURE.burst) effort = 1;   // ses premiers battements, amples et vifs
+    // en piqué vers la page : il plane, ailes tendues, avec de brèves reprises de battements, légers
+    const late = guided && G.mode === 'free' && t - G.liftoff > GESTURE.burst ? catching() : 0;
+    if (late > 0.3) {
+      f.gliding = ((t + f.ph) % 1) > CATCH.beat;
+      effort = Math.min(effort, 0.3);
+      f.dived = true;
+    } else if (f.dived) {                            // arrivé : il reprend son vol ordinaire, sans finir son plané
+      f.dived = false;
+      f.gliding = false;
+      f.timer = rand(...FLIGHT.rest);
+    }
     // penché dans les virages (accélération de côté), cabré un peu, plus en montée
     const side = f.acc.x * f.head.z - f.acc.z * f.head.x;
     f.bank += (THREE.MathUtils.clamp(-side * 0.1, -0.55, 0.55) - f.bank) * (1 - Math.exp(-dt * 5));
@@ -1232,6 +1475,21 @@ function updateButterflies(t, dt) {
       _bz.setFromMatrixColumn(_m, 2);                // l'avant
       f.root.rotateZ(-show * _look.dot(_bx));
       f.root.rotateX(show * _look.dot(_bz));
+    }
+    // près de la page : à plat au-dessus d'elle, la tête dans son cap, cabré un peu (plus en s'en éloignant), penché
+    // dans les virages ; parmi les objets, l'attitude ordinaire (on passe de l'une à l'autre en approchant du texte)
+    if (pg > 0) {
+      const side = f.acc.dot(_hx);
+      f.pbank = (f.pbank ?? 0) + (THREE.MathUtils.clamp(-side * 0.1, -0.5, 0.5) - (f.pbank ?? 0)) * (1 - Math.exp(-dt * 5));
+      const up = 0.2 + THREE.MathUtils.clamp(climb * 0.35, -0.2, 0.3);
+      f.ppitch = (f.ppitch ?? up) + (up - (f.ppitch ?? up)) * (1 - Math.exp(-dt * 4));
+      wallQuat(f.pos, f.psi, _hq);
+      _gq.setFromAxisAngle(_bx.set(1, 0, 0), -f.ppitch);
+      _hq.multiply(_gq);
+      _gq.setFromAxisAngle(_bz.set(0, 0, 1), f.pbank);
+      _hq.multiply(_gq);
+      f.root.quaternion.slerp(_hq, pg);
+      if (pg > 0.5) f.head.copy(_pf);               // pour son vol (vitesse minimale dans le sens où il va)
     }
     if (guided && G.mode === 'land') {               // à l'approche, il se couche peu à peu sur la page
       f.root.quaternion.slerp(wallQuat(f.pos, G.wall, _gq), smooth(0, 1, 1 - G.dist / GUIDE.settle));
@@ -2603,3 +2861,10 @@ document.addEventListener('visibilitychange', start);
 window.addEventListener('scroll', () => { if (!gone()) host.style.visibility = ''; start(); }, { passive: true });
 resize();
 start();
+
+
+
+
+
+
+
