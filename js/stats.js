@@ -20,9 +20,9 @@ const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const smooth = (x) => x * x * (3 - 2 * x);
 const backOut = (t) => { const c = 1.9; return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2; };
 
-// [une ligne s'allume quand son milieu passe au-dessus de cette part de l'écran, s'éteint quand il redescend sous
-//  celle-ci ; temps (s) : le texte arrive, il s'allume, le décompte, un élément de la scène surgit]
-const SHOW = { at: 0.8, off: 0.92, text: 0.45, on: 0.35, count: 1.6, pop: 0.4 };
+// [une ligne s'allume dès qu'elle entre à l'écran (son haut passe au-dessus de cette part de l'écran), s'éteint quand
+//  elle en est ressortie par le bas (son haut redescend sous celle-ci) ; temps (s) : le texte arrive, il s'allume, le décompte, un élément de la scène surgit]
+const SHOW = { at: 0.97, off: 1, text: 0.45, on: 0.35, count: 1.6, pop: 0.4 };
 // Les scènes, comme dans le site immersif (m) : [agrandissement des objets des services, de la carte, de l'enveloppe ;
 //  échelle de la page (px par m, en tailles de chiffre F : celle relevée à l'écran du site immersif) ; centre de l'emplacement
 //  de la scène, avant le bord droit des chiffres (en F) ; plongée de la caméra depuis la verticale (°) ; champ (°)]
@@ -57,12 +57,12 @@ function paint(r) {
 }
 for (const r of rows) { if (!live) r.text = r.on = r.k = 1; paint(r); }   // en attendant : là à 16 %, à 0
 
-// une ligne arrive (son milieu passe au-dessus de SHOW.at de l'écran), ou repart (sous SHOW.off)
+// une ligne arrive (le haut de son chiffre passe au-dessus de SHOW.at de l'écran), ou repart (sous SHOW.off)
 function watch() {
   const vh = window.innerHeight;
   let changed = false;
   for (const r of rows) {
-    const b = r.li.getBoundingClientRect(), c = (b.top + b.bottom) / 2 / vh;
+    const c = r.num.getBoundingClientRect().top / vh;   // le chiffre lui-même
     const shown = c < SHOW.at ? true : c > SHOW.off ? false : r.shown;
     if (shown !== r.shown) { r.shown = shown; changed = true; }
   }
