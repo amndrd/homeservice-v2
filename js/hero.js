@@ -674,20 +674,20 @@ function flyStep(f, t, h) {
 // animation au défilement : à chaque image, il regarde ce qu'il y a à l'écran et décide. Il voit les objets qui
 // volent (il les contourne), les bords de l'écran (il y reste), la lecture de l'À propos et les endroits où il peut se
 // poser (js/apropos.js : window.hsPage). Au repos, il vit chez lui comme les autres. Quand les objets décollent, il
-// quitte son coin d'herbe et vole parmi eux ; le vide ne le reprend pas. À partir de l'À propos, la page est son sol :
-// il vole au-dessus d'elle par trajets (ROUTES : une traversée, un tour du texte, une exploration le long des lignes,
+// quitte son coin d'herbe et vole parmi eux ; le vide ne le reprend pas. À partir de l'À propos, la page est un mur,
+// face à nous : il vole devant lui par trajets (ROUTES : une traversée, un tour du texte, une exploration le long des lignes,
 // un survol de mots, une sortie de l'écran), tracés d'avance en courbe ; le défilement ne les interrompt pas. Il ne se
 // pose que si on lit (LAND : la page arrêtée depuis quelques secondes, de plus en plus volontiers), d'abord sur le
-// dernier mot du texte, souvent après un ou deux passages d'inspection. Posé à plat, le dos vers nous — on le voit de
-// dessus —, il part avec la page ; il s'envole quand on reprend le défilement, quand son perchoir quitte l'écran, ou
+// dernier mot du texte, souvent après un ou deux passages d'inspection. Posé contre le mur, la tête vers le haut, le
+// dos vers nous, il part avec la page ; il s'envole quand on reprend le défilement, quand son perchoir quitte l'écran, ou
 // quand il en a assez (après s'être réveillé, s'il est resté longtemps). En remontant jusqu'à l'îlot, il rentre chez
-// lui. Son vol est celui des autres (poursuite amortie, accélération et vitesse bornées, vol erratique), son cap se
-// prend dans le plan de la page (guideHeading).
+// lui. Son vol est celui des autres (poursuite amortie, accélération et vitesse bornées, vol erratique), dans le
+// repère du mur (wallFrame) : on le voit de face ou de profil, jamais de dessus.
 // [profondeur où il vole près de la page, parmi les objets (part du recul de la caméra), vitesse max, accélération
 //  max, pulsation et amortissement de la poursuite, vol erratique (de côté, en hauteur), marge autour des objets (m)
 //  et anticipation (s), temps pour rattraper un
 //  perchoir (s), zone de l'écran où il reste (x0, y0, x1, y1), taille près de la page (×), distance où il commence
-//  à se coucher sur la page (m), temps pour s'en relever (s), hauteur de vol au-dessus de la page (m), moment où il
+//  à se plaquer contre le mur (m), temps pour s'en écarter (s), distance de vol au mur (m), moment où il
 //  rejoint la page (part de l'envol : début, fin)]
 const GUIDE = { species: 'aurore', depth: 0.45, among: 0.85, vmax: 2.2, accel: 6, omega: 2.2, zeta: 0.85,
   wander: [0.7, 1.4], avoid: 0.5, ahead: 0.4, catchUp: 3, view: [0.06, 0.12, 0.94, 0.9],
@@ -699,16 +699,17 @@ const GUIDE = { species: 'aurore', depth: 0.45, among: 0.85, vmax: 2.2, accel: 6
 //  duquel il pique vers elle à pleine vitesse], vitesse du piqué (m/s), part du temps où il bat des ailes en piqué
 const CATCH = { late: [0.3, 1.5], dive: 4.5, beat: 0.3 };
 const PATH_LAND = { reach: 0.24, spread: 0.12, hop: [0.12, 0.3], speed: 1.6, touch: 0.3, cruise: 2.2, omega: 2.6 };
-// ses trajets au-dessus de la page : [chances (0 : jamais tiré au sort), allure (m/s), hauteur au-dessus de la page (m)]
+// ses trajets devant le mur : [chances (0 : jamais tiré au sort), allure (m/s), distances au mur entre lesquelles il
+//  va et vient le long du trajet (m)]
 // L'allure se juge à ses battements : un papillon avance de plusieurs envergures par battement ; à ~6 battements/s et
 // 0,23 m d'envergure, moins de ~1,5 m/s paraît au ralenti (on était à 0,8 : un quart d'envergure par battement).
 const ROUTES = {
-  traverse: { w: 0.25, speed: 2.6, alt: [0.5, 0.9] },    // d'un côté de l'écran à l'autre, en arc
-  tour: { w: 0.2, speed: 2.2, alt: [0.4, 0.8] },         // une grande boucle autour du texte
-  explore: { w: 0.2, speed: 1.5, alt: [0.2, 0.4] },      // en zigzag, bas, le long des lignes
-  words: { w: 0.15, speed: 1.6, alt: [0.25, 0.45] },     // de mot en mot, sans s'y poser
-  away: { w: 0.2, speed: 3.0, alt: [0.5, 0.9] },         // il sort de l'écran, et reviendra par un autre bord
-  enter: { w: 0, speed: 2.4, alt: [0.4, 0.8] },          // il rentre
+  traverse: { w: 0.25, speed: 2.6, alt: [0.25, 1.8] },   // d'un côté de l'écran à l'autre, en arc
+  tour: { w: 0.2, speed: 2.2, alt: [0.2, 1.6] },         // une grande boucle autour du texte
+  explore: { w: 0.2, speed: 1.5, alt: [0.12, 0.7] },     // en zigzag, près du mur, le long des lignes
+  words: { w: 0.15, speed: 1.6, alt: [0.15, 0.6] },      // de mot en mot, sans s'y poser
+  away: { w: 0.2, speed: 3.0, alt: [0.5, 1.8] },         // il sort de l'écran, et reviendra par un autre bord
+  enter: { w: 0, speed: 2.4, alt: [0.5, 1.6] },          // il rentre
   hop: { w: 0, speed: 1.5, alt: [0.3, 0.6] },            // un petit saut (approche abandonnée)
   inspect: { w: 0, speed: 1.6, alt: [0.2, 0.35] },       // il passe au-dessus d'un perchoir avant de s'y poser
 };
@@ -724,7 +725,7 @@ const G = { mode: 'home', target: new THREE.Vector3(), site: null, path: null, t
   touch: -9, clap: -9, clapAt: new THREE.Vector3(), scrollY: 0, route: null, recent: [], wake: null };
 const _gp = new THREE.Vector3(), _gd = new THREE.Vector3(), _ga = new THREE.Vector3(), _gq = new THREE.Quaternion();
 const _wy = new THREE.Vector3(), _wz = new THREE.Vector3(), _wx = new THREE.Vector3();
-// à plat sur la page : le dos vers la caméra, la tête vers le haut de l'écran, tournée de `angle`
+// à plat contre le mur : le dos vers la caméra, la tête vers le haut de l'écran, tournée de `angle`
 function wallQuat(pos, angle, out) {
   _wy.subVectors(camera.position, pos).normalize();
   _wz.setFromMatrixColumn(camera.matrixWorld, 1);
@@ -732,8 +733,8 @@ function wallQuat(pos, angle, out) {
   _wx.crossVectors(_wy, _wz);
   return out.setFromRotationMatrix(_m.makeBasis(_wx, _wy, _wz));
 }
-// 0 : parmi les objets, 1 : près de la page. Il ne rejoint la page que quand les objets s'en vont et que le texte
-// arrive (l'envol, flyK) : vu de face parmi eux, il passe peu à peu à vu de dessus en approchant du texte.
+// 0 : parmi les objets, 1 : près de la page (le mur). Il ne rejoint la page que quand les objets s'en vont et que le
+// texte arrive (l'envol, flyK) : il passe peu à peu du repère du monde à celui du mur (wallFrame).
 const nearPage = () => smooth(GUIDE.page[0], GUIDE.page[1], flyK);
 const guideDepth = () => THREE.MathUtils.lerp(GUIDE.among, GUIDE.depth, nearPage()) * baseDist;
 // son retard sur la page (m) : de combien il est plus loin de nous que sa hauteur de vol au-dessus d'elle. La page
@@ -743,7 +744,7 @@ function guideLag() {
   camera.getWorldDirection(_gl);
   return _gl.dot(_gm.subVectors(guide.pos, camera.position)) - (guideDepth() - G.alt * nearPage());
 }
-// 0 : il est à sa hauteur au-dessus de la page ; 1 : très en retard, il pique vers elle
+// 0 : il est à sa distance du mur ; 1 : très en retard, il pique vers lui
 const catching = () => nearPage() * smooth(CATCH.late[0], CATCH.late[1], guideLag());
 // il peut se poser : il a rejoint la page (pour de vrai, pas seulement le défilement), et il ne reste presque plus
 // d'objets à l'écran (compté chaque image) — ou on lit déjà : arrêté en pleine envolée, les objets restent en l'air
@@ -751,13 +752,13 @@ const catching = () => nearPage() * smooth(CATCH.late[0], CATCH.late[1], guideLa
 const pageReady = () => nearPage() >= 0.99 && guideLag() < CATCH.late[0]
   && (objectsOnScreen <= 1 || readFor() > LAND.read[0]);
 const guideScale = () => THREE.MathUtils.lerp(1, GUIDE.scale, nearPage());
-// À partir de l'À propos, la page est un sol : un plan à guideDepth() de la caméra. En vol, il est au-dessus, à G.alt
-// mètres vers nous (plus haut, il paraît plus grand) ; se poser, c'est descendre jusqu'au plan.
+// À partir de l'À propos, la page est un mur : un plan à guideDepth() de la caméra, face à elle. En vol, il est devant,
+// à G.alt mètres vers nous (plus loin du mur, il paraît plus grand) ; se poser, c'est aller jusqu'au plan.
 const airPoint = (sx, sy, out) => screenToWorld(sx, sy, guideDepth() - G.alt * nearPage(), out, true);
 // un perchoir de la page, à l'instant (ou null s'il n'existe plus)
 const perchNow = (id) => window.hsPage?.perches().find((p) => p.id === id) ?? null;
 const inView = (p) => p.y > 0.18 && p.y < 0.85 && p.x > 0.05 && p.x < 0.95;
-// Où se poser : un mot de la page, ou un point du blanc de la page (la page est un sol) ; les deux défilent avec
+// Où se poser : un mot de la page, ou un point du blanc de la page (le mur) ; les deux défilent avec
 // elle. Un endroit sur le blanc est retenu par sa place dans le document (docY), pas à l'écran.
 function siteAt(site) {                             // sa place à l'écran, à l'instant (null s'il n'existe plus)
   if (site.kind === 'word') { const p = perchNow(site.id); return p && { x: p.x, y: p.yc }; }
@@ -843,11 +844,11 @@ function cursorNear(me, r) {                        // le curseur, s'il a bougé
 // [temps posé (s), la première fois sur le dernier mot (s), un geste toutes les… (s), postures (angle des ailes) ;
 //  la souris : distance qui l'effraie posé (part de la hauteur de l'écran), vitesse du curseur qui l'effraie (hauteurs
 //  d'écran par s), fuite : durée (s), vitesse (m/s) ; défilement qui l'effraie posé (écrans par s), défilement qui le
-//  fait repartir (part de la hauteur de l'écran) ; le réveil : après combien de temps posé (s), durée (s), un
+//  fait repartir (part de la hauteur de l'écran), penché au plus contre le mur (rad) ; le réveil : après combien de temps posé (s), durée (s), un
 //  battement lent (s)]
 const BEHAVE = {
   rest: [8, 30], first: [10, 20], act: [2.5, 7], postures: { open: 0.08, vee: 0.62, closed: 1.3 },
-  startle: 0.09, scare: 0.4, flee: [1.2, 2], fleeSpeed: 3, jolt: 1.6, resume: 0.01,
+  startle: 0.09, scare: 0.4, flee: [1.2, 2], fleeSpeed: 3, jolt: 1.6, resume: 0.01, tilt: 0.6,
   wake: { after: 12, dur: [1.8, 2.8], beat: 0.9 },
 };
 // depuis combien de temps on lit (s) : la page n'a pas bougé
@@ -883,7 +884,7 @@ const inside = (x, y) => [THREE.MathUtils.clamp(x, 0.1, 0.9), THREE.MathUtils.cl
 const DOOR = 0.2;
 const doorOn = (e, a) => [[-DOOR, a], [1 + DOOR, a], [a, -DOOR], [a, 1 + DOOR]][e];
 // Un trajet : des points de l'écran (x, y en part de l'écran), tracés d'avance ; une courbe douce (Catmull-Rom) passe
-// par eux, au-dessus de la page, et il la suit à son allure (guideThink). Il part de là où il est, dans le sens où il
+// par eux, devant le mur, et il la suit à son allure (guideThink). Il part de là où il est, dans le sens où il
 // va : jamais de demi-tour au départ.
 function planRoute(t, kind, site = null, extra = {}) {
   const R = ROUTES[kind], me = onScreen(guide), asp = me.asp;
@@ -949,11 +950,21 @@ function planRoute(t, kind, site = null, extra = {}) {
     const pt = (a, b) => inside(c.x + (dx * a + nx * b) / asp, c.y + dy * a + ny * b);
     P.push(pt(0, 0.03), pt(0.2, 0.07), pt(0.3, 0.2), pt(0.22, 0.28), pt(0.2, 0.12), pt(0.12, 0.04));
   }
-  // dans le monde : au-dessus de la page, à sa hauteur de vol ; le départ dans le sens de son vol (ou de sa tête)
+  // dans le monde : devant le mur, à sa distance de vol ; le départ dans le sens de son vol (ou de sa tête)
   const pts = [guide.pos.clone()];
   if (guide.vel.lengthSq() > 0.04) pts.push(guide.pos.clone().addScaledVector(guide.vel, 0.4));
   else pts.push(guide.pos.clone().addScaledVector(guide.head, 0.35));   // juste envolé : d'abord droit devant lui
-  for (const [x, y] of P) pts.push(airPoint(x, y, new THREE.Vector3()));
+  // à chaque point, il s'approche du mur ou s'en éloigne (d'au moins un tiers de l'écart permis) : il ne vole pas
+  // toujours à la même distance
+  const [lo, hi] = R.alt, base = G.alt;
+  let alt = THREE.MathUtils.clamp(guideDepth() - _gp.subVectors(guide.pos, camera.position).dot(camera.getWorldDirection(_gd)), lo, hi);
+  for (const [x, y] of P) {
+    const far = alt < (lo + hi) / 2 ? Math.random() < 0.75 : Math.random() < 0.25;   // plutôt vers l'autre bout
+    alt = far ? rand(Math.min(hi, alt + (hi - lo) / 3), hi) : rand(lo, Math.max(lo, alt - (hi - lo) / 3));
+    G.alt = alt;
+    pts.push(airPoint(x, y, new THREE.Vector3()));
+  }
+  G.alt = base;
   const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
   G.route = { kind, curve, len: Math.max(0.05, curve.getLength()), u: 0, speed: R.speed, site, ...extra };
   if (R.w > 0) G.recent = [kind, ...G.recent].slice(0, 2);
@@ -984,7 +995,9 @@ function startFlee(t) {
 function landOn(site, t, first = false) {
   G.scrollY = window.scrollY;                       // la page où il a choisi de se poser : si elle repart, il renonce
   G.mode = 'land'; G.site = site; G.since = t; G.last = site.kind === 'word' ? site.id : null; G.first = first;
-  G.wall = (guide.psi ?? 0) + rand(-0.15, 0.15);    // il se posera dans l'axe de son arrivée (pas de pivot au contact)
+  // contre le mur, la tête vers le haut, un peu penchée du côté d'où il arrive (pas de pivot au contact)
+  _wx.setFromMatrixColumn(camera.matrixWorld, 0);
+  G.wall = THREE.MathUtils.clamp(-0.4 * guide.vel.dot(_wx), -BEHAVE.tilt, BEHAVE.tilt) + rand(-0.15, 0.15);
   G.route = null;
   G.path = { u: 0, from: guide.pos.clone(), dir: guide.vel.lengthSq() > 1e-4 ? guide.vel.clone().normalize()
     : new THREE.Vector3(0, 1, 0), len: 1 };
@@ -993,7 +1006,8 @@ function touchDown(t) {
   G.mode = 'perch';
   G.touch = t;
   G.timer = rand(...(G.first ? BEHAVE.first : BEHAVE.rest));
-  G.posture = Math.random() < 0.55 ? 'open' : Math.random() < 0.6 ? 'vee' : 'closed';
+  // contre le mur, on voit ses ailes ouvertes ; fermées, on ne verrait que leur tranche : plus rare
+  G.posture = Math.random() < 0.6 ? 'open' : Math.random() < 0.8 ? 'vee' : 'closed';
   G.nextAct = t + rand(...BEHAVE.act);
   G.step.set(0, 0); G.stepTo.set(0, 0); G.flick = 0;
   G.wake = null;
@@ -1007,7 +1021,6 @@ function takeOff(t, from = null) {
   // il ne part pas lancé : ses battements le soulèvent d'abord (guideStep, GESTURE.lift)
   _wy.subVectors(camera.position, guide.pos).normalize();
   guide.vel.copy(_wy).multiplyScalar(0.05);
-  guide.psi = G.wall;                               // il part dans l'axe où il était posé
   G.route = null;
   if (from) {                                       // effrayé : il s'en ira à l'opposé du curseur
     startFlee(t);
@@ -1020,7 +1033,7 @@ const _p1 = new THREE.Vector3(), _p2 = new THREE.Vector3(), _end = new THREE.Vec
 function approach(u, out) {
   const L = G.path.len;
   _p1.copy(G.path.from).addScaledVector(G.path.dir, L * 0.35);
-  camera.getWorldDirection(_gp).negate();           // au-dessus de la page : vers la caméra
+  camera.getWorldDirection(_gp).negate();           // devant le mur : vers la caméra
   _p2.copy(_end).addScaledVector(_gp, Math.min(0.45, L * 0.35)).lerp(G.path.from, 0.12);
   const a = 1 - u;
   return out.copy(G.path.from).multiplyScalar(a * a * a).addScaledVector(_p1, 3 * a * a * u)
@@ -1041,7 +1054,9 @@ function perchLife(t, dt, s) {
     if (r < 0.45) {                                 // une autre posture
       const others = Object.keys(BEHAVE.postures).filter((k) => k !== G.posture);
       G.posture = others[(Math.random() * others.length) | 0];
-    } else if (r < 0.65) G.wall += (Math.random() < 0.5 ? -1 : 1) * rand(0.25, 0.7);   // il pivote un peu, sur place
+    } else if (r < 0.65) {                          // il pivote un peu, sur place (la tête reste vers le haut)
+      G.wall = THREE.MathUtils.clamp(G.wall + (Math.random() < 0.5 ? -1 : 1) * rand(0.25, 0.7), -BEHAVE.tilt, BEHAVE.tilt);
+    }
     else if (r < 0.85) {                            // quelques pas, droit devant lui
       const d = rand(0.01, 0.03), a = G.wall;
       G.stepTo.x += -Math.sin(a) * d; G.stepTo.y += -Math.cos(a) * d;
@@ -1137,6 +1152,8 @@ function guideThink(t, dt) {
   const lead = 0.15 + 0.25 * R.speed;               // son but, un peu devant lui sur la courbe
   R.u = Math.min(1, R.u + (R.speed * (1 - smooth(lead + 0.1, lead + 0.6, lag)) * dt) / R.len);
   R.curve.getPointAt(Math.min(1, R.u + lead / R.len), G.target);
+  // sa distance au mur, celle de son but sur le trajet (elle varie le long du trajet)
+  G.alt = Math.max(0, guideDepth() - _gp.subVectors(G.target, camera.position).dot(camera.getWorldDirection(_gd)));
   // fini quand il est vraiment arrivé au bout (pas seulement son but) : sinon il est encore dans son virage
   const done = R.u >= 1 && guide.pos.distanceTo(R.curve.points[R.curve.points.length - 1]) < 0.3;
   // le texte : se poser, d'abord sur le dernier mot (une fois par passage du texte), seulement si on lit
@@ -1188,7 +1205,7 @@ function guideStep(f, t, h) {
   const since = t - G.liftoff, lifting = since < GESTURE.clap + GESTURE.lift;
   const late = landing || lifting ? 0 : catching();   // en retard : il pique vers la page
   if (lifting) {
-    camera.getWorldDirection(_gp).negate();         // au-dessus de la page : vers la caméra
+    camera.getWorldDirection(_gp).negate();         // devant le mur : vers la caméra
     G.target.copy(G.clapAt).addScaledVector(_gp, GESTURE.climb);
   }
   const dist = _gd.subVectors(G.target, f.pos).length();
@@ -1199,15 +1216,14 @@ function guideStep(f, t, h) {
   const wx = k * kh * (Math.sin(t * 0.7 + f.ph * 3) + 0.5 * Math.sin(t * 1.13 + f.ph));
   const wz = k * kh * 0.5 * (Math.sin(t * 0.83 + f.ph * 7) + 0.5 * Math.sin(t * 1.29 + f.ph * 4));
   const wy = k * kv * (Math.sin(t * 2.6 + f.ph * 5) + 0.5 * Math.sin(t * 4.3 + f.ph * 2));
-  // parmi les objets : de côté et en hauteur, dans le monde. Près de la page, son sol : le sautillement se fait en
-  // hauteur au-dessus d'elle (vers nous), et de côté dans la page, plus doux (sinon son cap suit chaque à-coup)
+  // parmi les objets : de côté et en hauteur, dans le monde. Devant le mur : en hauteur, il monte et descend le long du
+  // mur ; de côté, il ondule le long du mur, et à peine vers lui ou vers nous
   _acc.x += wx * (1 - near); _acc.z += wz * (1 - near); _acc.y += wy * (1 - near);
   if (near > 0) {
     camera.getWorldDirection(_gp).negate();
-    _acc.addScaledVector(_gp, wy * 0.6 * near);
     _wx.setFromMatrixColumn(camera.matrixWorld, 0);
     _wz.setFromMatrixColumn(camera.matrixWorld, 1);
-    _acc.addScaledVector(_wx, wx * 0.45 * near).addScaledVector(_wz, wz * 0.45 * near);
+    _acc.addScaledVector(_wz, wy * 0.8 * near).addScaledVector(_wx, wx * 0.45 * near).addScaledVector(_gp, wz * 0.25 * near);
   }
   if (f.gliding && !landing && !late) _acc.y -= FLIGHT.sink;
   // il contourne les objets qui volent : éviter passe avant son but (qui s'efface d'autant)
@@ -1228,7 +1244,7 @@ function guideStep(f, t, h) {
     if (out > 0) _acc.addScaledVector(screenToWorld(0.5, 0.5, guideDepth(), _gp).sub(f.pos), 2 + 30 * out);
   }
   // puis il prend de la vitesse peu à peu
-  const amax = THREE.MathUtils.lerp(GUIDE.accel, PAGE_FLY.accel, near) * (1 + evade) * (since < GESTURE.ramp + GESTURE.lift ? 0.25 + 0.75 * smooth(GESTURE.lift, GESTURE.lift + GESTURE.ramp, since) : 1);
+  const amax = THREE.MathUtils.lerp(GUIDE.accel, WALL_FLY.accel, near) * (1 + evade) * (since < GESTURE.ramp + GESTURE.lift ? 0.25 + 0.75 * smooth(GESTURE.lift, GESTURE.lift + GESTURE.ramp, since) : 1);
   if (_acc.length() > amax) _acc.setLength(amax);
   f.vel.addScaledVector(_acc, h);
   // la vitesse : en croisière près de la page, calme ; à l'approche, celle de sa courbe ; en fuite, plus vive ; dehors,
@@ -1238,18 +1254,19 @@ function guideStep(f, t, h) {
   const outside = !!me && G.away?.phase === 'outside' && (me.x < -0.03 || me.x > 1.03 || me.y < -0.03 || me.y > 1.03);
   const vmax = lifting ? 0.35 : landing ? PATH_LAND.speed * 1.4 : G.fly === 'flee' ? BEHAVE.fleeSpeed
     : outside ? Math.max(GUIDE.vmax, G.route?.speed ?? 0) * 1.5 : Math.max(cruise * (1 + 0.5 * evade), CATCH.dive * late);
-  // au-dessus de la page, jamais à reculons : sa vitesse reste dans l'axe de sa tête, à un dérapage près — c'est sa tête
-  // qui tourne (guideHeading) et l'entraîne (à la descente finale, il bouge à peine dans la page). Pas en s'élevant
+  // devant le mur, jamais à reculons : à l'horizontale (le long du mur, vers lui ou vers nous), sa vitesse reste dans
+  // l'axe de sa tête, à un dérapage près — c'est sa tête qui tourne et l'entraîne. Monter ou descendre n'a pas de cap.
+  // Pas en s'élevant
   if (near > 0.5 && !lifting) {
     _wx.setFromMatrixColumn(camera.matrixWorld, 0);
-    _wz.setFromMatrixColumn(camera.matrixWorld, 1);
+    camera.getWorldDirection(_wz).negate();
     const vx = f.vel.dot(_wx), vy = f.vel.dot(_wz), fx = f.head.dot(_wx), fy = f.head.dot(_wz);
     const vs = Math.hypot(vx, vy), fs = Math.hypot(fx, fy);
     if (vs > 0.15 && fs > 0.5) {
       const a = Math.atan2(fx * vy - fy * vx, fx * vx + fy * vy);
-      if (Math.abs(a) > PAGE_FLY.slip) {
-        const b = Math.atan2(fy, fx) + Math.sign(a) * PAGE_FLY.slip;
-        const k = vs * Math.max(0.35, Math.cos(Math.abs(a) - PAGE_FLY.slip));   // il freine plutôt que de déraper
+      if (Math.abs(a) > WALL_FLY.slip) {
+        const b = Math.atan2(fy, fx) + Math.sign(a) * WALL_FLY.slip;
+        const k = vs * Math.max(0.35, Math.cos(Math.abs(a) - WALL_FLY.slip));   // il freine plutôt que de déraper
         f.vel.addScaledVector(_wx, Math.cos(b) * k - vx).addScaledVector(_wz, Math.sin(b) * k - vy);
       }
     }
@@ -1277,14 +1294,14 @@ function perchPose(f, dt) {
   f.flap(dt, 0, 0, 1, G.restA ?? null);
 }
 
-// son ombre sur la page : à chaque image, sa silhouette vue de la lumière (ailes comprises, telles qu'elles battent)
-// est dessinée dans une petite image (shadowRT), puis posée sur la page, à l'endroit où la lumière la projette. Au
-// contact, elle est collée à lui, nette et sombre ; quand il monte, elle s'éloigne dans le sens de la lumière, grandit,
-// s'adoucit (mipmaps) et pâlit : c'est ce qui fait voir sa hauteur. La lumière vient d'en haut à gauche, du côté de
-// la caméra. [taille de l'image (px), direction de la lumière (vers la droite, vers le haut de l'écran : sa pente
+// son ombre sur le mur : à chaque image, sa silhouette vue de la lumière (ailes comprises, telles qu'elles battent)
+// est dessinée dans une petite image (shadowRT), puis posée sur le mur, à l'endroit où la lumière la projette. Au
+// contact, elle est collée à lui, nette et sombre ; quand il s'écarte du mur, elle descend sous lui, grandit,
+// s'adoucit (mipmaps) et pâlit : c'est ce qui fait voir sa distance au mur. La lumière vient d'en haut, un peu de
+// gauche, du côté de la caméra : l'ombre tombe sous lui, un peu à droite. [taille de l'image (px), direction de la lumière (vers la droite, vers le haut de l'écran : sa pente
 // par rapport à la page), force au contact, hauteur où elle a perdu les deux tiers de sa force (m), flou (niveaux de
 // mipmap par m), agrandissement (par m), teinte]
-const SHADOW = { px: 128, light: [-0.3, 0.38], strength: 0.4, fade: 1.1, blur: 3.5, grow: 0.3, color: [0.1, 0.11, 0.18] };
+const SHADOW = { px: 128, light: [-0.15, 0.6], strength: 0.4, fade: 1.1, blur: 3.5, grow: 0.3, color: [0.1, 0.11, 0.18] };
 const SHADOW_LAYER = 8, SHADOW_EYE = 2;
 const shadowRT = new THREE.WebGLRenderTarget(SHADOW.px, SHADOW.px, {
   generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
@@ -1329,7 +1346,7 @@ function updateGuideShadow() {
   _su.setFromMatrixColumn(camera.matrixWorld, 1);   // le haut et la droite de l'écran
   _sr.setFromMatrixColumn(camera.matrixWorld, 0);
   _sl.copy(_sn).addScaledVector(_sr, SHADOW.light[0]).addScaledVector(_su, SHADOW.light[1]).normalize();   // vers la lumière
-  // sa hauteur au-dessus de la page, et son ombre : sur la page, à l'opposé de la lumière
+  // sa distance au mur, et son ombre : sur le mur, à l'opposé de la lumière
   const h = Math.max(0, guideDepth() - _gp.subVectors(p, camera.position).dot(_sn.clone().negate()));
   shadowQuad.position.copy(p).addScaledVector(_sl, -h / _sl.dot(_sn)).addScaledVector(_sn, -0.03);   // un rien sous lui
   // sa silhouette projetée sur la page, dans l'image de l'ombre : vue d'en face (dans le plan de la page), chaque
@@ -1359,47 +1376,27 @@ function updateGuideShadow() {
   renderer.setRenderTarget(null);
   renderer.setClearColor(clear, clearA);
   renderer.shadowMap.autoUpdate = autoShadow;
-  // posée à plat sur la page, plus grande, plus floue et plus pâle quand il est haut
+  // posée à plat sur le mur, plus grande, plus floue et plus pâle quand il s'en écarte
   shadowQuad.quaternion.setFromRotationMatrix(_m.makeBasis(_sr, _su, _sn));
   shadowQuad.scale.setScalar(2 * e * (1 + SHADOW.grow * h));
   shadowQuad.material.uniforms.uLod.value = Math.min(5, h * SHADOW.blur);
   shadowQuad.material.uniforms.uAlpha.value = SHADOW.strength * Math.exp(-h / SHADOW.fade) * nearPage();
 }
 
-// Près de la page, le guide vole dans le plan de la page, face à nous : son cap se prend dans ce plan, d'après sa
-// direction à l'écran (psi : l'angle de sa tête depuis le haut de l'écran, comme wallQuat), et non à l'horizontale du
-// monde — où monter ou descendre à l'écran n'a pas de cap, et le moindre écart le retournait. Au ralenti ou en
-// surplace, il garde son cap ; il tourne à vitesse bornée.
-// Son cap suit sa direction moyenne (lissée), pas chaque à-coup de son vol erratique : il dérape un peu, comme les vrais.
-// [vitesse dans le plan (m/s) en deçà de laquelle il garde son cap, au-delà de laquelle il le suit pleinement ;
-//  virage max (rad/s) ; lissage de la direction (s) ; dérapage max de sa vitesse par rapport à sa tête (rad) ;
-//  accélération max au-dessus de la page (m/s²)]
-const PAGE_FLY = { hold: [0.08, 0.3], turn: 4, smooth: 0.2, slip: 0.6, accel: 14 };
-const _pn = new THREE.Vector3(), _pr = new THREE.Vector3(), _pu = new THREE.Vector3(), _pf = new THREE.Vector3();
-const _hx = new THREE.Vector3(), _hq = new THREE.Quaternion();
-function guideHeading(f, dt) {
-  camera.getWorldDirection(_pn).negate();           // la normale de la page : vers nous
-  _pr.setFromMatrixColumn(camera.matrixWorld, 0);
-  _pu.setFromMatrixColumn(camera.matrixWorld, 1);
-  const a = 1 - Math.exp(-dt / PAGE_FLY.smooth);
-  f.vsx = (f.vsx ?? 0) + (f.vel.dot(_pr) - (f.vsx ?? 0)) * a;
-  f.vsy = (f.vsy ?? 0) + (f.vel.dot(_pu) - (f.vsy ?? 0)) * a;
-  const vx = f.vsx, vy = f.vsy;
-  if (!(f.pgOn > 0)) {                              // il arrive au-dessus de la page : il garde le cap qu'il avait
-    _pf.set(0, 0, 1).applyQuaternion(f.root.quaternion);   // l'avant de son corps, tel qu'on le voit
-    f.psi = Math.atan2(-_pf.dot(_pr), _pf.dot(_pu));
-    f.vsx = f.vel.dot(_pr); f.vsy = f.vel.dot(_pu);
-  }
-  f.pgOn = 1;
-  const want = Math.atan2(-vx, vy);
-  const d = Math.atan2(Math.sin(want - f.psi), Math.cos(want - f.psi));
-  // en approche, il garde son cap pendant la descente finale (il s'est aligné avant de descendre)
-  const max = G.mode === 'land' && G.path.u > 0.92 ? 0 : PAGE_FLY.turn * dt * smooth(PAGE_FLY.hold[0], PAGE_FLY.hold[1], Math.hypot(vx, vy));
-  const turn = THREE.MathUtils.clamp(d, -max, max);
-  f.psi += turn;
-  _pf.copy(_pu).multiplyScalar(Math.cos(f.psi)).addScaledVector(_pr, -Math.sin(f.psi));   // l'avant, dans la page
-  _hx.crossVectors(_pn, _pf);                       // sa droite (l'axe x de wallQuat)
-  return turn / Math.max(dt, 1e-3);
+// Devant le mur, le guide vole comme les autres, mais dans le repère du mur : son haut est le haut de l'écran (le
+// mur est face à la caméra, qui plonge un peu sur l'îlot), son cap se prend à l'horizontale du mur — de côté, vers
+// nous, vers le mur. On le voit donc de face, de profil, de trois quarts, jamais de dessus ; monter ou descendre à
+// l'écran, c'est monter ou descendre, sans changer de cap. wallFrame : la rotation du monde vers ce repère, en part
+// `k` (0 : le monde, 1 : le mur).
+// [vitesse à l'horizontale (m/s) en deçà de laquelle il garde son cap ; dérapage max de sa vitesse par rapport à sa
+//  tête (rad) ; accélération max devant le mur (m/s²)]
+const WALL_FLY = { hold: 0.15, slip: 0.6, accel: 14 };
+const _pn = new THREE.Vector3(), _wq = new THREE.Quaternion(), _wqi = new THREE.Quaternion(), _wqf = new THREE.Quaternion();
+const _lv = new THREE.Vector3(), _la = new THREE.Vector3();
+function wallFrame(k, out) {
+  _pn.setFromMatrixColumn(camera.matrixWorld, 1);   // le haut de l'écran
+  _wqf.setFromUnitVectors(UP, _pn);
+  return out.identity().slerp(_wqf, k);
 }
 
 function updateButterflies(t, dt) {
@@ -1427,25 +1424,30 @@ function updateButterflies(t, dt) {
       if (guided) { f.u = null; guideStep(f, ti, dt / n); if (G.mode === 'perch') break; } else flyStep(f, ti, dt / n);
     }
     if (guided && G.mode === 'perch') { perchPose(f, dt); continue; }
+    // le guide près du mur : son haut est celui du mur (le haut de l'écran), il vole dans le repère du mur ; ailleurs,
+    // dans celui du monde (on passe de l'un à l'autre en approchant du texte)
+    const pg = guided ? nearPage() : 0;
+    if (pg > 0) wallFrame(pg, _wq); else _wq.identity();
+    _wqi.copy(_wq).invert();
+    _lv.copy(f.vel).applyQuaternion(_wqi);
+    _la.copy(f.acc).applyQuaternion(_wqi);
     // le cap : vers sa vitesse à l'horizontale, en tournant à vitesse limitée
-    _hv.set(f.vel.x, 0, f.vel.z);
-    const yawWanted = _hv.lengthSq() > 1e-6 ? Math.atan2(_hv.x, _hv.z) : f.yaw;
+    _hv.set(_lv.x, 0, _lv.z);
+    const yawWanted = _hv.lengthSq() > (pg > 0 ? WALL_FLY.hold ** 2 : 1e-6) ? Math.atan2(_hv.x, _hv.z) : f.yaw;
     let dy = yawWanted - f.yaw;
     dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    // devant le mur, un demi-tour se fait face à nous, jamais le nez dans le mur
+    if (pg > 0.5 && Math.abs(dy) > 2.4) {
+      _pn.set(0, 0, 1).applyQuaternion(camera.quaternion).applyQuaternion(_wqi);   // vers nous, dans son repère
+      const s = Math.sign(dy);
+      if (Math.sin(f.yaw + s * Math.PI / 2) * _pn.x + Math.cos(f.yaw + s * Math.PI / 2) * _pn.z < 0) dy -= s * 2 * Math.PI;
+    }
     const maxTurn = FLIGHT.yawRate * dt;
     const turn = THREE.MathUtils.clamp(dy, -maxTurn, maxTurn);
     f.yaw += turn;
     f.head.set(Math.sin(f.yaw), 0, Math.cos(f.yaw));
-    let yawRate = turn / Math.max(dt, 1e-3);
-    // le guide près de la page : virage et montée se comptent dans le plan de la page (monter : s'en éloigner)
-    const pg = guided ? nearPage() : 0;
-    let climb = f.vel.y;
-    if (pg <= 0) f.pgOn = 0;
-    if (pg > 0) {
-      const psiRate = guideHeading(f, dt);
-      yawRate = THREE.MathUtils.lerp(yawRate, psiRate, pg);
-      climb = THREE.MathUtils.lerp(climb, f.vel.dot(_pn), pg);
-    }
+    const yawRate = turn / Math.max(dt, 1e-3);
+    const climb = _lv.y;
     // planer : en vol rapide, à peu près droit et sans monter ; il reprend ses battements pour monter ou tourner
     const speed = f.vel.length();
     f.timer -= dt;
@@ -1469,9 +1471,9 @@ function updateButterflies(t, dt) {
       f.timer = rand(...FLIGHT.rest);
     }
     // penché dans les virages (accélération de côté), cabré un peu, plus en montée
-    const side = f.acc.x * f.head.z - f.acc.z * f.head.x;
+    const side = _la.x * f.head.z - _la.z * f.head.x;
     f.bank += (THREE.MathUtils.clamp(-side * 0.1, -0.55, 0.55) - f.bank) * (1 - Math.exp(-dt * 5));
-    const pitchUp = 0.24 + THREE.MathUtils.clamp(f.vel.y * 0.35, -0.2, 0.3);
+    const pitchUp = 0.24 + THREE.MathUtils.clamp(climb * 0.35, -0.2, 0.3);
     f.pitch += (pitchUp - f.pitch) * (1 - Math.exp(-dt * 4));
     f.root.position.copy(f.pos);
     f.root.rotation.set(0, 0, 0);
@@ -1479,8 +1481,7 @@ function updateButterflies(t, dt) {
     f.root.rotateX(-f.pitch);
     f.root.rotateZ(f.bank);
     // en excursion, il se penche vers l'écran : on voit le dessus de ses ailes, pas sa tranche
-    // le guide près de la page : on le voit plutôt de dessus, comme posé
-    const show = guided ? 0.8 * nearPage() : f.u === null ? 0 : Math.sin(Math.PI * f.u) * 0.9;
+    const show = guided || f.u === null ? 0 : Math.sin(Math.PI * f.u) * 0.9;
     if (show > 0) {
       _look.subVectors(camera.position, f.pos).normalize();
       _m.makeRotationFromQuaternion(f.root.quaternion);
@@ -1489,24 +1490,12 @@ function updateButterflies(t, dt) {
       f.root.rotateZ(-show * _look.dot(_bx));
       f.root.rotateX(show * _look.dot(_bz));
     }
-    // près de la page : à plat au-dessus d'elle, la tête dans son cap, cabré un peu (plus en s'en éloignant), penché
-    // dans les virages ; parmi les objets, l'attitude ordinaire (on passe de l'une à l'autre en approchant du texte)
-    if (pg > 0) {
-      const side = f.acc.dot(_hx);
-      f.pbank = (f.pbank ?? 0) + (THREE.MathUtils.clamp(-side * 0.1, -0.5, 0.5) - (f.pbank ?? 0)) * (1 - Math.exp(-dt * 5));
-      const up = 0.2 + THREE.MathUtils.clamp(climb * 0.35, -0.2, 0.3);
-      f.ppitch = (f.ppitch ?? up) + (up - (f.ppitch ?? up)) * (1 - Math.exp(-dt * 4));
-      wallQuat(f.pos, f.psi, _hq);
-      _gq.setFromAxisAngle(_bx.set(1, 0, 0), -f.ppitch);
-      _hq.multiply(_gq);
-      _gq.setFromAxisAngle(_bz.set(0, 0, 1), f.pbank);
-      _hq.multiply(_gq);
-      f.root.quaternion.slerp(_hq, pg);
-      if (pg > 0.5) f.head.copy(_pf);               // pour son vol (vitesse minimale dans le sens où il va)
-    }
-    if (guided && G.mode === 'land') {               // à l'approche, il se couche peu à peu sur la page
+    // son attitude et son cap, du repère du mur à celui du monde
+    f.root.quaternion.premultiply(_wq);
+    f.head.applyQuaternion(_wq);
+    if (guided && G.mode === 'land') {               // à l'approche, il se redresse peu à peu contre le mur
       f.root.quaternion.slerp(wallQuat(f.pos, G.wall, _gq), smooth(0, 1, 1 - G.dist / GUIDE.settle));
-      // il freine en se redressant (la tête vers nous), en battant plus fort ; au contact, il se remet à plat
+      // il freine en se cabrant, en battant plus fort ; au contact, il est à plat contre le mur
       const fl = smooth(0, 1, 1 - G.dist / GESTURE.flare) * (1 - smooth(0.9, 1, G.path.u));
       f.root.rotateX(-GESTURE.pitch * fl);
       effort = Math.max(effort, 0.6 + 0.4 * fl);
@@ -2850,7 +2839,7 @@ function frame() {
   host.style.visibility = gone() ? 'hidden' : '';
   if (animating) {
     updateButterflies(uTime.value, dt);
-    updateGuideShadow();                            // son ombre sur la page, d'après sa pose de l'instant
+    updateGuideShadow();                            // son ombre sur le mur, d'après sa pose de l'instant
     if (desktop) updateEscapes(uTime.value, dt);
     if (desktop) updateGusts(uTime.value);
     if (bees.length) updateBees(uTime.value, dt);
