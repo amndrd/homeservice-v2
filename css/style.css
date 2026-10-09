@@ -122,7 +122,9 @@ html.intro.scrolled .scroll-hint { opacity: 0; transform: translate(-50%, 10px);
    l'unité en vert ; 0,3 F plus loin, le titre (0,44 F, encre) et la description (0,28 F, gris). Le texte est là à
    16 % ; il s'allume quand sa ligne arrive, et le chiffre se décompte (js/stats.js). */
 .stats { position: relative; z-index: 4; padding: 0 5vw 22vh; color: var(--ink); --F: clamp(44px, 4.4vw, 70px); }
-.stats__list { position: relative; z-index: 1; list-style: none; margin: 0 auto; padding: 0; width: fit-content; }
+/* sur la droite de l'écran, calée sur le bord droit de l'À propos (sa colonne fait au plus 1240 px) */
+.stats__list { position: relative; z-index: 1; list-style: none; margin: 0 max(0px, calc((100% - 1240px) / 2)) 0 auto;
+  padding: 0; width: fit-content; }
 .stat { display: grid; grid-template-columns: calc(3.6 * var(--F)) calc(1.75 * var(--F)) calc(5.8 * var(--F));
   align-items: center; height: calc(3.7 * var(--F)); opacity: var(--on, 1); }
 .stat__num { grid-column: 2; justify-self: end; display: flex; align-items: baseline; white-space: nowrap;
@@ -140,6 +142,7 @@ html:not(.stats3d) .stat__text { grid-column: 2; }
 
 @media (max-width: 760px), (max-aspect-ratio: 1/1) {
   .stats { padding: 0 20px 12vh; --F: clamp(36px, 11vw, 52px); }
+  .stats__list { margin: 0 auto; }
   html:not(.stats3d) .stat { grid-template-columns: calc(1.75 * var(--F)) minmax(0, 1fr); height: auto;
     padding: calc(.45 * var(--F)) 0; }
   .stat__text { max-width: none; }
