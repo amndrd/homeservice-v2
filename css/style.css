@@ -139,6 +139,31 @@ html.intro.scrolled .scroll-hint { opacity: 0; transform: translate(-50%, 10px);
 html:not(.stats3d) .stat { grid-template-columns: calc(1.75 * var(--F)) calc(5.8 * var(--F)); }   /* sans scène 3D */
 html:not(.stats3d) .stat__num { grid-column: 1; }
 html:not(.stats3d) .stat__text { grid-column: 2; }
+/* sur ordinateur, les chiffres sur le mur (js/statsmur.js, js/stats.js) : la section reste en place (collante) le temps
+   de trois pas de défilement (--step chacun, plus une petite fin --tail avant de repartir) ; à gauche, la scène (le
+   modèle 3D est dans une toile fixée sur tout l'écran) ; à droite, un seul chiffre à la fois : il entre par la droite
+   en se précisant (flou → net), le chiffre puis son texte ; le précédent sort vers la gauche. Le défilement est
+   aimanté sur chaque pas (scroll-snap, de proximité) : la page se cale d'elle-même sur la boule, puis sur chaque
+   chiffre. */
+html.statsWall { scroll-snap-type: y proximity; }
+html.statsWall .stats { --step: 70vh; --tail: 40vh; display: grid; grid-template-columns: 1fr auto;
+  align-items: start; width: min(1240px, 90vw); height: calc(100vh + 2 * var(--step) + var(--tail)); margin: 0 auto;
+  padding: 0; }
+html.statsWall .stats__stage { grid-column: 1; grid-row: 1; position: sticky; top: 0; height: 100vh; height: 100svh;
+  pointer-events: none; }
+html.statsWall .stats__stage canvas { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; z-index: 0; }
+html.statsWall .stats__list { grid-column: 2; grid-row: 1; position: sticky; top: 0; margin: 0;
+  width: calc(7.55 * var(--F)); height: 100vh; height: 100svh; }
+html.statsWall .stat { position: absolute; left: 0; right: 0; top: 50%; height: auto; translate: 0 -50%;
+  opacity: 0; transform: translateX(calc(1.2 * var(--F))); filter: blur(10px); pointer-events: none;
+  transition: opacity .5s ease, transform .9s var(--ease), filter .6s ease; }
+html.statsWall .stat__text { transform: translateX(calc(.8 * var(--F))); opacity: 0;
+  transition: transform 1s var(--ease), opacity .6s ease; }
+html.statsWall .stat.on { opacity: 1; transform: none; filter: none; pointer-events: auto; transition-delay: .15s; }
+html.statsWall .stat.on .stat__text { transform: none; opacity: 1; transition-delay: .3s; }
+html.statsWall .stat.past { transform: translateX(calc(-.8 * var(--F))); transition-duration: .35s, .6s, .35s; }
+/* les points d'aimantation : la section en place, puis chaque pas */
+.stats__snap { position: absolute; left: 0; width: 1px; height: 1px; scroll-snap-align: start; pointer-events: none; }
 
 @media (max-width: 760px), (max-aspect-ratio: 1/1) {
   .stats { padding: 0 20px 12vh; --F: clamp(36px, 11vw, 52px); }

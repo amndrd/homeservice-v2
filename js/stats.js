@@ -23,9 +23,10 @@ const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const smooth = (x) => x * x * (3 - 2 * x);
 const backOut = (t) => { const c = 1.9; return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2; };
 
-// [une ligne s'allume dès qu'elle entre à l'écran (son haut passe au-dessus de cette part de l'écran), s'éteint quand
+// [sur le mur : le premier chiffre arrive quand le haut de la section passe au-dessus de cette part de l'écran (elle
+//  est presque en place) ; ailleurs : une ligne s'allume dès qu'elle entre à l'écran (son haut passe au-dessus de cette part de l'écran), s'éteint quand
 //  elle en est ressortie par le bas (son haut redescend sous celle-ci) ; temps (s) : le texte arrive, il s'allume, le décompte, un élément de la scène surgit]
-const SHOW = { at: 0.97, off: 1, text: 0.45, on: 0.35, count: 1.6, pop: 0.4 };
+const SHOW = { at: 0.97, off: 1, wall: 0.12, text: 0.45, on: 0.35, count: 1.6, pop: 0.4 };
 // Les scènes, comme dans le site immersif (m) : [agrandissement des objets des services, de la carte, de l'enveloppe ;
 //  échelle de la page (px par m, en tailles de chiffre F : celle relevée à l'écran du site immersif) ; centre de l'emplacement
 //  de la scène, avant le bord droit des chiffres (en F) ; plongée de la caméra depuis la verticale (°) ; champ (°)]
@@ -60,12 +61,30 @@ function paint(r) {
 }
 for (const r of rows) { if (!live) r.text = r.on = r.k = 1; paint(r); }   // en attendant : là à 16 %, à 0
 
-// une ligne arrive (le haut de son chiffre passe au-dessus de SHOW.at de l'écran), ou repart (sous SHOW.off)
+// une ligne arrive (le haut de son chiffre passe au-dessus de SHOW.at de l'écran), ou repart (sous SHOW.off). Sur le
+// mur (html.statsWall, js/statsmur.js), un seul chiffre à la fois, selon le pas de défilement dans la section
+// (window.hsStats.active, lu aussi par le modèle 3D) : aucun avant que la section soit en place, puis le premier, le
+// deuxième, le troisième
+function wallActive() {
+  const vh = window.innerHeight, top = box.getBoundingClientRect().top / vh;
+  const step = parseFloat(getComputedStyle(box).getPropertyValue('--step')) / 100 || 1;   // en hauteurs d'écran
+  return top > SHOW.wall ? -1 : clamp(Math.round(-top / step), 0, rows.length - 1);
+}
 function watch() {
   const vh = window.innerHeight;
   let changed = false;
+  if (root.classList.contains('statsWall')) {
+    const a = wallActive();
+    window.hsStats = { active: a };
+    rows.forEach((r, i) => {
+      r.li.classList.toggle('on', i === a);
+      r.li.classList.toggle('past', a > i);
+      if ((i === a) !== r.shown) { r.shown = i === a; changed = true; }
+    });
+    return changed;
+  }
   for (const r of rows) {
-    const c = r.num.getBoundingClientRect().top / vh;   // le chiffre lui-même
+    const c = r.num.getBoundingClientRect().top / vh;   // le chiffre lui-même (sur le mur, chacun a un écran)
     const shown = c < SHOW.at ? true : c > SHOW.off ? false : r.shown;
     if (shown !== r.shown) { r.shown = shown; changed = true; }
   }

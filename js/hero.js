@@ -12,7 +12,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { makeButterfly } from './papillons.js';
 import { makeBee } from './abeilles.js';
-import './stats.js';                                // les chiffres, sous l'À propos (leurs scènes 3D)
+import './stats.js';                                // les chiffres, sous l'À propos (texte et décompte)
+import { statObjects } from './statsmur.js';       // leur modèle 3D, sur le mur
 
 const host = document.getElementById('hero-scene');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2481,6 +2482,7 @@ draco.preload();
 const gltfLoader = new GLTFLoader().setDRACOLoader(draco);
 gltfLoader.load(MODEL, (gltf) => {
   const root = gltf.scene;
+  statObjects(root);                                // les chiffres en prennent quelques objets, intacts (js/statsmur.js)
   let seedTemplate = null, floraMesh = null;
   const drop = [];
   root.traverse((o) => {
