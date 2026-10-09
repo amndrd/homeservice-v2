@@ -16,6 +16,9 @@ const root = document.documentElement;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const desktop = matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches;
 const live = desktop && !reduced;                  // le décompte et les scènes animées
+// les petites scènes 3D, vues de dessus comme posées sur un sol : retirées depuis que la page est un mur (on n'y met
+// rien pour l'instant) ; les chiffres se décomptent toujours
+const SCENES = false;
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const smooth = (x) => x * x * (3 - 2 * x);
 const backOut = (t) => { const c = 1.9; return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2; };
@@ -310,7 +313,7 @@ if (box && rows.length) {
     window.addEventListener('scroll', () => { if (visible && watch()) wake(); }, { passive: true });
     new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible && watch()) wake(); }).observe(box);
   }
-  if (desktop) {
+  if (desktop && SCENES) {
     const draco = new DRACOLoader().setDecoderPath('js/draco/');
     new GLTFLoader().setDRACOLoader(draco).loadAsync(__STATS__).then((gltf) => {
       try { initScenes(gltf); } catch { /* sans WebGL : les chiffres seuls */ }
