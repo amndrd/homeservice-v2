@@ -39,7 +39,7 @@ if (on) {
 //  hauteur de l'écran qu'elle occupe, place de son centre (part de la largeur de l'écran) ; part de la surface du noyau couverte par les empreintes des objets ; un objet
 //  est long quand sa plus grande dimension dépasse autant de fois la suivante
 const BALL = { gap: 0.16, spin: 0.14, bob: 0.04, bobSpeed: 1.3, sway: 0.04,
-  screen: 0.8, x: 0.3, cover: 0.8, long: 2.4 };
+  screen: 1.1, x: 0.3, cover: 0.8, long: 2.4 };
 // la chute : [pesanteur (m/s²), hauteur au-dessus de sa place où la lévitation commence à le retenir (m), raideur et
 //  amortissement de la lévitation, départs échelonnés (s, entre deux objets, et au hasard en plus), marge au-dessus
 //  de l'écran (m), tournoiement pendant la chute (rad)]
