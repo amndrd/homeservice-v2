@@ -112,6 +112,7 @@ function init(found) {
       m.material = Array.isArray(m.material) ? m.material.map((x) => x.clone()) : m.material.clone();
       m.castShadow = false;                         // son ombre : une fois à l'écran (draw)
       m.receiveShadow = false;
+      (Array.isArray(m.material) ? m.material : [m.material]).forEach(voidify);
     });
     o.updateMatrixWorld(true);
     box3.setFromObject(o).getCenter(c);
@@ -135,7 +136,7 @@ function init(found) {
   const order = pieces.map((p, i) => i).sort((a, b) => (pieces[a].home.y + rnd() * 0.3) - (pieces[b].home.y + rnd() * 0.3));
   order.forEach((k, i) => { pieces[k].wait = i * FALL.step + rnd() * FALL.jitter; });
 
-  gl = { renderer, scene, camera, sun, wall, ball, stage, phase: 'idle', t0: 0, extent };
+  gl = { renderer, scene, camera, sun, wall, ball, stage, phase: 'idle', t0: 0, extent, voidX: 0, voidK: 0 };
   makeBlock();
   makeMap();
   layout();
@@ -340,15 +341,73 @@ function draw(dt) {
   // l'ombre sur le mur se lève à mesure que les objets arrivent à leur place (pas d'ombres qui surgissent pendant la
   // chute)
   const k = Math.min(1, Math.max(0, (settled / pieces.length - 0.6) / 0.4));
-  gl.wall.material.opacity = LIGHT.shadow * k * k * (3 - 2 * k);
+  // (et s'efface avec la boule quand le vide la reprend)
+  gl.wall.material.opacity = LIGHT.shadow * k * k * (3 - 2 * k) * (1 - gl.voidK);
   if (stepBlock(dt)) { busy = true; shown = true; }
   const dig = stepMap(dt);
   if (dig) busy = true;
   if (map?.t > 0) shown = true;
-  gl.ball.visible = !(map?.t > 0);                  // pour l'instant, la boule cède simplement la place à la carte
+  if (stepVoid(dt)) busy = true;
   gl.renderer.domElement.style.visibility = shown ? '' : 'hidden';
   gl.renderer.render(gl.scene, gl.camera);
   return busy;
+}
+
+// ------------------------------------------------------------ le vide reprend la boule
+// Au deuxième chiffre, la boule s'en va comme l'îlot du hero : le blanc de la page la reprend, du bord vers le centre
+// (js/hero.js : REVEAL, VD_NOISE, voidAt, EXIT ; même bruit, même formule, même bord net, même allure du front). Ce
+// qui est déjà dans le vide n'est pas dessiné : on voit la page. Le mur joue le rôle du sol de l'îlot : le front avance
+// sur le plan du mur, et un point plus près de nous lui demande un peu plus d'avance (comme un point plus haut que le
+// sol de l'îlot) : la boule se défait par l'avant. Le hero compte environ 10 m sur la hauteur de l'écran : ici, tout
+// est mis à l'échelle de la boule (même dessin du bord à l'écran). Il se joue de lui-même (pas au défilement), pendant
+// que la carte se creuse ; en revenant au premier chiffre, la boule ressort du vide.
+// [durée (s), fréquences des deux octaves du bruit (1/m du hero), profondeur du bord (m du hero), biseau (m d'avance
+//  par m vers nous), hauteur de l'écran du hero (m)]
+const VOID = { dur: 1.8, f1: 0.66, f2: 3.8, edge: 3.0, rise: 3.0, screen: 10 };
+const uVoid = { uVoidR: { value: 1e5 }, uVoidC: { value: new THREE.Vector3() }, uVoidSc: { value: 1 }, uVoidBack: { value: 0 } };
+// le bruit du bord, identique à celui de js/hero.js (VD_NOISE)
+const VD_NOISE = `
+float vdHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vdNoise(vec3 x) {
+  vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(vdHash(i), vdHash(i + vec3(1, 0, 0)), f.x), mix(vdHash(i + vec3(0, 1, 0)), vdHash(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(vdHash(i + vec3(0, 0, 1)), vdHash(i + vec3(1, 0, 1)), f.x), mix(vdHash(i + vec3(0, 1, 1)), vdHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}`;
+// (le point, en m du hero, depuis le centre de la boule ; « hauteur » : depuis l'arrière de la boule, vers nous)
+const VOID_FRAG = `
+uniform float uVoidR, uVoidSc, uVoidBack; uniform vec3 uVoidC; varying vec3 vVoidW;
+${VD_NOISE}
+float voidAt(vec3 W) {
+  vec3 P = (W - uVoidC) / uVoidSc;
+  float n = vdNoise(P * ${VOID.f1.toFixed(2)}) * 0.75 + vdNoise(P * ${VOID.f2.toFixed(2)}) * 0.25;
+  return uVoidR - length(P.xy) - max(P.z - uVoidBack, 0.0) / ${VOID.rise.toFixed(1)} + n * ${VOID.edge.toFixed(1)};
+}`;
+function voidify(m) {
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, uVoid);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vVoidW;')
+      .replace('#include <project_vertex>', 'vVoidW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;\n#include <project_vertex>');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\n' + VOID_FRAG)
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif ( uVoidR < 1e4 && voidAt(vVoidW) < 0.0 ) discard;');
+  };
+  m.customProgramCacheKey = () => 'vide-boule';
+}
+// un pas : le front avance (deuxième chiffre et au-delà) ou recule ; son rayon suit l'allure du départ de l'îlot
+function stepVoid(dt) {
+  const goal = (window.hsStats?.active ?? -1) >= 1 ? 1 : 0;
+  gl.voidX = goal > gl.voidX ? Math.min(1, gl.voidX + dt / VOID.dur) : Math.max(0, gl.voidX - dt / VOID.dur);
+  const x = gl.voidX, sc = (2 * gl.half) / VOID.screen, R = gl.extent / 2 / sc;   // le rayon de la boule (m du hero)
+  gl.voidK = x * x * (3 - 2 * x);
+  // du dehors de la boule (rien n'est repris, même son avant) jusqu'en deçà du centre (tout est repris, bruit compris)
+  const from = R * (1 + 2 / VOID.rise) + 0.1, to = -VOID.edge - 0.1;
+  uVoid.uVoidR.value = x <= 0 ? 1e5 : from + (to - from) * (x + (gl.voidK - x) * 0.35);
+  uVoid.uVoidC.value.set(gl.ball.position.x, gl.ball.position.y, 0);
+  uVoid.uVoidSc.value = sc;
+  uVoid.uVoidBack.value = -R;
+  gl.ball.visible = x < 1;
+  return x !== goal;
 }
 
 // ------------------------------------------------------------ le bloc des chiffres
