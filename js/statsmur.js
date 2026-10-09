@@ -132,6 +132,7 @@ function init(found) {
   order.forEach((k, i) => { pieces[k].wait = i * FALL.step + rnd() * FALL.jitter; });
 
   gl = { renderer, scene, camera, sun, wall, ball, stage, phase: 'idle', t0: 0, extent };
+  makeBlock();
   layout();
   new ResizeObserver(layout).observe(document.body);
   window.addEventListener('scroll', wake, { passive: true });
@@ -247,13 +248,14 @@ function layout() {
   gl.ball.position.x = (BALL.x - 0.5) * 2 * gl.half * cam.aspect;
   gl.wall.position.set(0, 0, -(gl.extent / 2 + WALL));
   gl.wall.scale.set(gl.half * cam.aspect * 6, gl.half * 6, 1);
-  // la carte d'ombre couvre tout ce qu'on voit du mur
+  // la carte d'ombre couvre tout ce qu'on voit du mur (la boule et le bloc des chiffres)
   gl.wallZ = -(gl.extent / 2 + WALL);
   gl.halfW = (D - gl.wallZ) * Math.tan(THREE.MathUtils.degToRad(FOV / 2));   // la demi-hauteur vue, au mur (m)
   const s = gl.halfW * cam.aspect * 1.05;
   gl.sunAt = s * 3;
   Object.assign(gl.sun.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 0.1, far: s * 8 });
   gl.sun.shadow.camera.updateProjectionMatrix();
+  layoutBlock();
   draw(0);
 }
 
@@ -333,8 +335,148 @@ function draw(dt) {
   // chute)
   const k = Math.min(1, Math.max(0, (settled / pieces.length - 0.6) / 0.4));
   gl.wall.material.opacity = LIGHT.shadow * k * k * (3 - 2 * k);
+  if (stepBlock(dt)) { busy = true; shown = true; }
   gl.renderer.domElement.style.visibility = shown ? '' : 'hidden';
   gl.renderer.render(gl.scene, gl.camera);
   return busy;
+}
+
+// ------------------------------------------------------------ le bloc des chiffres
+// À droite, un bloc blanc à section carrée, encastré dans le mur, comme une lamelle d'un panneau d'aéroport : il tourne
+// d'un quart de tour autour d'un axe horizontal à chaque chiffre (la face du dessus vient vers nous en descendant). Ses
+// quatre faces : blanche (au repos, elle affleure le mur et on ne la distingue pas), puis le premier chiffre, le
+// deuxième, le troisième (window.hsStats.active, js/stats.js). Il tourne dans une fente du mur : pendant le quart de
+// tour, ses arêtes sortent un peu du mur et on aperçoit le fond sombre de la fente ; il démarre et s'arrête en
+// douceur, sans rebond. Ses faces ont toujours exactement les couleurs de la page (le blanc du mur, l'encre, le vert),
+// sans lumière ni ombre : elles ne s'assombrissent pas en tournant. Le texte des faces est celui de la page (traduit,
+// décompté par js/stats.js), dessiné dans une image ; le HTML reste pour les lecteurs d'écran.
+// [taille de la face, en tailles de chiffre F (largeur, hauteur = profondeur), durée d'un quart de tour (s),
+//  netteté des faces (px d'image par px d'écran), couleurs]
+const BLOCK = { w: 8.4, h: 2.4, turn: 0.9, sharp: 2, ink: '#0f1a2c', green: '#11703f', grey: '#6a7382',
+  paper: '#f7f7f5', cavity: '#30343b' };
+// les faces de la boîte (BoxGeometry : +x, −x, +y, −y, +z, −z) : la blanche devant, puis celles qui arrivent tour à tour
+const FACE_BLANK = 4, FACE_STAT = [2, 5, 3];
+const rowsEl = box ? [...box.querySelectorAll('.stat')] : [];
+let block = null;
+function makeBlock() {
+  if (rowsEl.length < 3) return;
+  // ses faces : leur couleur exacte, sans lumière ni mappage des tons (la face blanche ne se distingue pas de la page)
+  const plain = () => new THREE.MeshBasicMaterial({ color: BLOCK.paper, toneMapped: false });
+  const faces = FACE_STAT.map((idx, i) => {
+    const canvas = document.createElement('canvas');
+    const map = new THREE.CanvasTexture(canvas);
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.anisotropy = 4;
+    if (idx === 5) { map.center.set(0.5, 0.5); map.rotation = Math.PI; }   // la face arrière arrive tête en bas
+    return { idx, i, canvas, map, key: '' };
+  });
+  const mats = [plain(), plain(), plain(), plain(), plain(), plain()];
+  for (const f of faces) mats[f.idx] = new THREE.MeshBasicMaterial({ map: f.map, toneMapped: false });
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mats);
+  mesh.castShadow = true;
+  const group = new THREE.Group();                  // sur l'axe de rotation
+  group.add(mesh);
+  // la fente : son fond sombre (l'intérieur d'une boîte), et le mur autour, qui cache ce qui est derrière lui (il
+  // n'écrit que la profondeur : on voit la page à travers)
+  const cavity = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshStandardMaterial({ color: BLOCK.cavity, roughness: 1, side: THREE.BackSide }));
+  // (quatre bandes qui se chevauchent autour de la fente, en unités de fente : pas de fissure entre elles)
+  const maskMat = new THREE.MeshBasicMaterial({ colorWrite: false }), mask = new THREE.Group();
+  for (const [w, h, x, y] of [[7, 3, 0, 2], [7, 3, 0, -2], [3, 1.2, -2, 0], [3, 1.2, 2, 0]]) {
+    const band = new THREE.Mesh(new THREE.PlaneGeometry(w, h), maskMat);
+    band.position.set(x, y, 0);
+    band.renderOrder = -1;
+    mask.add(band);
+  }
+  gl.scene.add(group, cavity, mask);
+  block = { faces, mesh, group, cavity, mask, angle: 0, from: 0, to: 0, t: 1, F: 0 };
+  root.classList.add('statsBlock');                 // le texte HTML des chiffres s'efface (css) : le bloc l'affiche
+  document.fonts?.ready.then(() => { for (const f of faces) f.key = ''; });
+}
+// sa place : là où étaient les chiffres (la colonne de droite), à la taille des chiffres
+function layoutBlock() {
+  if (!block) return;
+  const F = parseFloat(getComputedStyle(rowsEl[0].querySelector('.stat__num')).fontSize) || 60;
+  const H = window.innerHeight, mpp = (2 * gl.halfW) / H;   // m par px, au mur
+  const w = BLOCK.w * F * mpp, a = BLOCK.h * F * mpp;
+  const list = box.querySelector('.stats__list').getBoundingClientRect();
+  block.x = (((list.left + list.right) / 2) / window.innerWidth - 0.5) * 2 * gl.halfW * gl.camera.aspect;
+  block.w = w; block.a = a; block.mpp = mpp;
+  block.mesh.scale.set(w, a, a);
+  block.cavity.scale.set(w * 1.002, a * 1.46, a * 1.26);
+  block.mask.scale.set(w, a, 1);
+  if (F !== block.F) {                              // les images des faces, à la taille de l'écran
+    block.F = F;
+    for (const f of block.faces) {
+      f.canvas.width = Math.round(BLOCK.w * F * BLOCK.sharp);
+      f.canvas.height = Math.round(BLOCK.h * F * BLOCK.sharp);
+      f.key = '';
+    }
+  }
+}
+// une face : le chiffre (et son unité, en vert), son titre et sa description, comme dans la page (css : .stat)
+function drawFace(f) {
+  const li = rowsEl[f.i], strong = li.querySelector('.stat__text strong');
+  const count = li.querySelector('.stat__count').textContent, unit = li.querySelector('.stat__unit').textContent;
+  const title = strong?.textContent.trim() ?? '';
+  const desc = (strong?.parentElement.textContent ?? '').replace(strong?.textContent ?? '', '').replace(/\s+/g, ' ').trim();
+  const key = [count, unit, title, desc, f.canvas.width].join('|');
+  if (key === f.key) return;
+  f.key = key;
+  const c = f.canvas.getContext('2d'), W = f.canvas.width, Hh = f.canvas.height, F = block.F * BLOCK.sharp;
+  c.fillStyle = BLOCK.paper;
+  c.fillRect(0, 0, W, Hh);
+  c.textBaseline = 'alphabetic';
+  // le texte : le titre, puis la description, coupée en lignes
+  const tf = `800 ${0.44 * F}px Manrope, sans-serif`, df = `500 ${0.28 * F}px Manrope, sans-serif`;
+  c.font = tf;
+  const tw = c.measureText(title).width;
+  c.font = df;
+  const lines = [];
+  let line = '';
+  for (const word of desc.split(' ')) {
+    const test = line ? `${line} ${word}` : word;
+    if (line && c.measureText(test).width > 4.7 * F) { lines.push(line); line = word; } else line = test;
+  }
+  if (line) lines.push(line);
+  const textW = Math.max(tw, ...lines.map((l) => c.measureText(l).width));
+  // le chiffre
+  const nf = `800 ${F}px Manrope, sans-serif`, uf = `800 ${0.5 * F}px Manrope, sans-serif`;
+  c.font = nf;
+  const nw = c.measureText(count).width;
+  c.font = uf;
+  const uw = unit ? c.measureText(unit).width + 0.03 * F : 0;
+  // l'ensemble, centré sur la face
+  const gap = 0.3 * F, total = nw + uw + gap + textW, x0 = (W - total) / 2, cy = Hh / 2;
+  c.fillStyle = BLOCK.ink;
+  c.font = nf;
+  c.fillText(count, x0, cy + 0.36 * F);
+  if (unit) { c.fillStyle = BLOCK.green; c.font = uf; c.fillText(unit, x0 + nw + 0.03 * F, cy + 0.36 * F); }
+  const th = 0.44 * F * 1.05 + 0.07 * F + lines.length * 0.28 * F * 1.08, top = cy - th / 2, tx = x0 + nw + uw + gap;
+  c.fillStyle = BLOCK.ink;
+  c.font = tf;
+  c.fillText(title, tx, top + 0.44 * F * 0.85);
+  c.fillStyle = BLOCK.grey;
+  c.font = df;
+  lines.forEach((l, k) => c.fillText(l, tx, top + 0.44 * F * 1.05 + 0.07 * F + 0.28 * F * (0.85 + k * 1.08)));
+  f.map.needsUpdate = true;
+}
+// un pas : le quart de tour vers la face du chiffre lu (accéléré puis freiné, sans dépassement ; s'il change de cible
+// en route, il repart de là où il est), sa place (avec la section)
+function stepBlock(dt) {
+  if (!block) return false;
+  for (const f of block.faces) drawFace(f);
+  const target = ((window.hsStats?.active ?? -1) + 1) * (Math.PI / 2);
+  if (target !== block.to) { block.from = block.angle; block.to = target; block.t = 0; }
+  const quarters = Math.max(1, Math.abs(block.to - block.from) / (Math.PI / 2));
+  block.t = Math.min(1, block.t + dt / (BLOCK.turn * Math.sqrt(quarters)));
+  const e = block.t < 0.5 ? 4 * block.t ** 3 : 1 - (-2 * block.t + 2) ** 3 / 2;
+  block.angle = block.from + (block.to - block.from) * e;
+  const y = (gl.ball.position.y / gl.half) * gl.halfW;   // avec la section (la boule et lui, à la même hauteur d'écran)
+  block.group.position.set(block.x, y, gl.wallZ + 0.002 - block.a / 2);
+  block.mesh.rotation.x = block.angle;
+  block.cavity.position.set(block.x, y, gl.wallZ - 0.05 - (block.a * 1.26) / 2);   // tout entière derrière le mur
+  block.mask.position.set(block.x, y, gl.wallZ - 0.003);
+  return block.t < 1;
 }
 

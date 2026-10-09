@@ -162,6 +162,8 @@ html.statsWall .stat__text { transform: translateX(calc(.8 * var(--F))); opacity
 html.statsWall .stat.on { opacity: 1; transform: none; filter: none; pointer-events: auto; transition-delay: .15s; }
 html.statsWall .stat.on .stat__text { transform: none; opacity: 1; transition-delay: .3s; }
 html.statsWall .stat.past { transform: translateX(calc(-.8 * var(--F))); transition-duration: .35s, .6s, .35s; }
+/* le bloc des chiffres (js/statsmur.js) les affiche en 3D : le texte HTML reste là pour les lecteurs d'écran, invisible */
+html.statsBlock .stats__list { opacity: 0; }
 /* les points d'aimantation : la section en place, puis chaque pas */
 .stats__snap { position: absolute; left: 0; width: 1px; height: 1px; scroll-snap-align: start; pointer-events: none; }
 
