@@ -689,6 +689,8 @@ function flyStep(f, t, h) {
 //  perchoir (s), zone de l'écran où il reste (x0, y0, x1, y1), taille près de la page (×), distance où il commence
 //  à se plaquer contre le mur (m), temps pour s'en écarter (s), distance de vol au mur (m), moment où il
 //  rejoint la page (part de l'envol : début, fin)]
+// le guide est retiré pour l'instant (2026-10-09) : tout son code reste, prêt à revenir
+const GUIDE_ON = false;
 const GUIDE = { species: 'aurore', depth: 0.45, among: 0.85, vmax: 2.2, accel: 6, omega: 2.2, zeta: 0.85,
   wander: [0.7, 1.4], avoid: 0.5, ahead: 0.4, catchUp: 3, view: [0.06, 0.12, 0.94, 0.9],
   scale: 1.15, settle: 0.5, rise: 0.45, alt: [0.35, 0.9], page: [0.03, 0.4] };
@@ -2521,8 +2523,9 @@ gltfLoader.load(MODEL, (gltf) => {
       yaw: 0, bank: 0, pitch: 0.24, gliding: false, timer: rand(...FLIGHT.rest), started: false, u: null });
   });
 
-  // le papillon guide (sur ordinateur) : le vide du départ ne le reprend pas
-  if (desktop && !reduced) {
+  // le papillon guide (sur ordinateur) : le vide du départ ne le reprend pas. RETIRÉ (GUIDE_ON) : l'aurore reste un
+  // papillon de l'îlot comme les autres, et part avec lui
+  if (GUIDE_ON && desktop && !reduced) {
     guide = flyers[BUTTERFLY.species.indexOf(GUIDE.species)] ?? null;
     guide?.root.traverse((c) => { if (c.isMesh) c.material.userData.lifter = true; });
   }
