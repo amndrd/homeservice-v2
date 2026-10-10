@@ -559,9 +559,8 @@ function stepBlock(dt) {
 // (js/bruxelles.js) ; le troisième, un cadran solaire (une cuvette, ses graduations, ses chiffres, et un gnomon dont
 // l'ombre fait le tour des heures). Un creux est fait de morceaux (un objet, une commune, une heure),
 // chacun à sa propre profondeur, souvent un peu différente de celle de ses voisins : leurs frontières sont des marches.
-// Ils se creusent l'un après l'autre (les objets du fond vers l'avant, les communes du centre de la région vers ses
-// bords, les heures dans le sens des aiguilles d'une montre, de plus en plus profondes) ; quand on change de chiffre,
-// le creux du chiffre quitté remonte et remplit le mur dans l'ordre inverse, et celui du nouveau chiffre se creuse en
+// Ils se creusent l'un après l'autre, du plus profond au moins profond, et remontent dans le même ordre ; quand on
+// change de chiffre, le creux du chiffre quitté remonte et remplit le mur, et celui du nouveau chiffre se creuse en
 // même temps, mais seulement là où le mur est déjà de nouveau plein : chacun de ses morceaux attend que les morceaux
 // de l'ancien creux qu'il recouvre aient fini de remonter (linkReliefs). Les creux sont du blanc du mur : on ne les lit
 // qu'à la lumière du soleil (LIGHT.dir), calculée ici plutôt que par la carte d'ombre (trop floue pour des marches si fines). Une image dit, en chaque point du creux, quel
@@ -586,6 +585,11 @@ const reliefs = [];
 // chacun, ses polygones : un contour, puis ses trous), le moment de son départ (de 0 à 1), sa profondeur (de 0 à 1) ;
 // ses contours extérieurs (ils donnent sa taille)
 const golden = (i, o) => (i * 0.618034 + o) % 1;
+// l'ordre de passage des morceaux (0 : le premier, 1 : le dernier) : du plus profond au moins profond
+const byDepth = (deep) => {
+  const order = deep.map((d, i) => i).sort((a, b) => deep[b] - deep[a]);
+  return deep.map((d, i) => order.indexOf(i) / (deep.length - 1));
+};
 // le groupe d'objets : la largeur du groupe tient dans la moitié gauche de l'écran (part de la hauteur de l'écran) ;
 // [profondeur du plus profond (part de la hauteur du groupe), la plus sombre des nuances choisies, force et portée
 //  (part de la hauteur du groupe) de l'ombre douce des bords]
@@ -593,16 +597,14 @@ const GROUP_W = 0.85;
 const BOARD = { depth: 0.065, toneMax: 0.12, ao: 0.5, aoR: 0.014 };
 function boardDef() {
   // du fond vers l'avant ; plus un objet est loin, plus son creux est profond
-  const n = EMPREINTES.length;
   return { screen: Math.min(0.72, GROUP_W / BOARD_W), spread: 1.6, depth: BOARD.depth, toneMax: BOARD.toneMax,
     ao: BOARD.ao, aoR: BOARD.aoR, parts: EMPREINTES.map((o) => o.p),
-    at: EMPREINTES.map((o, i) => i / (n - 1)), deep: EMPREINTES.map((o) => o.d), tone: EMPREINTES.map((o) => o.t),
+    at: byDepth(EMPREINTES.map((o) => o.d)), deep: EMPREINTES.map((o) => o.d), tone: EMPREINTES.map((o) => o.t),
     holes: EMPREINTES.flatMap((o) => o.p.map((poly) => poly[0])) };
 }
 function mapDef() {
-  const order = COMMUNES.map((c, i) => i).sort((a, b) => COMMUNES[a].d - COMMUNES[b].d);
-  return { screen: 0.8, spread: 1.1, parts: COMMUNES.map((c) => c.p.map((ring) => [ring])),
-    at: COMMUNES.map((c, i) => order.indexOf(i) / (COMMUNES.length - 1)), deep: COMMUNES.map((c, i) => golden(i, 0.3)),
+  const deep = COMMUNES.map((c, i) => golden(i, 0.3));
+  return { screen: 0.8, spread: 1.1, parts: COMMUNES.map((c) => c.p.map((ring) => [ring])), at: byDepth(deep), deep,
     holes: [REGION] };
 }
 function dialDef() {
@@ -611,7 +613,7 @@ function dialDef() {
     const a = a0 + ((a1 - a0) * j) / DIAL.arc;
     return [rad * Math.cos(a), rad * Math.sin(a)];
   });
-  // de midi, dans le sens des aiguilles d'une montre
+  // de midi, dans le sens des aiguilles d'une montre (le plus profond à midi)
   const parts = Array.from({ length: n }, (_, k) => {
     const a0 = Math.PI / 2 - (2 * Math.PI * k) / n, a1 = a0 - (2 * Math.PI) / n;
     return [[[...ring(R, a0, a1), ...ring(r, a1, a0)]]];
@@ -620,7 +622,7 @@ function dialDef() {
     const a = (2 * Math.PI * j) / (DIAL.arc * n);
     return [rad * Math.cos(a), rad * Math.sin(a)];
   });
-  return { screen: 0.72, spread: 2.2, parts, at: parts.map((p, k) => k / (n - 1)), deep: parts.map((p, k) => k / (n - 1)),
+  return { screen: 0.72, spread: 2.2, parts, at: parts.map((p, k) => k / (n - 1)), deep: parts.map((p, k) => 1 - k / (n - 1)),
     holes: [full(R)] };
 }
 
@@ -820,6 +822,7 @@ function stepReliefs(dt) {
   const active = window.hsStats?.active ?? -1, rate = dt / MAP.dig;
   reliefs.forEach((m, idx) => {
     const goal = active === idx ? m.total : 0;
+    if (goal !== m.t) m.out = goal < m.t;
     m.t = goal > m.t ? Math.min(goal, m.t + dt) : Math.max(goal, m.t - dt);
     if (m.t !== goal) busy = true;
     m.group.position.set(m.x, (gl.ball.position.y / gl.half) * gl.halfW, gl.wallZ);
@@ -828,7 +831,8 @@ function stepReliefs(dt) {
     u.uS.value = m.S;
     let open = false;
     m.cells.forEach((c, i) => {
-      const want = Math.min(1, Math.max(0, (m.t - c.delay) / MAP.dig));
+      // en se remplissant, ils remontent dans l'ordre où ils se sont creusés (le premier creusé, le premier rempli)
+      const want = Math.min(1, Math.max(0, (m.t - (m.out ? m.def.spread - c.delay : c.delay)) / MAP.dig));
       if (want > c.k) { if (!c.after.some((o) => o.k > 0)) c.k = Math.min(want, c.k + rate); } else c.k = Math.max(want, c.k - rate);
       if (c.k !== want) busy = true;
       const k = c.k, e = k * k * (3 - 2 * k);
