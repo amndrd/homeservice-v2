@@ -282,7 +282,7 @@ function wake() {
 }
 function frame(now) {
   raf = 0;
-  const dt = Math.min(0.05, (now - last) / 1000 || 0);
+  const dt = Math.min(0.05, Math.max(0, (now - last) / 1000 || 0));   // (l'image peut dater d'avant le réveil)
   last = now;
   // la section approche : les objets tombent (une fois pour toutes)
   if (gl.phase === 'idle' && box.getBoundingClientRect().top / window.innerHeight <= ENTER) start();
