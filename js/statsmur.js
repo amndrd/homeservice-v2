@@ -38,6 +38,8 @@ if (on) {
 //  rotation lente (rad/s), lévitation : ampleur (m), vitesse (rad/s), balancement des objets (rad)] ; part de la
 //  hauteur de l'écran qu'elle occupe, place de son centre (part de la largeur de l'écran) ; part de la surface du noyau couverte par les empreintes des objets ; un objet
 //  est long quand sa plus grande dimension dépasse autant de fois la suivante
+// (retirée le 2026-10-10 : le premier chiffre attend son creux dans le mur ; son code reste, dormant)
+const BALL_ON = false;
 const BALL = { gap: 0.16, spin: 0.14, bob: 0.04, bobSpeed: 1.3, sway: 0.04,
   screen: 1.1, x: 0.3, cover: 0.8, long: 2.4 };
 // la chute : [pesanteur (m/s²), hauteur au-dessus de sa place où la lévitation commence à le retenir (m), raideur et
@@ -310,7 +312,7 @@ function draw(dt) {
   gl.sun.position.set(...LIGHT.dir).normalize().multiplyScalar(gl.sunAt).add(gl.sun.target.position);
   let busy = false, shown = false, settled = 0;
   const top = gl.half - gl.ball.position.y;          // le haut de l'écran, au-dessus du centre de la boule (m)
-  for (const p of pieces) {
+  for (const p of BALL_ON ? pieces : []) {
     if (gl.phase === 'in') {
       if (!p.live && t - gl.t0 >= p.wait) p.live = true;
       if (p.live) {
@@ -406,7 +408,7 @@ function stepVoid(dt) {
   uVoid.uVoidC.value.set(gl.ball.position.x, gl.ball.position.y, 0);
   uVoid.uVoidSc.value = sc;
   uVoid.uVoidBack.value = -R;
-  gl.ball.visible = x < 1;
+  gl.ball.visible = BALL_ON && x < 1;
   return x !== goal;
 }
 
