@@ -18,6 +18,7 @@
 import * as THREE from 'three';
 import { COMMUNES, REGION } from './bruxelles.js';
 import { BOARD_W, EMPREINTES } from './empreintes.js';
+import { CHIFFRES } from './cadran.js';
 
 const box = document.querySelector('.stats');
 const root = document.documentElement;
@@ -557,7 +558,7 @@ function stepBlock(dt) {
 // Chaque chiffre a son creux dans le mur, à gauche, à la place de la boule (même centre) : le premier, le tableau
 // d'objets (les empreintes des objets de l'îlot, groupés, js/empreintes.js) ; le deuxième, la Région de Bruxelles-Capitale
 // (js/bruxelles.js) ; le troisième, un cadran solaire (une cuvette, ses graduations, ses chiffres, et un gnomon dont
-// l'ombre fait le tour des heures). Un creux est fait de morceaux (un objet, une commune, une heure),
+// l'ombre fait le tour des heures). Un creux est fait de morceaux (un objet, une commune, une graduation, un chiffre),
 // chacun à sa propre profondeur, souvent un peu différente de celle de ses voisins : leurs frontières sont des marches.
 // Ils se creusent l'un après l'autre, du plus profond au moins profond, et remontent dans le même ordre ; quand on
 // change de chiffre, le creux du chiffre quitté remonte et remplit le mur, et celui du nouveau chiffre se creuse en
@@ -576,8 +577,13 @@ function stepBlock(dt) {
 //  l'image des morceaux (px), écart des nuances (mêlées, et la plus sombre d'une nuance choisie)]
 const MAP = { depth: 0.05, shallow: 0.3, dig: 0.55, shade: 0.3, cast: 0.2, tint: 0.8,
   soft: 0.002, spread2: 0.25, res: 2048, tones: 0.07, toneMax: 0.09 };
-// le cadran : [rayon du moyeu, laissé plein (part du rayon), points par arc d'une heure]
-const DIAL = { hub: 0.34, arc: 8 };
+// le cadran : [rayon du moyeu, laissé plein (part du rayon), points par arc d'une heure, une barre sur deux un peu moins
+// profonde (de cette part)] ; les chiffres de 0, 6, 12 et 18 h, creusés dans leur barre [rayon de leur centre (part du
+// rayon), hauteur (part de la hauteur du cadran), creusés plus profond que leur barre (part de la profondeur du
+// creux), leur nuance (0 : le blanc du mur, 1 : la plus sombre)] ; une fois creusé, une barre après l'autre remonte
+// puis redescend, en faisant le tour [durée d'un tour (s), barres en mouvement à la fois, ce qui reste de leur creux
+// au plus haut, mise en route (s)]
+const DIAL = { hub: 0.15, arc: 8, num: [0.76, 0.064], numDeep: 0.35, alt: 0.2, numTone: 1, tour: 8, wave: 2.5, low: 0.12, ease: 0.5 };
 const STENCIL_MAP = 1, STENCIL_OPEN = 2;
 const reliefs = [];
 
@@ -613,17 +619,28 @@ function dialDef() {
     const a = a0 + ((a1 - a0) * j) / DIAL.arc;
     return [rad * Math.cos(a), rad * Math.sin(a)];
   });
-  // de midi, dans le sens des aiguilles d'une montre (le plus profond à midi)
-  const parts = Array.from({ length: n }, (_, k) => {
-    const a0 = Math.PI / 2 - (2 * Math.PI * k) / n, a1 = a0 - (2 * Math.PI) / n;
-    return [[[...ring(R, a0, a1), ...ring(r, a1, a0)]]];
-  });
+  // de 0 h (centrée en haut), dans le sens des aiguilles d'une montre ; une barre sur deux un peu moins profonde (pas
+  // de grande marche nulle part) ; les chiffres de 0, 6, 12 et 18 h au milieu de leur barre (la barre autour d'eux,
+  // et dans leurs boucles)
+  const parts = [], deep = [], bar = [], at = [], nums = [];
+  for (let k = 0; k < n; k++) {
+    const a0 = Math.PI / 2 + Math.PI / n - (2 * Math.PI * k) / n, a1 = a0 - (2 * Math.PI) / n, d = (1 - DIAL.numDeep) * (1 - DIAL.alt * (k % 2));
+    const sector = [[...ring(R, a0, a1), ...ring(r, a1, a0)]];
+    if (k % 6) { parts.push([sector]); deep.push(d); bar.push(k); at.push(k / n); continue; }
+    const am = (a0 + a1) / 2, cx = DIAL.num[0] * R * Math.cos(am), cy = DIAL.num[0] * R * Math.sin(am);
+    const glyph = CHIFFRES[String(k)].map((rings) => rings.map((rg) => rg.map(([x, y]) => [cx + x * DIAL.num[1], cy + y * DIAL.num[1]])));
+    sector.push(...glyph.map((rings) => rings[0]));
+    parts.push([sector, ...glyph.flatMap((rings) => rings.slice(1).map((c) => [c]))]); deep.push(d); bar.push(k); at.push(k / n);
+    nums.push([glyph, d + DIAL.numDeep, k]);
+  }
+  // (chaque chiffre un peu avant sa barre : il est plus profond)
+  for (const [glyph, d, k] of nums) { parts.push(glyph); deep.push(d); bar.push(k); at.push(Math.max(0, k - 0.5) / n); }
   const full = (rad) => Array.from({ length: DIAL.arc * n }, (_, j) => {
     const a = (2 * Math.PI * j) / (DIAL.arc * n);
     return [rad * Math.cos(a), rad * Math.sin(a)];
   });
-  return { screen: 0.72, spread: 2.2, parts, at: parts.map((p, k) => k / (n - 1)), deep: parts.map((p, k) => 1 - k / (n - 1)),
-    holes: [full(R)] };
+  return { screen: 0.72, spread: 2.2, parts, at, deep, bar, holes: [full(R)],
+    tone: parts.map((p, i) => (i < n ? null : DIAL.numTone)) };
 }
 
 function makeRelief(def) {
@@ -765,7 +782,7 @@ function makeRelief(def) {
   group.add(rim);
   group.visible = false;
   gl.scene.add(group);
-  return { def, group, cells, inside, t: 0, total: def.spread + MAP.dig };
+  return { def, group, cells, inside, wave: 0, amp: 0, t: 0, total: def.spread + MAP.dig };
 }
 const openMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
   stencilWrite: true, stencilRef: STENCIL_OPEN, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp });
@@ -829,13 +846,26 @@ function stepReliefs(dt) {
     const u = m.inside.uniforms;
     u.uAt.value.copy(m.group.position);
     u.uS.value = m.S;
+    // la vague du cadran : une fois creusé tout entier, une barre après l'autre remonte (et ses chiffres avec elle)
+    if (m.def.bar) {
+      const full = active === idx && m.cells.every((c) => c.k > 0.999);
+      m.amp = full ? Math.min(1, m.amp + dt / DIAL.ease) : Math.max(0, m.amp - dt / DIAL.ease);
+      if (m.amp > 0) m.wave = (m.wave + dt / DIAL.tour) % 1; else m.wave = 0;
+      if (m.amp > 0 || active === idx) busy = true;     // (elle tourne tant que le cadran est là)
+    }
     let open = false;
     m.cells.forEach((c, i) => {
       // en se remplissant, ils remontent dans l'ordre où ils se sont creusés (le premier creusé, le premier rempli)
       const want = Math.min(1, Math.max(0, (m.t - (m.out ? m.def.spread - c.delay : c.delay)) / MAP.dig));
       if (want > c.k) { if (!c.after.some((o) => o.k > 0)) c.k = Math.min(want, c.k + rate); } else c.k = Math.max(want, c.k - rate);
       if (c.k !== want) busy = true;
-      const k = c.k, e = k * k * (3 - 2 * k);
+      const k = c.k;
+      let e = k * k * (3 - 2 * k);
+      if (m.amp > 0) {
+        // sa place dans la vague (en barres, depuis le front) : elle monte puis redescend
+        const x = (((m.wave * 24 - m.def.bar[i]) % 24) + 24) % 24 / DIAL.wave;
+        if (x < 1) e *= 1 - m.amp * (1 - DIAL.low) * Math.sin(Math.PI * x) ** 2;
+      }
       c.cell.visible = e > 0.001;
       if (c.cell.visible) open = true;
       c.cell.scale.z = c.deep * m.S * e;
