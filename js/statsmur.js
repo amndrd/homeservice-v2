@@ -17,6 +17,7 @@
 // chaque commune à sa profondeur (plus bas : la carte). Le modèle du troisième chiffre reste à définir.
 import * as THREE from 'three';
 import { COMMUNES, REGION } from './bruxelles.js';
+import { BOARD_W, EMPREINTES } from './empreintes.js';
 
 const box = document.querySelector('.stats');
 const root = document.documentElement;
@@ -140,7 +141,7 @@ function init(found) {
 
   gl = { renderer, scene, camera, sun, wall, ball, stage, phase: 'idle', t0: 0, extent, voidX: 0, voidK: 0 };
   makeBlock();
-  makeMap();
+  makeReliefs();
   layout();
   new ResizeObserver(layout).observe(document.body);
   window.addEventListener('scroll', wake, { passive: true });
@@ -264,7 +265,7 @@ function layout() {
   Object.assign(gl.sun.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 0.1, far: s * 8 });
   gl.sun.shadow.camera.updateProjectionMatrix();
   layoutBlock();
-  layoutMap();
+  layoutReliefs();
   draw(0);
 }
 
@@ -346,9 +347,9 @@ function draw(dt) {
   // (et s'efface avec la boule quand le vide la reprend)
   gl.wall.material.opacity = LIGHT.shadow * k * k * (3 - 2 * k) * (1 - gl.voidK);
   if (stepBlock(dt)) { busy = true; shown = true; }
-  const dig = stepMap(dt);
-  if (dig) busy = true;
-  if (map?.t > 0) shown = true;
+  const dig = stepReliefs(dt);
+  if (dig.busy) busy = true;
+  if (dig.shown) shown = true;
   if (stepVoid(dt)) busy = true;
   gl.renderer.domElement.style.visibility = shown ? '' : 'hidden';
   gl.renderer.render(gl.scene, gl.camera);
@@ -552,45 +553,101 @@ function stepBlock(dt) {
   return block.t < 1;
 }
 
-// ------------------------------------------------------------ la carte
-// Deuxième chiffre : la Région de Bruxelles-Capitale se creuse dans le mur, en grand, à la place de la boule (même
-// centre). Chaque commune est un creux à part (js/bruxelles.js), à sa propre profondeur, un peu différente de celle de
-// ses voisines : les frontières sont les marches entre elles. Elles se creusent l'une après l'autre, du centre de la
-// région vers ses bords, pendant le décompte ; en revenant au premier chiffre, elles se referment dans l'ordre
-// inverse. Les creux sont du blanc du mur : on ne les lit qu'à la lumière du soleil (LIGHT.dir), calculée ici plutôt
-// que par la carte d'ombre (trop floue pour des marches si fines). Une image dit, en chaque point de la carte, quelle
-// commune s'y trouve (sa profondeur du moment : uDepth) ; un point est au soleil si le rayon qui va de lui vers le
-// soleil remonte jusqu'au mur sans rencontrer de commune moins profonde (l'ombre d'une marche, ou du bord du trou).
+// ------------------------------------------------------------ les creux
+// Chaque chiffre a son creux dans le mur, à gauche, à la place de la boule (même centre) : le premier, le tableau
+// d'objets (les empreintes des objets de l'îlot, groupés, js/empreintes.js) ; le deuxième, la Région de Bruxelles-Capitale
+// (js/bruxelles.js) ; le troisième, un cadran solaire (une cuvette, ses graduations, ses chiffres, et un gnomon dont
+// l'ombre fait le tour des heures). Un creux est fait de morceaux (un objet, une commune, une heure),
+// chacun à sa propre profondeur, souvent un peu différente de celle de ses voisins : leurs frontières sont des marches.
+// Ils se creusent l'un après l'autre (les objets du fond vers l'avant, les communes du centre de la région vers ses
+// bords, les heures dans le sens des aiguilles d'une montre, de plus en plus profondes) ; quand on change de chiffre,
+// le creux du chiffre quitté remonte et remplit le mur dans l'ordre inverse, et celui du nouveau chiffre se creuse en
+// même temps, mais seulement là où le mur est déjà de nouveau plein : chacun de ses morceaux attend que les morceaux
+// de l'ancien creux qu'il recouvre aient fini de remonter (linkReliefs). Les creux sont du blanc du mur : on ne les lit
+// qu'à la lumière du soleil (LIGHT.dir), calculée ici plutôt que par la carte d'ombre (trop floue pour des marches si fines). Une image dit, en chaque point du creux, quel
+// morceau s'y trouve (sa profondeur du moment : uDepth) ; un point est au soleil si le rayon qui va de lui vers le
+// soleil remonte jusqu'au mur sans rencontrer de morceau moins profond (l'ombre d'une marche, ou du bord du trou).
 // Les parois sont d'autant plus sombres qu'elles se détournent du soleil (celles du haut et de gauche). Une paroi ne
-// se dessine que sous le fond de la commune voisine (la marche). Plus un fond est profond, un peu plus il est sombre
-// (moins de ciel y descend). Chaque commune a aussi sa nuance de blanc, un peu plus claire ou plus sombre que ses
-// voisines (MAP.tones), pour mieux les distinguer.
-// [hauteur de la carte (part de la hauteur de l'écran), profondeur des creux (part de la hauteur de la carte : la plus
-//  grande, et la part de la plus petite), durée de l'étalement des départs (s), durée du creusement d'une commune (s),
-//  force : des parois détournées, de l'ombre portée, de l'assombrissement par hauteur de carte de profondeur ;
-//  pénombre (part de la hauteur de la carte, au pied de la marche, et en plus par unité d'ombre), taille de l'image
-//  des communes (px)]
-const MAP = { screen: 0.8, depth: 0.05, shallow: 0.3, spread: 1.1, dig: 0.55, shade: 0.3, cast: 0.2, tint: 0.8,
-  soft: 0.002, spread2: 0.25, res: 2048, tones: 0.07 };
-const MAP_EDGE = 0.51;                              // le mur percé autour de la carte (en hauteurs de carte)
-const STENCIL_MAP = 1;
-let map = null;
-function makeMap() {
-  const n = COMMUNES.length;
-  // l'ordre : du centre de la région vers ses bords ; les profondeurs : mêlées (suite du nombre d'or)
+// se dessine que sous le fond du morceau voisin (la marche). Plus un fond est profond, un peu plus il est sombre
+// (moins de ciel y descend). Chaque morceau a aussi sa nuance de blanc, un peu plus claire ou plus sombre que ses
+// voisins (MAP.tones), pour mieux les distinguer.
+// [profondeur des creux (part de la hauteur du creux : la plus grande, et la part de la plus petite), durée du creusement d'un
+//  morceau (s), force : des parois détournées, de l'ombre portée, de l'assombrissement par hauteur de creux de
+//  profondeur ; pénombre (part de la hauteur du creux, au pied de la marche, et en plus par unité d'ombre), taille de
+//  l'image des morceaux (px), écart des nuances (mêlées, et la plus sombre d'une nuance choisie)]
+const MAP = { depth: 0.05, shallow: 0.3, dig: 0.55, shade: 0.3, cast: 0.2, tint: 0.8,
+  soft: 0.002, spread2: 0.25, res: 2048, tones: 0.07, toneMax: 0.09 };
+// le cadran : [rayon du moyeu, laissé plein (part du rayon), points par arc d'une heure]
+const DIAL = { hub: 0.34, arc: 8 };
+const STENCIL_MAP = 1, STENCIL_OPEN = 2;
+const reliefs = [];
+
+// Chaque creux : [hauteur (part de la hauteur de l'écran), durée de l'étalement des départs (s)] ; ses morceaux (pour
+// chacun, ses polygones : un contour, puis ses trous), le moment de son départ (de 0 à 1), sa profondeur (de 0 à 1) ;
+// ses contours extérieurs (ils donnent sa taille)
+const golden = (i, o) => (i * 0.618034 + o) % 1;
+// le groupe d'objets : la largeur du groupe tient dans la moitié gauche de l'écran (part de la hauteur de l'écran) ;
+// [profondeur du plus profond (part de la hauteur du groupe), la plus sombre des nuances choisies]
+const GROUP_W = 0.85;
+const BOARD = { depth: 0.065, toneMax: 0.12 };
+function boardDef() {
+  // du fond vers l'avant ; plus un objet est loin, plus son creux est profond
+  const n = EMPREINTES.length;
+  return { screen: Math.min(0.72, GROUP_W / BOARD_W), spread: 1.6, depth: BOARD.depth, toneMax: BOARD.toneMax,
+    parts: EMPREINTES.map((o) => o.p),
+    at: EMPREINTES.map((o, i) => i / (n - 1)), deep: EMPREINTES.map((o) => o.d), tone: EMPREINTES.map((o) => o.t),
+    holes: EMPREINTES.flatMap((o) => o.p.map((poly) => poly[0])) };
+}
+function mapDef() {
   const order = COMMUNES.map((c, i) => i).sort((a, b) => COMMUNES[a].d - COMMUNES[b].d);
-  const deep = COMMUNES.map((c, i) => MAP.depth * (MAP.shallow + (1 - MAP.shallow) * ((i * 0.618034 + 0.3) % 1)));
-  // leurs nuances (de 1 : le blanc du mur, à 1 − MAP.tones), mêlées autrement que les profondeurs
-  const tone = COMMUNES.map((c, i) => 1 - MAP.tones * ((i * 0.381966 + 0.55) % 1));
-  // l'image des communes : commune i → (i + 1) / 255, hors de la région 0 ; rendue une fois, sans lissage
-  const N = MAP.res, E = MAP_EDGE;
+  return { screen: 0.8, spread: 1.1, parts: COMMUNES.map((c) => c.p.map((ring) => [ring])),
+    at: COMMUNES.map((c, i) => order.indexOf(i) / (COMMUNES.length - 1)), deep: COMMUNES.map((c, i) => golden(i, 0.3)),
+    holes: [REGION] };
+}
+function dialDef() {
+  const R = 0.5, r = R * DIAL.hub, n = 24;
+  const ring = (rad, a0, a1) => Array.from({ length: DIAL.arc + 1 }, (_, j) => {
+    const a = a0 + ((a1 - a0) * j) / DIAL.arc;
+    return [rad * Math.cos(a), rad * Math.sin(a)];
+  });
+  // de midi, dans le sens des aiguilles d'une montre
+  const parts = Array.from({ length: n }, (_, k) => {
+    const a0 = Math.PI / 2 - (2 * Math.PI * k) / n, a1 = a0 - (2 * Math.PI) / n;
+    return [[[...ring(R, a0, a1), ...ring(r, a1, a0)]]];
+  });
+  const full = (rad) => Array.from({ length: DIAL.arc * n }, (_, j) => {
+    const a = (2 * Math.PI * j) / (DIAL.arc * n);
+    return [rad * Math.cos(a), rad * Math.sin(a)];
+  });
+  return { screen: 0.72, spread: 2.2, parts, at: parts.map((p, k) => k / (n - 1)), deep: parts.map((p, k) => k / (n - 1)),
+    holes: [full(R)] };
+}
+
+function makeRelief(def) {
+  const n = def.parts.length;
+  const depth = def.depth ?? MAP.depth, toneMax = def.toneMax ?? MAP.toneMax;
+  const shallow = def.shallow ?? MAP.shallow, deep = def.deep.map((d) => depth * (shallow + (1 - shallow) * d));
+  // leurs nuances (de 1 : le blanc du mur, à 1 − MAP.tones), mêlées autrement que les profondeurs ; un morceau peut
+  // avoir la sienne (def.tone : de 0, le blanc du mur, à 1 ; un peu plus que MAP.tones à 1)
+  const tone = def.parts.map((p, i) => 1 - (def.tone?.[i] != null ? toneMax * def.tone[i] : MAP.tones * ((i * 0.381966 + 0.55) % 1)));
+  // l'image des morceaux : morceau i → (i + 1) / 255, hors du creux 0 ; rendue une fois, sans lissage
+  const E = 0.01 + Math.max(...def.holes.flat().map(([x, y]) => Math.max(Math.abs(x), Math.abs(y))));
+  const N = MAP.res, V = (pts) => pts.map(([x, y]) => new THREE.Vector2(x, y));
   const ids = new THREE.WebGLRenderTarget(N, N, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
     generateMipmaps: false, depthBuffer: false });
   const flat = new THREE.Scene(), cam = new THREE.OrthographicCamera(-E, E, E, -E, -1, 1);
-  const shapes = COMMUNES.map((c) => c.p.map((pts) => new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)))));
+  // chaque polygone : un contour (sens trigonométrique), ses trous (sens horaire) ; l'intérieur du morceau toujours
+  // à gauche
+  const shapes = def.parts.map((polys) => polys.map(([outer, ...inner]) => {
+    let o = V(outer);
+    if (THREE.ShapeUtils.isClockWise(o)) o = o.reverse();
+    const sh = new THREE.Shape(o);
+    sh.holes = inner.map((h) => { let v = V(h); if (!THREE.ShapeUtils.isClockWise(v)) v = v.reverse(); return new THREE.Path(v); });
+    return { sh, rings: [o, ...sh.holes.map((h) => h.getPoints())] };
+  }));
   shapes.forEach((list, i) => {
     const m = new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB((i + 1) / 255, 0, 0), toneMapped: false });
-    for (const sh of list) flat.add(new THREE.Mesh(new THREE.ShapeGeometry(sh), m));
+    for (const { sh } of list) flat.add(new THREE.Mesh(new THREE.ShapeGeometry(sh), m));
   });
   const r = gl.renderer, clear = r.getClearAlpha();
   r.setClearColor(0x000000, 1);
@@ -621,7 +678,7 @@ function makeMap() {
       uniform sampler2D uIds; uniform float uDepth[${n}];
       uniform vec3 uPaper, uSun, uAt; uniform float uS, uShade, uCast, uTint, uSpread, uSoft, uEdge, uTexel;
       varying vec3 vW; varying vec3 vIn; varying float vTone;
-      // la profondeur du fond en ce point de la carte (en hauteurs de carte ; 0 : le mur)
+      // la profondeur du fond en ce point du creux (en hauteurs de creux ; 0 : le mur)
       float floorAt(vec2 q) {
         float id = floor(texture2D(uIds, (q + uEdge) / (2.0 * uEdge)).r * 255.0 + 0.5);
         if (id < 0.5) return 0.0;
@@ -634,7 +691,7 @@ function makeMap() {
         float z = max(0.0, uAt.z - vW.z) / uS;           // sa profondeur
         vec3 n = vIn;
         if (n.z < 0.5) {
-          // une paroi : seulement sous le fond de la commune voisine (au-dessus, c'est l'air entre les deux creux)
+          // une paroi : seulement sous le fond du morceau voisin (au-dessus, c'est l'air entre les deux creux)
           if (z < floorAt(p - n.xy * 1.5 * uTexel) - 1e-5) discard;
         }
         // le rayon vers le soleil, jusqu'au mur : rencontre-t-il un fond moins profond que lui ?
@@ -653,66 +710,118 @@ function makeMap() {
   const group = new THREE.Group();
   const cells = shapes.map((list, i) => {
     const cell = new THREE.Group();                 // son creux : le fond à z = −1, les parois de 0 à −1 (échelle z)
-    for (const sh of list) {
+    for (const { sh, rings } of list) {
       const floor = new THREE.Mesh(new THREE.ShapeGeometry(sh), inside);
       const fc = floor.geometry.attributes.position.count;
       floor.geometry.setAttribute('inward', new THREE.Float32BufferAttribute(new Array(fc).fill([0, 0, 1]).flat(), 3));
       floor.geometry.setAttribute('cid', new THREE.Float32BufferAttribute(new Array(fc).fill(i), 1));
       floor.position.z = -1;
-      // ses parois, tournées vers l'intérieur du creux
-      let v = sh.getPoints();
-      if (THREE.ShapeUtils.isClockWise(v)) v = v.slice().reverse();   // sens trigonométrique : l'intérieur à gauche
+      // ses parois (autour du contour et de chaque trou), tournées vers l'intérieur du morceau (à gauche)
       const pos = [], inw = [];
-      v.forEach((a, k) => {
-        const b = v[(k + 1) % v.length], l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-        const nx = -(b.y - a.y) / l, ny = (b.x - a.x) / l;
-        pos.push(a.x, a.y, 0, b.x, b.y, 0, b.x, b.y, -1, a.x, a.y, 0, b.x, b.y, -1, a.x, a.y, -1);
-        for (let q = 0; q < 6; q++) inw.push(nx, ny, 0);
-      });
+      for (const v of rings) {
+        v.forEach((a, k) => {
+          const b = v[(k + 1) % v.length], l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+          const nx = -(b.y - a.y) / l, ny = (b.x - a.x) / l;
+          pos.push(a.x, a.y, 0, b.x, b.y, 0, b.x, b.y, -1, a.x, a.y, 0, b.x, b.y, -1, a.x, a.y, -1);
+          for (let q = 0; q < 6; q++) inw.push(nx, ny, 0);
+        });
+      }
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
       g.setAttribute('inward', new THREE.Float32BufferAttribute(inw, 3));
       g.setAttribute('cid', new THREE.Float32BufferAttribute(new Array(inw.length / 3).fill(i), 1));
-      cell.add(floor, new THREE.Mesh(g, inside));
+      // son ouverture dans le mur (elle marque le stencil : le mur ne s'y dessine pas)
+      const hole = new THREE.Mesh(new THREE.ShapeGeometry(sh), openMat);
+      hole.renderOrder = -3;
+      cell.add(floor, new THREE.Mesh(g, inside), hole);
     }
     cell.visible = false;
     group.add(cell);
-    return { cell, deep: deep[i], delay: (order.indexOf(i) / (n - 1)) * MAP.spread };
+    return { cell, shapes: list, deep: deep[i], delay: def.at[i] * def.spread, k: 0, after: [] };
   });
-  // le mur autour, percé du contour de la région : il n'écrit que la profondeur (il cache ce qui dépasse derrière le
-  // mur)
-  const around = new THREE.Shape([new THREE.Vector2(-E, -E), new THREE.Vector2(E, -E), new THREE.Vector2(E, E),
-    new THREE.Vector2(-E, E)]);
-  around.holes = [new THREE.Path(REGION.map(([x, y]) => new THREE.Vector2(x, y)))];
-  const rim = new THREE.Mesh(new THREE.ShapeGeometry(around), new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide }));
-  rim.renderOrder = -1;
+  // le mur autour, partout sauf dans les ouvertures des morceaux creusés (de ce creux ou d'un autre, pendant qu'ils
+  // se relaient) : il n'écrit que la profondeur (il cache ce qui dépasse derrière le mur)
+  const rim = new THREE.Mesh(new THREE.PlaneGeometry(2 * E, 2 * E), rimMat);
+  rim.renderOrder = -2;
   group.add(rim);
   group.visible = false;
   gl.scene.add(group);
-  map = { group, cells, rim, inside, t: 0 };
+  return { def, group, cells, inside, t: 0, total: def.spread + MAP.dig };
 }
-// sa place : au centre de la boule, sur le mur
-function layoutMap() {
-  if (!map) return;
-  map.S = MAP.screen * 2 * gl.halfW;
-  map.group.scale.set(map.S, map.S, 1);
-  map.x = (BALL.x - 0.5) * 2 * gl.halfW * gl.camera.aspect;
+const openMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
+  stencilWrite: true, stencilRef: STENCIL_OPEN, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp });
+const rimMat = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide,
+  stencilWrite: true, stencilWriteMask: 0, stencilRef: STENCIL_OPEN, stencilFunc: THREE.NotEqualStencilFunc });
+function makeReliefs() {
+  reliefs.push(makeRelief(boardDef()), makeRelief(mapDef()), makeRelief(dialDef()));
+  linkReliefs();
 }
-// un pas : le creusement avance vers la carte (deuxième chiffre et au-delà) ou revient vers le mur plein
-function stepMap(dt) {
-  if (!map) return false;
-  const total = MAP.spread + MAP.dig, goal = (window.hsStats?.active ?? -1) >= 1 ? total : 0;
-  map.t = goal > map.t ? Math.min(goal, map.t + dt) : Math.max(goal, map.t - dt);
-  map.group.visible = map.t > 0;
-  map.group.position.set(map.x, (gl.ball.position.y / gl.half) * gl.halfW, gl.wallZ);
-  const u = map.inside.uniforms;
-  u.uAt.value.copy(map.group.position);
-  u.uS.value = map.S;
-  map.cells.forEach((c, i) => {
-    const k = Math.min(1, Math.max(0, (map.t - c.delay) / MAP.dig)), e = k * k * (3 - 2 * k);
-    c.cell.visible = e > 0.001;
-    c.cell.scale.z = c.deep * map.S * e;
-    u.uDepth.value[i] = c.deep * e;
+// qui recouvre qui : chaque morceau, dessiné dans une petite image commune aux trois creux (à leur taille relative,
+// un peu élargi) ; deux morceaux de creux différents se recouvrent s'ils partagent un point de l'image. Un morceau ne
+// se creuse que lorsque ceux qu'il recouvre dans les autres creux sont tout à fait remontés.
+function linkReliefs() {
+  const N = 256, span = 0.46, cv = document.createElement('canvas');
+  cv.width = cv.height = N;
+  const cx = cv.getContext('2d', { willReadFrequently: true });
+  const owner = reliefs.map((m) => {
+    const id = new Int16Array(N * N).fill(-1);
+    m.cells.forEach((c, i) => {
+      cx.clearRect(0, 0, N, N);
+      const path = new Path2D(), f = (N / 2) / span * m.def.screen;
+      for (const { rings } of c.shapes) for (const ring of rings) {
+        ring.forEach((v, j) => path[j ? 'lineTo' : 'moveTo'](N / 2 + v.x * f, N / 2 - v.y * f));
+        path.closePath();
+      }
+      cx.fill(path, 'evenodd');
+      cx.lineWidth = 2;
+      cx.stroke(path);
+      const px = cx.getImageData(0, 0, N, N).data;
+      for (let q = 0; q < N * N; q++) if (px[q * 4 + 3] > 40) id[q] = i;
+    });
+    return id;
   });
-  return map.t !== goal;
+  reliefs.forEach((m, a) => reliefs.forEach((o, b) => {
+    if (a === b) return;
+    const seen = m.cells.map(() => new Set());
+    for (let q = 0; q < N * N; q++) if (owner[a][q] >= 0 && owner[b][q] >= 0) seen[owner[a][q]].add(owner[b][q]);
+    seen.forEach((set, i) => { for (const j of set) m.cells[i].after.push(o.cells[j]); });
+  }));
+}
+// leur place : au centre de la boule, sur le mur
+function layoutReliefs() {
+  for (const m of reliefs) {
+    m.S = m.def.screen * 2 * gl.halfW;
+    m.group.scale.set(m.S, m.S, 1);
+    m.x = (BALL.x - 0.5) * 2 * gl.halfW * gl.camera.aspect;
+  }
+}
+// un pas : chaque creux avance vers son chiffre (creusé) ou revient vers le mur plein ; chaque morceau suit l'horloge
+// de son creux (son départ, puis MAP.dig), mais ne se creuse pas tant qu'un morceau qu'il recouvre n'est pas remonté
+// (il prend alors du retard, puis se creuse à son allure) ; dit s'il bouge encore, et si l'un d'eux se voit
+function stepReliefs(dt) {
+  let busy = false, shown = false;
+  const active = window.hsStats?.active ?? -1, rate = dt / MAP.dig;
+  reliefs.forEach((m, idx) => {
+    const goal = active === idx ? m.total : 0;
+    m.t = goal > m.t ? Math.min(goal, m.t + dt) : Math.max(goal, m.t - dt);
+    if (m.t !== goal) busy = true;
+    m.group.position.set(m.x, (gl.ball.position.y / gl.half) * gl.halfW, gl.wallZ);
+    const u = m.inside.uniforms;
+    u.uAt.value.copy(m.group.position);
+    u.uS.value = m.S;
+    let open = false;
+    m.cells.forEach((c, i) => {
+      const want = Math.min(1, Math.max(0, (m.t - c.delay) / MAP.dig));
+      if (want > c.k) { if (!c.after.some((o) => o.k > 0)) c.k = Math.min(want, c.k + rate); } else c.k = Math.max(want, c.k - rate);
+      if (c.k !== want) busy = true;
+      const k = c.k, e = k * k * (3 - 2 * k);
+      c.cell.visible = e > 0.001;
+      if (c.cell.visible) open = true;
+      c.cell.scale.z = c.deep * m.S * e;
+      u.uDepth.value[i] = c.deep * e;
+    });
+    m.group.visible = open;
+    if (open) shown = true;
+  });
+  return { busy, shown };
 }
