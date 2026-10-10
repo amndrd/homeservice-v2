@@ -587,14 +587,15 @@ const reliefs = [];
 // ses contours extérieurs (ils donnent sa taille)
 const golden = (i, o) => (i * 0.618034 + o) % 1;
 // le groupe d'objets : la largeur du groupe tient dans la moitié gauche de l'écran (part de la hauteur de l'écran) ;
-// [profondeur du plus profond (part de la hauteur du groupe), la plus sombre des nuances choisies]
+// [profondeur du plus profond (part de la hauteur du groupe), la plus sombre des nuances choisies, force et portée
+//  (part de la hauteur du groupe) de l'ombre douce des bords]
 const GROUP_W = 0.85;
-const BOARD = { depth: 0.065, toneMax: 0.12 };
+const BOARD = { depth: 0.065, toneMax: 0.12, ao: 0.5, aoR: 0.014 };
 function boardDef() {
   // du fond vers l'avant ; plus un objet est loin, plus son creux est profond
   const n = EMPREINTES.length;
   return { screen: Math.min(0.72, GROUP_W / BOARD_W), spread: 1.6, depth: BOARD.depth, toneMax: BOARD.toneMax,
-    parts: EMPREINTES.map((o) => o.p),
+    ao: BOARD.ao, aoR: BOARD.aoR, parts: EMPREINTES.map((o) => o.p),
     at: EMPREINTES.map((o, i) => i / (n - 1)), deep: EMPREINTES.map((o) => o.d), tone: EMPREINTES.map((o) => o.t),
     holes: EMPREINTES.flatMap((o) => o.p.map((poly) => poly[0])) };
 }
@@ -663,7 +664,8 @@ function makeRelief(def) {
     stencilWrite: true, stencilRef: STENCIL_MAP, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp,
     uniforms: { uIds: { value: ids.texture }, uDepth: { value: new Float32Array(n) }, uTone: { value: tone }, uPaper: { value: new THREE.Color('#f7f7f5') },
       uSun: { value: sunDir }, uAt: { value: new THREE.Vector3() }, uS: { value: 1 }, uShade: { value: MAP.shade }, uCast: { value: MAP.cast }, uTint: { value: MAP.tint }, uSpread: { value: MAP.spread2 },
-      uSoft: { value: MAP.soft }, uEdge: { value: E }, uTexel: { value: (2 * E) / N } },
+      uSoft: { value: MAP.soft }, uEdge: { value: E }, uTexel: { value: (2 * E) / N },
+      uAO: { value: def.ao ?? 0 }, uAOR: { value: def.aoR ?? 0.01 } },
     vertexShader: `
       attribute vec3 inward; attribute float cid;
       uniform float uTone[${n}];
@@ -676,7 +678,7 @@ function makeRelief(def) {
       }`,
     fragmentShader: `
       uniform sampler2D uIds; uniform float uDepth[${n}];
-      uniform vec3 uPaper, uSun, uAt; uniform float uS, uShade, uCast, uTint, uSpread, uSoft, uEdge, uTexel;
+      uniform vec3 uPaper, uSun, uAt; uniform float uS, uShade, uCast, uTint, uSpread, uSoft, uEdge, uTexel, uAO, uAOR;
       varying vec3 vW; varying vec3 vIn; varying float vTone;
       // la profondeur du fond en ce point du creux (en hauteurs de creux ; 0 : le mur)
       float floorAt(vec2 q) {
@@ -703,7 +705,22 @@ function makeRelief(def) {
           shut = max(shut, smoothstep(0.0, uSoft + uSpread * (z - zj), zj - floorAt(q)));   // pénombre : plus large loin de la marche
         }
         float facing = clamp(dot(n, uSun) / uSun.z, 0.0, 1.0);
-        gl_FragColor = vec4(uPaper * vTone * (1.0 - uShade * (1.0 - facing)) * (1.0 - uCast * shut) * (1.0 - uTint * z), 1.0);
+        // l'ombre douce du bord : tout autour, ce qui monte plus haut que lui (le mur, un morceau moins profond) lui
+        // cache un peu de ciel ; d'autant plus que c'est haut et proche (comme au pied d'une paroi)
+        float occ = 0.0;
+        if (uAO > 0.0) {
+          for (int j = 0; j < 12; j++) {
+            float a = float(j) * 0.5235988 + 0.26;
+            vec2 dir = vec2(cos(a), sin(a));
+            for (int r = 1; r <= 3; r++) {
+              float d = uAOR * float(r) / 3.0;
+              float h = z - floorAt(p + n.xy * uTexel + dir * d);
+              occ += clamp(h / d, 0.0, 1.0) * (1.0 - float(r - 1) / 3.0);
+            }
+          }
+          occ /= 24.0;
+        }
+        gl_FragColor = vec4(uPaper * vTone * (1.0 - uShade * (1.0 - facing)) * (1.0 - uCast * shut) * (1.0 - uTint * z) * (1.0 - uAO * occ), 1.0);
         #include <colorspace_fragment>
       }`,
   });
