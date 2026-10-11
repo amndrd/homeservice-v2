@@ -1,0 +1,12 @@
+L'illustration du premier chiffre (images/services-studio.webp) : les objets du groupe des empreintes
+(empreintes/groupe.py), à la même place à l'écran, posés au sol en profondeur et rendus en studio (Cycles, lumière
+douce, ombres de contact sur un sol invisible, légère plongée orthographique).
+Dans un dossier de travail, avec tris.json (empreintes/dump.py), sil.py et groupe.py copiés à côté :
+  1. python layout.py            (avec shapely)  → layout.json : la place de chaque objet
+  2. cp blender/hero.blend src.blend ; Blender -b src.blend --python studio.py -- studio_hd.png 2000 160
+     → studio_hd.png et studio_frame.json (le cadre, en m)
+  3. python fondu.py studio_hd.png fondu.png   (avec numpy) : l'ombre s'efface avant les bords
+  4. fondu.png réduit à 1600 px de large ; pixels d'ombre (alpha < 200, couleur < 60) passés au noir ; alpha arrondi
+     au pair ; webp quality 82 (alpha sans perte : une alpha compressée fait des paliers dans l'ombre)
+     → images/services-studio.webp
+Si le cadre change, mettre à jour FLAT (scale, aspect, dy) dans js/statsvide.js.
