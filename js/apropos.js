@@ -6,8 +6,8 @@
 //    simplement, l'îlot avec lui.
 // 2. L'À propos, repris du plan 1 du site immersif (homeservice-immersive/web/js/app.js : inkMaterial, wordsLit,
 //    photoMat, photoAt), défile comme une section de page : ses mots sont là à 16 % et s'allument un à un en passant
-//    au milieu de l'écran, la partie en couleur passe au vert avec son premier mot ; la photo s'ouvre depuis son
-//    centre, derrière un bord ondulé et net, celui du vide, en montant vers le milieu de l'écran. Tout est lié au
+//    au milieu de l'écran, la partie en couleur passe au vert avec son premier mot ; la photo sort du vide (celui
+//    de l'îlot du hero) depuis son centre, en montant vers le milieu de l'écran. Tout est lié au
 //    défilement : on avance, ça apparaît ; on s'arrête, ça s'arrête. Tout se rejoue à l'envers en remontant.
 (() => {
   const track = document.querySelector('.hero-track');
@@ -18,7 +18,6 @@
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
   const span = (a, b, x) => clamp((x - a) / (b - a), 0, 1);
-  const sms = (a, b, x) => { const t = span(a, b, x); return t * t * (3 - 2 * t); };
 
   // La course, en écrans de défilement (1 = la hauteur de la fenêtre)
   // la lévitation : sur ordinateur seulement (même règle que js/hero.js)
@@ -28,7 +27,7 @@
   root.classList.toggle('lifts', LIFT > 0);       // la scène 3D reste fixée à l'écran (css : .scene)
   // le milieu de l'écran, en part de sa hauteur, que traversent les mots (de … à : ils s'allument) et la photo
   // (elle s'ouvre)
-  const WORD = [0.62, 0.48], PHOTO = [0.92, 0.5];
+  const WORD = [0.62, 0.48], PHOTO = [1.0, 0.32];
 
   // la course du hero ; le repère de l'accueil dans la navbar la couvre
   const home = document.getElementById('accueil');
@@ -132,23 +131,25 @@
     },
   };
 
-  // ------------------------------------------------------------ la photo : elle s'ouvre derrière le bord du vide
-  // Le shader du site immersif (photoMat), à plat : la photo mesure PHOTO_W m de large ; une ouverture en rectangle
-  // arrondi grandit depuis son centre, son bord est le bruit du vide (mêmes fréquences, bande de 6 m pendant
-  // l'ouverture) ; sur la fin, la bande ondulée se resserre jusqu'à disparaître : ouverte, la photo est entière, aux
-  // bords nets et aux coins arrondis comme les images du site (PHOTO_CORNER px). Le contour est lissé au pixel près.
-  const PHOTO_W = 18.5, PHOTO_EDGE = 6.0, PHOTO_ROUND = 2.2, PHOTO_CORNER = 18;
+  // ------------------------------------------------------------ la photo : elle sort du vide
+  // Le vide de l'îlot du hero (js/hero.js : REVEAL, VOID_FN), à plat : même bruit, même échelle à l'écran (10 m par
+  // hauteur d'écran), même bord ondulé de profondeur constante. Le front part du centre de la photo et passe sur toute
+  // elle à la même allure, jusqu'à ses bords, sans se resserrer (le défilement le fait avancer : on avance, il avance) ;
+  // la photo garde ses coins arrondis (PHOTO_CORNER px). Le contour est lissé au pixel près.
+  // [m par hauteur d'écran, fréquences des deux octaves (1/m), profondeur du bord (m), rayon où rien n'est encore
+  //  découvert (m), lissage de l'allure (celui de l'îlot), coins (px)]
+  const VOID = { screen: 10, f1: 0.66, f2: 3.8, edge: 3.0, none: -3.0, ease: 0.35 }, PHOTO_CORNER = 18;
   const photoBox = about.querySelector('.about__photo');
   const img = photoBox?.querySelector('img');
   const pCanvas = document.createElement('canvas');
   pCanvas.setAttribute('aria-hidden', 'true');
-  let pgl = null, PU = null, photoReady = false, photoH = PHOTO_W * 0.75;
+  let pgl = null, PU = null, photoReady = false;
   if (img && !reduced) {
     photoBox.prepend(pCanvas);
     pgl = pCanvas.getContext('webgl', { alpha: true, antialias: false, premultipliedAlpha: true });
     const prog = pgl && program(pgl, `attribute vec2 aPos; varying vec2 vUv;
       void main() { vUv = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }`, `precision highp float;
-      uniform sampler2D uImg; uniform float uReveal, uAlpha, uPx, uCorner; uniform vec2 uSize; varying vec2 vUv;
+      uniform sampler2D uImg; uniform float uR, uAlpha, uPx, uCorner; uniform vec2 uSize; varying vec2 vUv;
       float vdHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
       float vdNoise(vec3 x) {
         vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -156,21 +157,19 @@
                    mix(mix(vdHash(i + vec3(0, 0, 1)), vdHash(i + vec3(1, 0, 1)), f.x), mix(vdHash(i + vec3(0, 1, 1)), vdHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
       }
       void main() {
-        vec2 pm = vUv * uSize;                                          // en mètres, comme le vide
-        vec3 w = vec3(pm.x + 31.0, 0.0, pm.y + 17.0);
-        float n = vdNoise(w * 0.33) * 0.75 + vdNoise(w * 1.9) * 0.25;
-        float edge = mix(${PHOTO_EDGE.toFixed(1)}, 0.0, smoothstep(0.55, 1.0, uReveal));   // le bord ondulé se resserre
-        vec2 hs = uReveal * (uSize * 0.5 - edge);                       // l'ouverture grandit jusqu'au cadre
-        float rc = min(mix(uReveal * ${PHOTO_ROUND.toFixed(1)}, uCorner, smoothstep(0.7, 1.0, uReveal)), min(hs.x, hs.y));
-        vec2 q = abs(pm - uSize * 0.5) - hs + rc;
-        float sd = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - rc;  // > 0 : hors de l'ouverture
-        float a = clamp((-sd + (n - 1.0 + uReveal) * edge) / uPx + 0.5, 0.0, 1.0);   // bord lissé sur un pixel
+        vec2 p = (vUv - 0.5) * uSize;                                   // en m, depuis le centre
+        vec3 P = vec3(p.x + 31.0, 0.0, p.y + 17.0);
+        float n = vdNoise(P * ${VOID.f1.toFixed(2)}) * 0.75 + vdNoise(P * ${VOID.f2.toFixed(2)}) * 0.25;
+        float a = clamp((uR - length(p) + n * ${VOID.edge.toFixed(1)}) / uPx + 0.5, 0.0, 1.0);   // le vide (îlot)
+        vec2 q = abs(p) - uSize * 0.5 + uCorner;                        // le cadre, aux coins arrondis
+        float sd = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - uCorner;
+        a *= clamp(-sd / uPx + 0.5, 0.0, 1.0);
         if (a <= 0.0) { gl_FragColor = vec4(0.0); return; }
         gl_FragColor = texture2D(uImg, vUv) * uAlpha * a;
       }`);
     if (prog) {
       PU = {};
-      for (const k of ['uImg', 'uReveal', 'uAlpha', 'uSize', 'uPx', 'uCorner']) PU[k] = pgl.getUniformLocation(prog, k);
+      for (const k of ['uImg', 'uR', 'uAlpha', 'uSize', 'uPx', 'uCorner']) PU[k] = pgl.getUniformLocation(prog, k);
       pgl.uniform1i(PU.uImg, 0);
       const load = () => {
         const tex = pgl.createTexture();
@@ -180,8 +179,6 @@
         pgl.texImage2D(pgl.TEXTURE_2D, 0, pgl.RGBA, pgl.RGBA, pgl.UNSIGNED_BYTE, img);
         for (const [p, v] of [[pgl.TEXTURE_MIN_FILTER, pgl.LINEAR], [pgl.TEXTURE_MAG_FILTER, pgl.LINEAR],
           [pgl.TEXTURE_WRAP_S, pgl.CLAMP_TO_EDGE], [pgl.TEXTURE_WRAP_T, pgl.CLAMP_TO_EDGE]]) pgl.texParameteri(pgl.TEXTURE_2D, p, v);
-        photoH = PHOTO_W * img.naturalHeight / img.naturalWidth;
-        pgl.uniform2f(PU.uSize, PHOTO_W, photoH);
         photoReady = true;
         photoBox.classList.add('about__photo--gl');
         kick();
@@ -192,10 +189,14 @@
   function drawPhoto(open, alpha) {
     if (!photoReady) { if (img) img.style.opacity = String(Math.min(alpha, open > 0.02 ? 1 : 0)); return; }
     fit(pCanvas, pgl, pCanvas, 2);
-    const mpp = PHOTO_W / Math.max(1, pCanvas.width);                   // mètres par pixel de la toile
+    const mpp = VOID.screen / window.innerHeight / (pCanvas.width / Math.max(1, pCanvas.clientWidth));   // m par px de toile
+    const w = pCanvas.width * mpp, h = pCanvas.height * mpp;
+    pgl.uniform2f(PU.uSize, w, h);
     pgl.uniform1f(PU.uPx, mpp);
     pgl.uniform1f(PU.uCorner, PHOTO_CORNER * (pCanvas.width / Math.max(1, pCanvas.clientWidth)) * mpp);
-    pgl.uniform1f(PU.uReveal, open);
+    // le front : de « rien » jusqu'aux coins de la photo, à l'allure de l'îlot (presque constante)
+    const e = open + (open * open * (3 - 2 * open) - open) * VOID.ease;
+    pgl.uniform1f(PU.uR, VOID.none + (Math.hypot(w, h) / 2 + 0.05 - VOID.none) * e);
     pgl.uniform1f(PU.uAlpha, alpha);
     pgl.clearColor(0, 0, 0, 0);
     pgl.clear(pgl.COLOR_BUFFER_BIT);
@@ -217,7 +218,7 @@
     if (r.bottom < -vh || r.top > 2 * vh) return;   // loin de l'écran : rien à faire
     light(vh);
     const box = photoBox?.getBoundingClientRect();
-    drawPhoto(reduced ? 1 : box ? sms(PHOTO[0] * vh, PHOTO[1] * vh, (box.top + box.bottom) / 2) : 1, 1);
+    drawPhoto(reduced ? 1 : box ? span(PHOTO[0] * vh, PHOTO[1] * vh, (box.top + box.bottom) / 2) : 1, 1);
   }
 
   split();
