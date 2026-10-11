@@ -67,7 +67,7 @@ Les éléments du site immersif y sont repris un à un, adaptés à un site clas
 | `outils/` | Construction : scripts minifiés, versions des fichiers, optimisation du modèle |
 | `vercel.json`, `.vercelignore` | Cache d'un an des fichiers versionnés ; ce qui n'est pas mis en ligne |
 | `js/apropos.js` | Du hero à l'À propos, au défilement : la course, l'À propos (mots, photo) |
-| `images/teampic.webp` | Photo de l'équipe (À propos) |
+| `images/camion.webp` | Le camion HomeService (À propos ; rendu de `blender/apropos.blend`) |
 | `blender/` | Scène du hero et scripts (îlot, objets, export web) |
 
 ## Lancer le site

@@ -9,21 +9,21 @@
 <script>try { var v = sessionStorage.getItem('hs-veil'); if (document.prerendering || v) { document.documentElement.classList.add('veil-in'); sessionStorage.removeItem('hs-veil'); } else document.documentElement.classList.add('loading'); } catch (e) { document.documentElement.classList.add('loading'); }</script>
 <!-- chargés tout de suite : la police, le script de l'îlot et son modèle (même version que MODEL dans js/hero.js) -->
 <link rel="preload" href="fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="modulepreload" href="js/hero.min.js?v=d5c476e286">
+<link rel="modulepreload" href="js/hero.min.js?v=62b6f08d5d">
 <link rel="preload" href="models/ilot.glb?v=fe77098755" as="fetch" crossorigin>
-<link rel="stylesheet" href="css/style.min.css?v=7ac51fe444">
+<link rel="stylesheet" href="css/style.min.css?v=f716b27375">
 </head>
 <body>
 
 <header class="header" id="header">
   <div class="header__bar">
-    <a href="#accueil" class="logo" aria-label="HomeService BXL, accueil" data-i18n-aria="home" aria-current="page"><img src="images/logo-blanc.webp" alt="HomeService BXL" width="801" height="380"></a>
+    <a href="#accueil" class="logo" data-veil aria-label="HomeService BXL, accueil" data-i18n-aria="home" aria-current="page"><img src="images/logo-blanc.webp" alt="HomeService BXL" width="801" height="380"></a>
     <nav class="nav" aria-label="Navigation principale" data-i18n-aria="mainNav">
-      <a href="#a-propos" data-i18n="nav.about">À propos</a>
-      <a href="#services" data-i18n="nav.services">Services</a>
-      <a href="#fonctionnement" data-i18n="nav.how">Fonctionnement</a>
-      <a href="#zone" data-i18n="nav.zone">Zone</a>
-      <a href="#contact" data-i18n="nav.contact">Contact</a>
+      <a href="#a-propos" data-veil data-i18n="nav.about">À propos</a>
+      <a href="#services" data-veil data-i18n="nav.services">Services</a>
+      <a href="#fonctionnement" data-veil data-i18n="nav.how">Fonctionnement</a>
+      <a href="#zone" data-veil data-i18n="nav.zone">Zone</a>
+      <a href="#contact" data-veil data-i18n="nav.contact">Contact</a>
     </nav>
     <div class="lang" id="lang">
       <button class="lang__btn" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Langue"
@@ -38,7 +38,7 @@
         <li><button type="button" role="option" data-lang="nl" lang="nl"><span>NL</span>Nederlands</button></li>
       </ul>
     </div>
-    <a href="#devis" class="header__cta" data-i18n="cta">Devis gratuit</a>
+    <a href="#devis" class="header__cta" data-veil data-i18n="cta">Devis gratuit</a>
   </div>
 </header>
 
@@ -78,9 +78,10 @@
           <span class="accent">HomeService intervient chez vous à Bruxelles pour tous vos besoins</span>, on s'occupe de
           ce que vous n'avez pas le temps de faire, pour que vous puissiez vous concentrer sur ce qui compte vraiment.</p></div>
       </div>
-      <!-- la photo de l'équipe, à droite du texte : elle s'ouvre derrière le bord du vide (js/apropos.js) -->
+      <!-- l'image, à droite du texte : le camion HomeService, arrière ouvert, posé sur la page avec son ombre (rendu
+           Blender : blender/apropos.blend, fond transparent) ; elle sort du vide (js/apropos.js) -->
       <figure class="about__photo">
-        <img src="images/teampic.webp" alt="L'équipe HomeService" data-i18n-alt="about.photo" width="736" height="552"
+        <img src="images/camion.webp" alt="Le camion HomeService, arrière ouvert" data-i18n-alt="about.photo" width="736" height="552"
           loading="lazy">
       </figure>
     </div>
@@ -109,17 +110,232 @@
     </ul>
   </section>
 
-  <!-- tout en bas : la suite du site est en construction (clin d'œil provisoire, à retirer avec les sections suivantes) -->
-  <section class="chantier" aria-label="La suite est en construction" data-i18n-aria="chantier.label">
-    <img src="images/en-construction.webp" alt="Site en construction" data-i18n-alt="chantier.photo" width="1300"
-      height="970" loading="lazy">
+  <!-- les services : un diaporama des cinq services (js/services.js), repris de l'onglet Services du site immersif.
+       Chaque service a sa fiche (titre, description) et son mini-monde en 3D (models/minimondes.glb, un diorama par
+       service, qui tourne doucement ; on le fait tourner à la souris). Les flèches, les cases, le clavier (← →) et
+       le glissé au doigt changent de service ; le diorama sort du vide, et y retourne pour laisser la place au suivant. -->
+  <section class="services" id="services" aria-label="Nos services" data-i18n-aria="svc.eyebrow">
+    <div class="services__inner">
+      <div class="svc-stage" aria-hidden="true">
+        <!-- derrière le diorama, des formes en aplat (comme sous le camion de l'À propos) -->
+        <div class="svc-forme"><span class="svc-forme__disque"></span><span class="svc-forme__petit"></span>
+          <span class="svc-forme__anneau"></span></div>
+      </div>
+      <!-- sous le diorama, à une place fixe : en savoir plus sur le service affiché (sa destination reste à définir) -->
+      <button class="svc-more" type="button" aria-haspopup="dialog"><span data-i18n="svc.more">Voir plus</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <!-- « Voir plus » : la carte du service (js/services.js). La fiche et le diorama s'effacent, la carte apparaît à
+           leur place ; la croix (ou Échap) la referme. Photos : images/services/<service>-1|2|3.webp ; tant qu'elles
+           manquent, un cadre « Photo à venir » les remplace. -->
+      <div class="svc-card" role="dialog" aria-modal="false" aria-label="Le service en détail" aria-hidden="true">
+        <button class="svc-card__close" type="button" aria-label="Fermer" data-i18n-aria="svcx.close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+        <article class="svc-detail" data-i="0" aria-hidden="true">
+          <div class="svc-detail__text">
+            <p class="svc-detail__kicker"><b>01</b> <span data-i18n="svc.nettoyage">Nettoyage</span></p>
+            <h3 data-i18n="svcx.nettoyage.t">Un intérieur impeccable, sans y penser</h3>
+            <p class="svc-detail__intro" data-i18n="svcx.nettoyage.d">Chaque semaine ou pour un grand nettoyage, nos équipes prennent en charge tout l'entretien de votre logement, pièce par pièce, avec le soin qu'on mettrait chez soi.</p>
+            <p class="svc-detail__label" data-i18n="svcx.list">Ce que nous faisons</p>
+            <ul class="svc-detail__list">
+              <li data-i18n="svcx.nettoyage.0">Sols : aspiration, lavage et dépoussiérage de toutes les pièces</li>
+              <li data-i18n="svcx.nettoyage.1">Cuisine : plans de travail, électroménager et placards</li>
+              <li data-i18n="svcx.nettoyage.2">Salle de bain et sanitaires détartrés</li>
+              <li data-i18n="svcx.nettoyage.3">Vitres, châssis et miroirs</li>
+              <li data-i18n="svcx.nettoyage.4">Nettoyage de fin de bail ou après travaux</li>
+            </ul>
+            <a class="svc-detail__cta" href="#devis" data-veil data-i18n="svcx.cta">Demander un devis</a>
+          </div>
+          <div class="svc-detail__photos">
+            <figure class="svc-photo svc-photo--1"><img src="images/services/nettoyage-1.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+            <figure class="svc-photo svc-photo--2"><img src="images/services/nettoyage-2.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+            <figure class="svc-photo svc-photo--3"><img src="images/services/nettoyage-3.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+          </div>
+        </article>
+        <article class="svc-detail" data-i="1" aria-hidden="true">
+          <div class="svc-detail__text">
+            <p class="svc-detail__kicker"><b>02</b> <span data-i18n="svc.jardinage">Jardinage</span></p>
+            <h3 data-i18n="svcx.jardinage.t">Un jardin entretenu toute l'année</h3>
+            <p class="svc-detail__intro" data-i18n="svcx.jardinage.d">Petit jardin de ville ou grande pelouse, nous l'entretenons au fil des saisons pour que vous n'ayez plus qu'à en profiter, et nous repartons avec les déchets verts.</p>
+            <p class="svc-detail__label" data-i18n="svcx.list">Ce que nous faisons</p>
+            <ul class="svc-detail__list">
+              <li data-i18n="svcx.jardinage.0">Tonte de la pelouse et finition des bordures</li>
+              <li data-i18n="svcx.jardinage.1">Taille des haies, arbustes et rosiers</li>
+              <li data-i18n="svcx.jardinage.2">Désherbage des allées et des massifs</li>
+              <li data-i18n="svcx.jardinage.3">Ramassage des feuilles et évacuation des déchets verts</li>
+              <li data-i18n="svcx.jardinage.4">Plantations et entretien des jardinières</li>
+            </ul>
+            <a class="svc-detail__cta" href="#devis" data-veil data-i18n="svcx.cta">Demander un devis</a>
+          </div>
+          <div class="svc-detail__photos">
+            <figure class="svc-photo svc-photo--1"><img src="images/services/jardinage-1.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+            <figure class="svc-photo svc-photo--2"><img src="images/services/jardinage-2.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+            <figure class="svc-photo svc-photo--3"><img src="images/services/jardinage-3.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+          </div>
+        </article>
+        <article class="svc-detail" data-i="2" aria-hidden="true">
+          <div class="svc-detail__text">
+            <p class="svc-detail__kicker"><b>03</b> <span data-i18n="svc.desencombrement">Désencombrement</span></p>
+            <h3 data-i18n="svcx.desencombrement.t">De la place, enfin</h3>
+            <p class="svc-detail__intro" data-i18n="svcx.desencombrement.d">Cave, grenier, garage ou logement entier : nous trions avec vous ce qui reste, ce qui part et ce qui peut avoir une seconde vie, puis nous emballons et évacuons tout le reste.</p>
+            <p class="svc-detail__label" data-i18n="svcx.list">Ce que nous faisons</p>
+            <ul class="svc-detail__list">
+              <li data-i18n="svcx.desencombrement.0">Tri accompagné, pièce par pièce</li>
+              <li data-i18n="svcx.desencombrement.1">Emballage et protection des objets à garder</li>
+              <li data-i18n="svcx.desencombrement.2">Évacuation des encombrants, jusqu'au dernier carton</li>
+              <li data-i18n="svcx.desencombrement.3">Recyclage de tout ce qui peut l'être</li>
+              <li data-i18n="svcx.desencombrement.4">Nettoyage des lieux une fois vidés</li>
+            </ul>
+            <a class="svc-detail__cta" href="#devis" data-veil data-i18n="svcx.cta">Demander un devis</a>
+          </div>
+          <div class="svc-detail__photos">
+            <figure class="svc-photo svc-photo--1"><img src="images/services/desencombrement-1.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+            <figure class="svc-photo svc-photo--2"><img src="images/services/desencombrement-2.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+            <figure class="svc-photo svc-photo--3"><img src="images/services/desencombrement-3.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+          </div>
+        </article>
+        <article class="svc-detail" data-i="3" aria-hidden="true">
+          <div class="svc-detail__text">
+            <p class="svc-detail__kicker"><b>04</b> <span data-i18n="svc.montage">Montage</span></p>
+            <h3 data-i18n="svcx.montage.t">Vos meubles montés, droits et solides</h3>
+            <p class="svc-detail__intro" data-i18n="svcx.montage.d">Meubles en kit, étagères, luminaires ou tringles : nous venons avec l'outillage adapté, nous montons, fixons et réglons, puis nous repartons avec les emballages.</p>
+            <p class="svc-detail__label" data-i18n="svcx.list">Ce que nous faisons</p>
+            <ul class="svc-detail__list">
+              <li data-i18n="svcx.montage.0">Montage de meubles en kit, toutes marques</li>
+              <li data-i18n="svcx.montage.1">Fixations murales : étagères, téléviseurs, miroirs</li>
+              <li data-i18n="svcx.montage.2">Pose de tringles, stores et luminaires</li>
+              <li data-i18n="svcx.montage.3">Réglage des portes et des tiroirs</li>
+              <li data-i18n="svcx.montage.4">Évacuation des cartons et emballages</li>
+            </ul>
+            <a class="svc-detail__cta" href="#devis" data-veil data-i18n="svcx.cta">Demander un devis</a>
+          </div>
+          <div class="svc-detail__photos">
+            <figure class="svc-photo svc-photo--1"><img src="images/services/montage-1.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+            <figure class="svc-photo svc-photo--2"><img src="images/services/montage-2.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+            <figure class="svc-photo svc-photo--3"><img src="images/services/montage-3.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+          </div>
+        </article>
+        <article class="svc-detail" data-i="4" aria-hidden="true">
+          <div class="svc-detail__text">
+            <p class="svc-detail__kicker"><b>05</b> <span data-i18n="svc.livraison">Livraison</span></p>
+            <h3 data-i18n="svcx.livraison.t">Livré chez vous, à votre heure</h3>
+            <p class="svc-detail__intro" data-i18n="svcx.livraison.d">Courses, colis à récupérer ou achats encombrants : nous allons les chercher pour vous et les livrons à domicile, au moment qui vous arrange, jusque dans la pièce de votre choix.</p>
+            <p class="svc-detail__label" data-i18n="svcx.list">Ce que nous faisons</p>
+            <ul class="svc-detail__list">
+              <li data-i18n="svcx.livraison.0">Courses de la semaine, selon votre liste</li>
+              <li data-i18n="svcx.livraison.1">Retrait de colis en point relais</li>
+              <li data-i18n="svcx.livraison.2">Transport d'achats encombrants depuis le magasin</li>
+              <li data-i18n="svcx.livraison.3">Livraison jusque dans la pièce de votre choix</li>
+              <li data-i18n="svcx.livraison.4">Un créneau choisi avec vous</li>
+            </ul>
+            <a class="svc-detail__cta" href="#devis" data-veil data-i18n="svcx.cta">Demander un devis</a>
+          </div>
+          <div class="svc-detail__photos">
+            <figure class="svc-photo svc-photo--1"><img src="images/services/livraison-1.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+            <figure class="svc-photo svc-photo--2"><img src="images/services/livraison-2.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+            <figure class="svc-photo svc-photo--3"><img src="images/services/livraison-3.webp" alt="" loading="lazy">
+              <figcaption data-i18n="svcx.photo">Photo à venir</figcaption></figure>
+          </div>
+        </article>
+      </div>
+      <div class="svc-wrap" id="svcCarousel" aria-roledescription="carrousel">
+        <div class="svc-count" aria-hidden="true"><b>01</b><span>/05</span></div>
+        <div class="svc-slides" aria-live="polite">
+          <article class="svc-slide active" data-i="0">
+            <h2 data-i18n="svc.nettoyage">Nettoyage</h2>
+            <p data-i18n="svcd.nettoyage">Ménage régulier ou grand nettoyage : sols, cuisine, salle de bain, vitres. On vous rend un intérieur impeccable.</p>
+          </article>
+          <article class="svc-slide is-after" data-i="1">
+            <h2 data-i18n="svc.jardinage">Jardinage</h2>
+            <p data-i18n="svcd.jardinage">Tonte, taille des haies, désherbage et entretien des massifs, au fil des saisons.</p>
+          </article>
+          <article class="svc-slide is-after" data-i="2">
+            <h2 data-i18n="svc.desencombrement">Désencombrement</h2>
+            <p data-i18n="svcd.desencombrement">Cave, grenier ou logement entier : on trie, on emballe, on évacue, et on recycle tout ce qui peut l'être.</p>
+          </article>
+          <article class="svc-slide is-after" data-i="3">
+            <h2 data-i18n="svc.montage">Montage</h2>
+            <p data-i18n="svcd.montage">Meubles en kit, étagères, fixations murales : on monte, on fixe et on règle, sans que vous leviez le petit doigt.</p>
+          </article>
+          <article class="svc-slide is-after" data-i="4">
+            <h2 data-i18n="svc.livraison">Livraison</h2>
+            <p data-i18n="svcd.livraison">Courses, colis ou achats encombrants : on récupère et on livre chez vous, à l'heure qui vous arrange.</p>
+          </article>
+        </div>
+        <div class="svc-nav">
+          <button class="svc-arrow" type="button" data-step="-1" aria-label="Service précédent" data-i18n-aria="svc.prev">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg></button>
+          <div class="svc-dots">
+            <button class="svc-dot active" type="button" data-i="0" aria-label="Nettoyage" data-i18n-aria="svc.nettoyage">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10h12l-1.4 9.4a1.6 1.6 0 0 1-1.6 1.4H9a1.6 1.6 0 0 1-1.6-1.4L6 10z"/><path d="M7.5 10a4.5 4.5 0 0 1 9 0"/><path d="M19.5 2.5v3M18 4h3"/></svg></button>
+            <button class="svc-dot" type="button" data-i="1" aria-label="Jardinage" data-i18n-aria="svc.jardinage">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21v-8"/><path d="M12 13C12 9.2 9.3 7 5 7c0 4 2.8 6 7 6z"/><path d="M12 11c0-3.6 2.6-6 7-6 0 4.1-2.9 6-7 6z"/><path d="M8 21h8"/></svg></button>
+            <button class="svc-dot" type="button" data-i="2" aria-label="Désencombrement" data-i18n-aria="svc.desencombrement">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5v-9z"/><path d="M3 7.5l9 4.5 9-4.5"/><path d="M12 12v9"/><path d="M7.5 5.2l9 4.6"/></svg></button>
+            <button class="svc-dot" type="button" data-i="3" aria-label="Montage" data-i18n-aria="svc.montage">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.5 17.5l3 3 5.8-5.8a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4 2.6-2.6z"/></svg></button>
+            <button class="svc-dot" type="button" data-i="4" aria-label="Livraison" data-i18n-aria="svc.livraison">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1 12.5H6L5 8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg></button>
+          </div>
+          <button class="svc-arrow" type="button" data-step="1" aria-label="Service suivant" data-i18n-aria="svc.next">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- avant / après (js/avantapres.js) : la barre suit la souris au survol, sans clic. Images à déposer :
+       images/avant-apres/avant.webp et apres.webp (même cadrage) ; d'ici là, deux aplats (gris, vert d'eau). -->
+  <section class="avant-apres" aria-labelledby="ba-titre">
+    <header class="ba-head">
+      <h2 id="ba-titre" data-i18n="ba.title">La différence se voit</h2>
+    </header>
+    <div class="ba">
+      <div class="ba__layer ba__layer--avant"><img src="images/avant-apres/avant.webp" alt="Avant" data-i18n-alt="ba.before"
+          loading="lazy"></div>
+      <div class="ba__layer ba__layer--apres"><img src="images/avant-apres/apres.webp" alt="Après" data-i18n-alt="ba.after"
+          loading="lazy"></div>
+      <span class="ba__tag ba__tag--avant" aria-hidden="true" data-i18n="ba.before">Avant</span>
+      <span class="ba__tag ba__tag--apres" aria-hidden="true" data-i18n="ba.after">Après</span>
+      <div class="ba__bar" aria-hidden="true"><span class="ba__knob">
+        <svg viewBox="0 0 24 24"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg></span></div>
+      <input class="ba__range" type="range" min="2" max="98" value="50" aria-label="Comparer avant et après"
+        data-i18n-aria="ba.range">
+    </div>
   </section>
 </main>
 
+<!-- curseur qui suit la souris, son anneau montre la progression dans la page (js/cursor.js, repris du site immersif) -->
+<div class="cursor-wrap" id="cursor" aria-hidden="true">
+  <div class="cursor">
+    <div class="cursor-main">
+      <div class="cursor-outline">
+        <svg viewBox="0 0 60 60" width="100%"><circle r="28.5" cx="30" cy="30" stroke-width="2" fill="none"
+          stroke="currentColor"></circle></svg>
+      </div>
+      <div class="cursor-dot"></div>
+    </div>
+  </div>
+</div>
+
 <!-- fichiers construits à partir des sources (js/*.js, css/style.css) : outils/build.mjs -->
-<script src="js/veil.min.js?v=2ced49a0e4"></script>
-<script src="js/i18n.min.js?v=f67fcc945b"></script>
-<script src="js/apropos.min.js?v=f93b816c58"></script>
-<script type="module" src="js/hero.min.js?v=d5c476e286"></script>
+<script src="js/veil.min.js?v=36a8298c67"></script>
+<script src="js/i18n.min.js?v=b126ed7d35"></script>
+<script src="js/apropos.min.js?v=48cc44e0d8"></script>
+<script src="js/cursor.min.js?v=a55ef403d3"></script>
+<script src="js/avantapres.min.js?v=db75d33f38"></script>
+<script type="module" src="js/hero.min.js?v=62b6f08d5d"></script>
 </body>
 </html>
