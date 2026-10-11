@@ -58,6 +58,14 @@ html.intro .hero__text > * { opacity: 1; transform: none; }
 html.intro .hero__text > h1 { transition-delay: .55s; }
 html.intro .hero__text > p { transition-delay: .72s; }
 @media (prefers-reduced-motion: reduce) { .hero__text > * { opacity: 1; transform: none; transition: none; } }
+/* sur téléphone (js/herofloat.js, html.heroFloat) : pas d'îlot ; le titre et la description au centre de l'écran,
+   entre deux toiles : derrière eux, des objets lointains et flous ; devant, sur le pourtour, des objets nets */
+html.heroFloat .scene { z-index: auto; pointer-events: none; }
+html.heroFloat .hero { background: transparent; }   /* la toile du fond est sous le hero (la page a déjà sa couleur) */
+html.heroFloat .hero__text { top: 50%; z-index: 1; translate: 0 -50%; }
+html.heroFloat .scene canvas { position: absolute; inset: 0; }
+html.heroFloat .scene__back { z-index: 0; filter: blur(5px); opacity: .9; }
+html.heroFloat .scene__front { z-index: 2; }
 .hero__text h1 { font: 800 clamp(44px, 5.4vw, 88px)/1 var(--title); letter-spacing: -.04em; margin: 0 0 22px;
   color: var(--ink); }
 .hero__text p { max-width: 34em; margin: 0 auto; font: 500 clamp(16px, 1.3vw, 20px)/1.55 var(--body); color: #3a4352;
@@ -103,7 +111,7 @@ html.intro.scrolled .scroll-hint { opacity: 0; transform: translate(-50%, 10px);
    derrière elle. Repris du plan 1 du site immersif : le texte à l'encre en Manrope 800, tous ses mots là à 16 % qui
    s'allument un à un en passant au milieu de l'écran, la partie en couleur qui passe au vert ; la photo qui s'ouvre
    derrière le bord du vide. */
-.about { position: relative; z-index: 4; padding: 14vh 5vw 30vh; color: var(--ink); }   /* juste sous le hero */
+.about { position: relative; z-index: 4; padding: 14vh 5vw 15vh; color: var(--ink); }   /* juste sous le hero */
 /* deux colonnes : le texte à gauche ; à droite, la place de la photo (retirée pour l'instant) */
 .about__inner { width: min(1240px, 100%); margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr;
   gap: clamp(32px, 5vw, 80px); align-items: center; }
@@ -141,51 +149,238 @@ html:not(.stats3d) .stat__num { grid-column: 1; }
 html:not(.stats3d) .stat__text { grid-column: 2; }
 /* sur ordinateur, les chiffres sur le mur (js/statsmur.js, js/stats.js) : la section reste en place (collante) le temps
    de trois pas de défilement (--step chacun, plus une petite fin --tail avant de repartir) ; à gauche, la scène (le
-   modèle 3D est dans une toile fixée sur tout l'écran) ; à droite, un seul chiffre à la fois : il entre par la droite
-   en se précisant (flou → net), le chiffre puis son texte ; le précédent sort vers la gauche. Le défilement est
-   aimanté sur chaque pas (scroll-snap, de proximité) : la page se cale d'elle-même sur la boule, puis sur chaque
-   chiffre. */
-html.statsWall { scroll-snap-type: y proximity; }
-html.statsWall .stats { --step: 70vh; --tail: 40vh; display: grid; grid-template-columns: 1fr auto;
-  align-items: start; width: min(1240px, 90vw); height: calc(100vh + 2 * var(--step) + var(--tail)); margin: 0 auto;
+   modèle 3D est dans une toile fixée sur tout l'écran) ; à droite, les chiffres s'additionnent : à chaque pas, le
+   suivant s'ajoute sous les précédents, il s'ouvre derrière le bord du vide (js/statsvide.js, dans la toile
+   .stats__vide ; sans WebGL : en fondu). Le défilement s'arrête sur chaque pas (js/scroll.js). La section remonte sous la fin de l'À propos (sa marge du
+   bas) : les chiffres arrivent dès qu'on a fini de le lire. */
+/* (depuis le 2026-10-11 : un seul pas, les trois chiffres arrivent ensemble ; --step 0) */
+html.statsWall .stats { --step: 0vh; --tail: 40vh; display: grid; grid-template-columns: 1fr auto;
+  align-items: start; width: min(1240px, 90vw); height: calc(100vh + 2 * var(--step) + var(--tail)); margin: -15vh auto 0;
   padding: 0; }
 html.statsWall .stats__stage { grid-column: 1; grid-row: 1; position: sticky; top: 0; height: 100vh; height: 100svh;
   pointer-events: none; }
-html.statsWall .stats__stage canvas { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; z-index: 0; }
+html.statsWall .stats__stage canvas:not(.stats__flat) { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; z-index: 0; }
 html.statsWall .stats__list { grid-column: 2; grid-row: 1; position: sticky; top: 0; margin: 0;
-  width: calc(7.55 * var(--F)); height: 100vh; height: 100svh; }
-html.statsWall .stat { position: absolute; left: 0; right: 0; top: 50%; height: auto; translate: 0 -50%;
-  opacity: 0; transform: translateX(calc(1.2 * var(--F))); filter: blur(10px); pointer-events: none;
-  transition: opacity .5s ease, transform .9s var(--ease), filter .6s ease; }
-html.statsWall .stat__text { transform: translateX(calc(.8 * var(--F))); opacity: 0;
-  transition: transform 1s var(--ease), opacity .6s ease; }
-html.statsWall .stat.on { opacity: 1; transform: none; filter: none; pointer-events: auto; transition-delay: .15s; }
-html.statsWall .stat.on .stat__text { transform: none; opacity: 1; transition-delay: .3s; }
-html.statsWall .stat.past { transform: translateX(calc(-.8 * var(--F))); transition-duration: .35s, .6s, .35s; }
-/* le bloc des chiffres (js/statsmur.js) les affiche en 3D : le texte HTML reste là pour les lecteurs d'écran, invisible */
-html.statsBlock .stats__list { opacity: 0; }
-/* les points d'aimantation : la section en place, puis chaque pas */
-.stats__snap { position: absolute; left: 0; width: 1px; height: 1px; scroll-snap-align: start; pointer-events: none; }
+  width: calc(7.55 * var(--F)); height: 100vh; height: 100svh; display: flex; flex-direction: column;
+  justify-content: center; }
+html.statsWall .stat { height: calc(2.4 * var(--F)); opacity: 0; transition: opacity .6s ease; }
+html.statsWall .stat.on { opacity: 1; }
+/* la toile dessine le texte (js/statsvide.js : il sort du vide) : le HTML reste là pour les lecteurs d'écran,
+   invisible */
+html.statsVoid .stat, html.statsVoid .stat.on { opacity: 1; }
+html.statsVoid .stat__num, html.statsVoid .stat__text { opacity: 0; }
+.stats__vide { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; pointer-events: none; }
+.stats__flat { position: absolute; z-index: 1; pointer-events: none; }
+/* la progression, sous les creux (js/statsvide.js la place) : trois traits ; ceux des chiffres déjà là se remplissent
+   d'encre, de gauche à droite */
+.stats__progress { position: absolute; z-index: 1; display: flex; gap: 8px; translate: -50% 0; opacity: 0;
+  transition: opacity .5s ease; pointer-events: none; }
+.stats__progress.on { opacity: 1; }
+.stats__progress span { position: relative; width: 36px; height: 3px; border-radius: 3px; overflow: hidden;
+  background: rgba(15, 26, 44, .14); }
+.stats__progress span::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--ink);
+  transform: scaleX(0); transform-origin: left; transition: transform .6s cubic-bezier(.22, 1, .36, 1); }
+.stats__progress span.on::after { transform: scaleX(1); }
+/* les arrêts du défilement (js/scroll.js) : la section en place, puis chaque pas */
+.stats__snap { position: absolute; left: 0; width: 1px; height: 1px; pointer-events: none; }
 
 @media (max-width: 760px), (max-aspect-ratio: 1/1) {
-  .stats { padding: 0 20px 12vh; --F: clamp(36px, 11vw, 52px); }
+  .stats { padding: 3vh 20px 12vh; --F: clamp(36px, 11vw, 52px); }
   .stats__list { margin: 0 auto; }
   html:not(.stats3d) .stat { grid-template-columns: calc(1.75 * var(--F)) minmax(0, 1fr); height: auto;
-    padding: calc(.45 * var(--F)) 0; }
+    padding: calc(.7 * var(--F)) 0; }
   .stat__text { max-width: none; }
   .stat__text strong { white-space: normal; }
   .about { padding: 88px 20px 24px; }
-  .about__inner { grid-template-columns: 1fr; gap: 20px; }
+  .about__inner { grid-template-columns: 1fr; gap: 44px; }
   .about__text p { font-size: clamp(20px, 5.4vw, 28px); }
   .about__photo { max-height: 36svh; justify-self: center; width: min(100%, calc(36svh * 736 / 552)); }
   .section { padding: 120px 20px 72px; }
 }
 
-/* ---------------------------------------------------------------- tout en bas : la suite est en construction
-   (clin d'œil provisoire) : l'image, centrée, après l'À propos */
-.chantier { position: relative; z-index: 5; display: grid; place-items: center; padding: 12vh 20px 16vh;
-  background: var(--paper); }
-.chantier img { width: min(560px, 100%); height: auto; border-radius: 18px; }
+/* ---------------------------------------------------------------- les services (js/services.js)
+   Un diaporama des cinq services, repris de l'onglet Services du site immersif : à gauche la fiche (en-tête, titre,
+   description, navigation), à droite le mini-monde du service en 3D (toile .svc-stage). Sur téléphone, le mini-monde
+   au-dessus de la fiche. UI « au trait » : des filets et du texte posés sur la page, sans fond ni ombre ; angles
+   vifs, capitales espacées, un seul accent (le vert). La sélection se lit par des coins en L, jamais par un aplat. */
+.services { position: relative; z-index: 5; padding: 14vh 5vw 16vh; color: var(--ink); overflow-x: clip; }
+.services__inner { width: min(1240px, 100%); margin: 0 auto; display: grid; grid-template-columns: minmax(0, 480px) 1fr;
+  align-items: center; gap: 4px 4vw; }
+.svc-stage { grid-column: 2; grid-row: 1; position: relative; height: min(62vh, 580px); min-height: 380px;
+  cursor: grab; touch-action: pan-y; }
+.svc-stage.dragging { cursor: grabbing; }
+/* la toile déborde de sa case (le diorama et ses pièces qui tombent ou s'envolent ne sont jamais coupés) ; elle
+   laisse passer les clics (le glissé se lit sur la case) */
+.svc-stage canvas { position: absolute; left: -20%; top: -30%; width: 140%; height: 160%; display: block;
+  pointer-events: none; }
+.svc-wrap { grid-column: 1; grid-row: 1; align-self: center; --acc: #11703f; }   /* à la hauteur du diorama */
+/* en haut à gauche : où l'on en est (le numéro du service en vert, le total en gris) */
+.svc-count { display: flex; align-items: baseline; gap: 2px; margin-bottom: 18px;
+  font: 800 11px/1 var(--body); letter-spacing: .12em; font-variant-numeric: tabular-nums; color: #6a7382; }
+.svc-count b { color: var(--acc); }
+/* les fiches s'empilent dans la même case ; celle du service courant glisse à sa place */
+.svc-slides { display: grid; grid-template-columns: minmax(0, 1fr); touch-action: pan-y; }
+.svc-slide { grid-area: 1 / 1; opacity: 0; pointer-events: none;
+  transition: opacity .35s ease, transform .55s cubic-bezier(.2, .9, .3, 1); }
+.svc-slide.is-before { transform: translateX(-28px); }
+.svc-slide.is-after { transform: translateX(28px); }
+.svc-slide.active { opacity: 1; transform: none; pointer-events: auto; transition-delay: .08s; }
+.svc-slide h2 { margin: 0 0 16px; font: 800 clamp(30px, 3vw, 48px)/1 var(--title); letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ink); }
+.svc-slide p { margin: 0 0 32px; font: 500 clamp(16px, 1.3vw, 20px)/1.6 var(--body); color: #3a4352; text-wrap: pretty; }
+/* navigation : les flèches seules (« ‹ › », sans cadre) de part et d'autre des cinq services ; chaque service est son
+   icône seule ; la sélectionnée est cernée d'un carré vert aux coins arrondis, qui apparaît en se resserrant */
+.svc-nav { display: flex; align-items: center; gap: 6px; }
+.svc-dots { display: flex; align-items: center; gap: 6px; margin: 0 6px; }
+.svc-arrow { appearance: none; cursor: pointer; display: grid; place-items: center; width: 40px; height: 40px; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: var(--ink); transition: color .18s ease, transform .18s ease; }
+.svc-arrow svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round;
+  stroke-linejoin: round; }
+.svc-arrow:hover, .svc-arrow:focus-visible { outline: none; color: var(--acc); }
+.svc-arrow[data-step="-1"]:hover { transform: translateX(-2px); }
+.svc-arrow[data-step="1"]:hover { transform: translateX(2px); }
+.svc-dot { appearance: none; cursor: pointer; position: relative; display: grid; place-items: center; width: 46px; height: 46px;
+  padding: 0; border: 0; background: transparent; color: #5d6573; transition: color .2s ease; }
+.svc-dot::before { content: ""; position: absolute; inset: 2px; border: 2px solid var(--acc); border-radius: 12px;
+  opacity: 0; transform: scale(1.18); transition: opacity .22s ease, transform .3s cubic-bezier(.2, .9, .3, 1); }
+.svc-dot svg { position: relative; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round; }
+.svc-dot:hover, .svc-dot:focus-visible { outline: none; color: var(--ink); }
+.svc-dot.active { color: var(--acc); }
+.svc-dot.active::before { opacity: 1; transform: none; }
+/* derrière le diorama, des formes en aplat, comme sous le camion de l'À propos (blender/scripts/apropos_forme.py) :
+   un grand disque, un petit disque clair en haut à gauche, un anneau fin en haut à droite (en parts de la hauteur de
+   la case). Chaque service a sa palette, choisie hors des couleurs de son diorama pour qu'il s'en détache
+   (data-svc, posé par js/services.js). Elles arrivent un peu après le début de l'assemblage (le grand disque, puis
+   le petit, puis l'anneau) et repartent avec l'envol du diorama (.is-in). */
+.svc-forme { position: absolute; inset: 0; pointer-events: none; --c1: #f3c9b3; --c2: #fbe6da; --c3: #e0825e; }
+.svc-forme[data-svc="nettoyage"] { --c1: #f3c9b3; --c2: #fbe6da; --c3: #e0825e; }          /* pêche */
+.svc-forme[data-svc="jardinage"] { --c1: #bcd7f1; --c2: #e2eefa; --c3: #4a86c5; }          /* bleu ciel */
+.svc-forme[data-svc="desencombrement"] { --c1: #11703f; --c2: #c4e6d0; --c3: #11703f; }    /* le vert du site */
+.svc-forme[data-svc="montage"] { --c1: #d8d1f2; --c2: #eeeafb; --c3: #7a6cc9; }            /* lavande */
+.svc-forme[data-svc="livraison"] { --c1: #f5d98a; --c2: #fbefc6; --c3: #d6a12a; }          /* moutarde */
+.svc-forme span { position: absolute; border-radius: 50%; aspect-ratio: 1; opacity: 0; scale: .55;
+  transition: opacity .3s ease, scale .35s cubic-bezier(.5, 0, .75, 0); }
+.svc-forme.is-in span { opacity: 1; scale: 1; transition: opacity .35s ease, scale .75s cubic-bezier(.2, 1.35, .35, 1); }
+.svc-forme.is-in .svc-forme__petit { transition-delay: .12s; }
+.svc-forme.is-in .svc-forme__anneau { transition-delay: .22s; }
+.svc-forme__disque { height: 80%; left: 50%; top: 52%; translate: -50% -50%; background: var(--c1); }
+.svc-forme__petit { height: 24%; left: calc(50% - 40cqh); top: 12%; translate: -10% 0; background: var(--c2); }
+.svc-forme__anneau { height: 11%; left: calc(50% + 34cqh); top: 6%; box-sizing: border-box;
+  border: max(6px, 1.3cqh) solid var(--c3); }
+.svc-stage { container-type: size; }
+.svc-stage canvas { z-index: 1; }
+/* « Voir plus », à une place fixe sous le diorama : un rectangle aux coins arrondis, au contour encre, qui se
+   remplit au survol */
+.svc-more { grid-column: 2; grid-row: 2; justify-self: center; margin-top: 18px; appearance: none; cursor: pointer;
+  position: relative; z-index: 2;   /* par-dessus le diorama (sa toile déborde de sa case) */
+  display: inline-flex; align-items: center; gap: 10px; height: 48px; padding: 0 22px 0 24px; border: 1.5px solid var(--ink);
+  border-radius: 12px; background: var(--paper); color: var(--ink); font: 700 15px/1 var(--body); letter-spacing: .01em;
+  transition: background .2s ease, color .2s ease; }
+.svc-more svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round;
+  stroke-linejoin: round; transition: transform .2s ease; }
+.svc-more:hover, .svc-more:focus-visible { outline: none; background: var(--ink); color: #fff; }
+.svc-more:hover svg { transform: translateX(3px); }
+/* « Voir plus » : la carte du service (js/services.js). La fiche, le bouton et le diorama s'effacent ; un fond de la
+   couleur de la page couvre tout l'écran (menu compris) et la carte (blanche, grands coins arrondis) s'y pose au
+   centre : à gauche le titre, la présentation, ce que nous faisons et le devis ; à droite trois photos (une grande,
+   deux petites). La page ne défile plus (html.svc-lock) : seule la croix en haut à droite (ou Échap) la referme. Plus
+   haute que l'écran, la carte défile en elle-même. Tant qu'une photo manque, son cadre, teinté aux couleurs du
+   service, dit « Photo à venir ». */
+html.svc-lock { overflow: hidden; }
+.svc-backdrop { position: fixed; inset: 0; z-index: 90; background: var(--paper); opacity: 0; visibility: hidden;
+  transition: opacity .35s ease, visibility 0s linear .35s; }
+.svc-backdrop.is-open { opacity: 1; visibility: visible; transition: opacity .35s ease, visibility 0s; }
+.services__inner { position: relative; }
+.svc-wrap, .svc-more { transition: opacity .35s ease, translate .45s cubic-bezier(.2, .9, .3, 1); }
+.services.svc-open .svc-wrap, .services.svc-open .svc-more { opacity: 0; translate: 0 12px; pointer-events: none; }
+.svc-card { position: fixed; left: 50%; top: 50%; z-index: 91; width: min(1240px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px); max-height: calc(100svh - 48px); overflow-y: auto; overscroll-behavior: contain;
+  box-sizing: border-box;
+  padding: clamp(60px, 4.6vw, 76px) clamp(28px, 3.6vw, 56px) clamp(28px, 3.6vw, 56px); border-radius: 28px; background: #fff;
+  box-shadow: 0 0 0 1px rgba(15, 26, 44, .05), 0 2px 6px rgba(15, 26, 44, .04), 0 24px 60px rgba(15, 26, 44, .09);
+  opacity: 0; visibility: hidden; scale: .97; translate: -50% calc(-50% + 18px);
+  transition: opacity .3s ease, scale .35s ease, translate .35s ease, visibility 0s linear .35s;
+  --c1: #f3c9b3; --c2: #fbe6da; --c3: #e0825e; }
+.svc-card.is-open { opacity: 1; visibility: visible; scale: 1; translate: -50% -50%;
+  transition: opacity .45s ease, scale .6s cubic-bezier(.2, 1, .3, 1), translate .6s cubic-bezier(.2, 1, .3, 1),
+    visibility 0s; }
+.svc-card[data-svc="nettoyage"] { --c1: #f3c9b3; --c2: #fbe6da; --c3: #e0825e; }
+.svc-card[data-svc="jardinage"] { --c1: #bcd7f1; --c2: #e2eefa; --c3: #4a86c5; }
+.svc-card[data-svc="desencombrement"] { --c1: #11703f; --c2: #c4e6d0; --c3: #11703f; }
+.svc-card[data-svc="montage"] { --c1: #d8d1f2; --c2: #eeeafb; --c3: #7a6cc9; }
+.svc-card[data-svc="livraison"] { --c1: #f5d98a; --c2: #fbefc6; --c3: #d6a12a; }
+/* l'entrée du contenu, une fois la carte posée : le numéro, le titre, la présentation, chaque prestation, puis le
+   devis montent en fondu l'un après l'autre ; les photos se dévoilent de bas en haut (et leur image se resserre), en
+   décalé. En partant, tout s'efface d'un coup avec la carte. */
+.svc-detail__text > *, .svc-detail__list li, .svc-card__close { opacity: 0; translate: 0 14px;
+  transition: opacity .2s ease, translate .2s ease; }
+.svc-photo { clip-path: inset(100% 0 0 0 round 18px); transition: clip-path .25s ease; }
+.svc-photo img, .svc-photo figcaption { scale: 1.08; transition: scale .25s ease; }
+.svc-card.is-open .svc-detail__text > *, .svc-card.is-open .svc-detail__list li, .svc-card.is-open .svc-card__close {
+  opacity: 1; translate: 0 0; transition: opacity .5s ease var(--d, 0s), translate .7s cubic-bezier(.2, 1, .3, 1) var(--d, 0s); }
+.svc-card.is-open .svc-photo { clip-path: inset(0 0 0 0 round 18px);
+  transition: clip-path .9s cubic-bezier(.7, 0, .2, 1) var(--d, 0s); }
+.svc-card.is-open .svc-photo img, .svc-card.is-open .svc-photo figcaption { scale: 1;
+  transition: scale 1.2s cubic-bezier(.2, 1, .3, 1) var(--d, 0s); }
+.svc-card__close { --d: .5s; }
+.svc-detail__kicker { --d: .22s; }
+.svc-detail h3 { --d: .3s; }
+.svc-detail__intro { --d: .4s; }
+.svc-detail__label { --d: .5s; }
+.svc-detail__list { --d: .52s; }
+.svc-detail__list li:nth-child(1) { --d: .56s; }
+.svc-detail__list li:nth-child(2) { --d: .62s; }
+.svc-detail__list li:nth-child(3) { --d: .68s; }
+.svc-detail__list li:nth-child(4) { --d: .74s; }
+.svc-detail__list li:nth-child(5) { --d: .8s; }
+.svc-detail__cta { --d: .9s; }
+.svc-photo--1 { --d: .3s; }
+.svc-photo--2 { --d: .45s; }
+.svc-photo--3 { --d: .58s; }
+.svc-card__close { position: absolute; top: 18px; right: 18px; z-index: 1; appearance: none; cursor: pointer;
+  display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px;
+  background: rgba(15, 26, 44, .06); color: var(--ink); transition: background .2s ease, color .2s ease, rotate .3s ease; }
+.svc-card__close svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.svc-card__close:hover, .svc-card__close:focus-visible { outline: none; background: var(--ink); color: #fff; rotate: 90deg; }
+.svc-detail { display: none; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: clamp(28px, 4vw, 64px); align-items: center; }
+.svc-detail.active { display: grid; }
+.svc-detail__kicker { display: flex; gap: 8px; margin: 0 0 14px; font: 800 11px/1 var(--body); letter-spacing: .12em;
+  text-transform: uppercase; color: #6a7382; }
+.svc-detail__kicker b { color: var(--acc, #11703f); }
+.svc-detail h3 { margin: 0 0 16px; font: 800 clamp(26px, 2.4vw, 40px)/1.08 var(--title); letter-spacing: -.01em; color: var(--ink);
+  text-wrap: balance; }
+.svc-detail__intro { margin: 0 0 24px; font: 500 clamp(15px, 1.15vw, 18px)/1.6 var(--body); color: #3a4352; text-wrap: pretty; }
+.svc-detail__label { margin: 0 0 10px; font: 800 11px/1 var(--body); letter-spacing: .12em; text-transform: uppercase; color: #6a7382; }
+.svc-detail__list { list-style: none; margin: 0 0 28px; padding: 0; display: grid; gap: 10px; }
+.svc-detail__list li { position: relative; padding-left: 30px; font: 500 15px/1.45 var(--body); color: var(--ink); }
+.svc-detail__list li::before { content: ""; position: absolute; left: 0; top: 1px; width: 20px; height: 20px; border-radius: 6px;
+  background: var(--c2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f1a2c' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E") center / 14px no-repeat; }
+.svc-detail__cta { display: inline-flex; align-items: center; height: 48px; padding: 0 24px; border-radius: 12px;
+  background: var(--ink); color: #fff; font: 700 15px/1 var(--body); transition: background .2s ease; }
+.svc-detail__cta:hover, .svc-detail__cta:focus-visible { outline: none; background: #11703f; }
+.svc-detail__photos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.svc-photo { position: relative; margin: 0; overflow: hidden; border-radius: 18px; background: var(--c2); aspect-ratio: 4 / 3; }
+.svc-photo--1 { grid-column: 1 / -1; aspect-ratio: 16 / 9; background: var(--c1); }
+.svc-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.svc-photo figcaption { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px;
+  font: 700 12px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: rgba(15, 26, 44, .55); }
+.svc-photo figcaption::before { content: ""; width: 34px; height: 34px; opacity: .55;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f1a2c' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 8h3l1.5-2h7L17 8h3v11H4z'/%3E%3Ccircle cx='12' cy='13' r='3.5'/%3E%3C/svg%3E") center / contain no-repeat; }
+.svc-photo.has-img figcaption { display: none; }
+.svc-card[data-svc="desencombrement"] .svc-photo--1 figcaption { color: rgba(255, 255, 255, .8); }
+.svc-card[data-svc="desencombrement"] .svc-photo--1 figcaption::before { filter: invert(1); opacity: .7; }
+@media (max-width: 760px), (max-aspect-ratio: 1/1) {
+  .services { padding: 3vh 20px 14vh; }
+  .services__inner { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .svc-stage { grid-column: 1; grid-row: 1; height: 46svh; min-height: 300px; }
+  .svc-wrap { grid-column: 1; grid-row: 2; }
+  .svc-more { grid-column: 1; grid-row: 3; justify-self: start; margin-top: 28px; }
+  .svc-card { width: calc(100vw - 24px); max-height: calc(100svh - 24px); padding: 64px 22px 26px; border-radius: 22px; }
+  .svc-detail { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .svc-dots { gap: 6px; margin: 0 2px; }
+  .svc-dot { width: 42px; height: 42px; }
+}
 
 /* ---------------------------------------------------------------- navbar (reprise du site immersif) */
 .header { position: fixed; top: 16px; left: 0; width: 100%; z-index: 80; display: flex; align-items: center;
@@ -271,3 +466,60 @@ html.loaded .header { transition: transform .9s cubic-bezier(.2, 1, .3, 1) .45s;
 html.veil-in::after { content: ""; position: fixed; inset: 0; z-index: 151;
   background: #0f1a2c url("../images/logo-blanc.webp") center / auto 7.5vh no-repeat; }
 
+
+/* ---------------------------------------------------------------- curseur qui suit la souris (js/cursor.js), repris
+   tel quel du site immersif (lui-même de Harborview) : anneau de 64 px sur un écran de 1728 px, trait blanc en
+   différence (il s'inverse sur les fonds clairs), point au centre ; son contour se remplit avec la progression dans
+   la page. Au-dessus de tout, voile compris. */
+.cursor-wrap { position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 100000; pointer-events: none;
+  mix-blend-mode: difference; }
+.cursor { position: relative; display: flex; align-items: center; justify-content: center; width: 0; height: 0;
+  opacity: 0; transition: opacity .35s; transform: translate(-50%, -50%); }
+.cursor.active { opacity: 1; }
+.cursor-main { position: relative; flex: none; display: flex; align-items: center; justify-content: center;
+  width: 3.7vw; height: 3.7vw; padding: 1px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 50%;
+  will-change: transform; }
+.cursor-outline { position: absolute; inset: -1px; border-radius: 50%; color: #fff; }
+.cursor-outline svg { display: block; }
+.cursor-dot { position: absolute; left: 50%; top: 50%; width: .35vw; height: .35vw; border-radius: 50%;
+  background: #fff; transform: translate(-50%, -50%); }
+/* au-dessus d'une zone qui a sa propre poignée (le slider avant / après : html.cursor-off), l'anneau se resserre
+   jusqu'à disparaître en son centre, et revient de même en sortant */
+.cursor-main { transition: scale .45s cubic-bezier(.2, .9, .3, 1), opacity .3s ease; }
+html.cursor-off .cursor-main { scale: 0; opacity: 0; transition: scale .35s cubic-bezier(.5, 0, .75, 0), opacity .3s ease .05s; }
+@media (max-width: 991px), (hover: none), (pointer: coarse) { .cursor-wrap { display: none; } }
+
+/* ---------------------------------------------------------------- avant / après (js/avantapres.js)
+   Un grand rectangle centré aux coins arrondis : l'« avant » dessous, l'« après » par-dessus, découpé à droite de la
+   barre (--pos). La barre suit la souris au survol (sans clic), en douceur ; une pastille blanche aux deux flèches
+   la marque. Les étiquettes « Avant » / « Après » aux coins du haut. Tant qu'une image manque, un aplat la remplace. */
+.avant-apres { position: relative; z-index: 5; padding: 6vh 5vw 16vh; }
+/* son titre, centré au-dessus du cadre, comme ceux des services */
+.ba-head { margin: 0 auto clamp(28px, 4vh, 44px); text-align: center; }
+.ba-head h2 { margin: 0; font: 800 clamp(30px, 3vw, 48px)/1 var(--title); letter-spacing: .04em; text-transform: uppercase;
+  color: var(--ink); text-wrap: balance; }
+.ba { --pos: 50%; position: relative; width: min(1100px, 100%); margin: 0 auto; aspect-ratio: 16 / 9; overflow: hidden;
+  border-radius: 28px; cursor: ew-resize; touch-action: pan-y; user-select: none;
+  box-shadow: 0 0 0 1px rgba(15, 26, 44, .05), 0 24px 60px rgba(15, 26, 44, .08); }
+.ba__layer { position: absolute; inset: 0; display: grid; place-items: center; }
+.ba__layer img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.ba__layer--avant { background: #e4e2dc; }
+.ba__layer--apres { background: #cfe8d8; clip-path: inset(0 0 0 var(--pos)); }
+.ba__tag { position: absolute; top: 18px; z-index: 2; padding: 8px 14px; border-radius: 10px; background: rgba(255, 255, 255, .88);
+  font: 800 11px/1 var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); pointer-events: none; }
+.ba__tag--avant { left: 18px; }
+.ba__tag--apres { right: 18px; }
+.ba__bar { position: absolute; top: 0; bottom: 0; left: var(--pos); z-index: 3; width: 2px; translate: -50% 0; background: #fff;
+  box-shadow: 0 0 12px rgba(15, 26, 44, .18); pointer-events: none; }
+.ba__knob { position: absolute; top: 50%; left: 50%; translate: -50% -50%; display: grid; place-items: center; width: 52px;
+  height: 52px; border-radius: 50%; background: #fff; color: var(--ink); box-shadow: 0 6px 20px rgba(15, 26, 44, .18); }
+.ba__knob svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round;
+  stroke-linejoin: round; }
+.ba__range { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit;
+  pointer-events: none; }
+.ba:focus-within .ba__knob { outline: 2px solid #11703f; outline-offset: 3px; }
+@media (max-width: 760px), (max-aspect-ratio: 1/1) {
+  .avant-apres { padding: 4vh 20px 12vh; }
+  .ba { aspect-ratio: 4 / 5; border-radius: 22px; }
+  .ba__knob { width: 46px; height: 46px; }
+}
