@@ -13,7 +13,10 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { makeButterfly } from './papillons.js';
 import { makeBee } from './abeilles.js';
 import './stats.js';                                // les chiffres, sous l'À propos (texte et décompte)
+import './scroll.js';                               // le défilement, doux et contrôlé (ordinateur)
 import { statObjects } from './statsmur.js';       // leur modèle 3D, sur le mur
+import { floatHero } from './herofloat.js';        // sur téléphone : pas d'îlot, ses objets flottent autour du titre
+import './services.js';                             // le diaporama des services et leurs mini-mondes
 
 const host = document.getElementById('hero-scene');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2482,6 +2485,14 @@ draco.preload();
 const gltfLoader = new GLTFLoader().setDRACOLoader(draco);
 gltfLoader.load(MODEL, (gltf) => {
   const root = gltf.scene;
+  // sur téléphone (et tout écran sans souris) : pas d'îlot ; ses objets flottent autour du titre (js/herofloat.js)
+  if (!desktop) {
+    renderer.domElement.remove();
+    floatHero(root, host);
+    window.__heroReady = true;
+    window.dispatchEvent(new Event('hero:ready'));
+    return;
+  }
   statObjects(root);                                // les chiffres en prennent quelques objets, intacts (js/statsmur.js)
   let seedTemplate = null, floraMesh = null;
   const drop = [];
@@ -2836,7 +2847,13 @@ function start() {
   requestAnimationFrame(frame);
 }
 function frame() {
-  if (hidden()) { running = false; return; }
+  if (hidden()) {
+    running = false;
+    // l'îlot parti, la toile (fixée à l'écran) se cache : sans cela, sa dernière image (pollen, aigrettes) restait
+    // par-dessus toute la page
+    if (gone()) host.style.visibility = 'hidden';
+    return;
+  }
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);       // pas de bond au retour d'un onglet
   uTime.value += dt;
