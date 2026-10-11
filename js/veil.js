@@ -1,5 +1,6 @@
 // Navbar et transitions entre pages, reprises du site immersif (homeservice-immersive/web/js/app.js, « onglets »).
-// Un clic sur un lien de la navbar fait monter du bas de l'écran un voile bleu encre frappé du logo, au bord rongé
+// Un clic sur un lien de la navbar (data-veil : le logo, les onglets, le devis) fait monter du bas de l'écran un
+// voile bleu encre frappé du logo, au bord rongé
 // comme une feuille qui brûle (le même bruit que le vide de la scène 3D) ; une fois l'écran couvert, on change de
 // page, et sur la nouvelle page le voile sort par le haut. Le changement de langue passe sous le même voile.
 // WebGL pur : pas besoin de three.js pour un rectangle plein écran.
@@ -180,8 +181,11 @@
     const url = new URL(href, location.href);
     const ok = cover(() => {
       try { sessionStorage.setItem(KEY, '1'); } catch {}
-      if (url.pathname === location.pathname) {    // même page : on remonte en haut, à couvert
-        if (url.hash) location.hash = url.hash; else window.scrollTo(0, 0);
+      if (url.pathname === location.pathname) {    // même page (les onglets) : on saute à la section, à couvert
+        const el = url.hash ? document.getElementById(decodeURIComponent(url.hash.slice(1))) : null;
+        const y = el ? el.getBoundingClientRect().top + window.scrollY : (url.hash ? null : 0);
+        if (y !== null) window.scrollTo({ top: y, behavior: 'instant' });   // d'un coup : rien ne défile sous le voile
+        if (url.hash) history.replaceState(null, '', url.hash);
         try { sessionStorage.removeItem(KEY); } catch {}
         clear();
       } else location.href = url.href;
