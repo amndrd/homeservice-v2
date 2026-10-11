@@ -62,13 +62,15 @@ function paint(r) {
 for (const r of rows) { if (!live) r.text = r.on = r.k = 1; paint(r); }   // en attendant : là à 16 %, à 0
 
 // une ligne arrive (le haut de son chiffre passe au-dessus de SHOW.at de l'écran), ou repart (sous SHOW.off). Sur le
-// mur (html.statsWall, js/statsmur.js), un seul chiffre à la fois, selon le pas de défilement dans la section
-// (window.hsStats.active, lu aussi par le modèle 3D) : aucun avant que la section soit en place, puis le premier, le
-// deuxième, le troisième
+// mur (html.statsWall, js/statsmur.js), selon le pas de défilement dans la section (window.hsStats.active, lu aussi
+// par le modèle 3D et js/statsvide.js) : aucun avant que la section soit en place, puis le premier, puis le deuxième
+// sous lui, puis le troisième
+// (pendant que js/scroll.js amène un chiffre, window.hsScrollGoal : c'est déjà lui, dès le début du geste)
+// (depuis le 2026-10-11, les trois chiffres arrivent ensemble dès que la section est en place : « active » vaut le
+//  dernier, tous ceux d'avant sont allumés)
 function wallActive() {
-  const vh = window.innerHeight, top = box.getBoundingClientRect().top / vh;
-  const step = parseFloat(getComputedStyle(box).getPropertyValue('--step')) / 100 || 1;   // en hauteurs d'écran
-  return top > SHOW.wall ? -1 : clamp(Math.round(-top / step), 0, rows.length - 1);
+  const top = box.getBoundingClientRect().top / window.innerHeight;
+  return top > SHOW.wall ? -1 : rows.length - 1;
 }
 function watch() {
   const vh = window.innerHeight;
@@ -76,11 +78,11 @@ function watch() {
   if (root.classList.contains('statsWall')) {
     const a = wallActive();
     window.hsStats = { active: a };
-    rows.forEach((r, i) => {
-      r.li.classList.toggle('on', i === a);
-      r.li.classList.toggle('past', a > i);
-      if ((i === a) !== r.shown) { r.shown = i === a; changed = true; }
+    rows.forEach((r, i) => {                       // ils s'additionnent : ceux d'avant restent
+      r.li.classList.toggle('on', i <= a);
+      if ((i <= a) !== r.shown) { r.shown = i <= a; changed = true; }
     });
+    if (changed) window.dispatchEvent(new Event('hs:stats'));   // js/statsvide.js les ouvre
     return changed;
   }
   for (const r of rows) {

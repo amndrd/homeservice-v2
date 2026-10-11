@@ -19,6 +19,7 @@ import * as THREE from 'three';
 import { COMMUNES, REGION } from './bruxelles.js';
 import { BOARD_W, EMPREINTES } from './empreintes.js';
 import { CHIFFRES } from './cadran.js';
+import { setFirst } from './statsvide.js';        // les chiffres qui s'additionnent, derrière le bord du vide
 
 const box = document.querySelector('.stats');
 const root = document.documentElement;
@@ -26,14 +27,8 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const desktop = matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches;
 const on = !!box && desktop && !reduced;
 if (on) {
-  root.classList.add('statsWall');                 // la mise en page des chiffres un par un (css/style.css)
-  // les points où le défilement s'aimante : la section en place (la boule au centre), puis chaque chiffre
-  for (let i = 0; i < 3; i++) {
-    const d = document.createElement('div');
-    d.className = 'stats__snap';
-    d.style.top = `calc(${i} * var(--step))`;
-    box.append(d);
-  }
+  root.classList.add('statsWall');                 // la mise en page des chiffres sur le mur (css/style.css)
+  // (plus d'arrêts du défilement par chiffre depuis le 2026-10-11 : les trois chiffres arrivent ensemble)
 }
 
 // la boule (m) : [écart gardé entre deux objets (m : ils ne se touchent jamais, même en lévitant et en se balançant),
@@ -141,7 +136,7 @@ function init(found) {
   order.forEach((k, i) => { pieces[k].wait = i * FALL.step + rnd() * FALL.jitter; });
 
   gl = { renderer, scene, camera, sun, wall, ball, stage, phase: 'idle', t0: 0, extent, voidX: 0, voidK: 0 };
-  makeBlock();
+  if (BLOCK_ON) makeBlock();
   makeReliefs();
   layout();
   new ResizeObserver(layout).observe(document.body);
@@ -425,6 +420,9 @@ function stepVoid(dt) {
 // décompté par js/stats.js), dessiné dans une image ; le HTML reste pour les lecteurs d'écran.
 // [taille de la face, en tailles de chiffre F (largeur, hauteur = profondeur), durée d'un quart de tour (s),
 //  netteté des faces (px d'image par px d'écran), couleurs]
+// (retiré le 2026-10-11 : les chiffres s'additionnent et s'ouvrent derrière le bord du vide, js/statsvide.js ; son
+//  code reste, dormant)
+const BLOCK_ON = false;
 const BLOCK = { w: 8.4, h: 2.4, turn: 0.9, sharp: 2, ink: '#0f1a2c', green: '#11703f', grey: '#6a7382',
   paper: '#f7f7f5', cavity: '#30343b' };
 // les faces de la boîte (BoxGeometry : +x, −x, +y, −y, +z, −z) : la blanche devant, puis celles qui arrivent tour à tour
@@ -823,22 +821,37 @@ function linkReliefs() {
     seen.forEach((set, i) => { for (const j of set) m.cells[i].after.push(o.cells[j]); });
   }));
 }
-// leur place : au centre de la boule, sur le mur
+// leur place : au centre de la boule, sur le mur ; RELIEF_SIZE réduit les trois creux ensemble
+const RELIEF_SIZE = 0.8;
+// le premier chiffre sans creux, une illustration à sa place (essayé le 2026-10-11, retiré : js/statsvide.js FLAT_ON)
+const FIRST_FLAT = false;
+// le creux affiché : la carte de Bruxelles (les empreintes et le cadran restent, dormants)
+const ONLY = 1;
 function layoutReliefs() {
   for (const m of reliefs) {
-    m.S = m.def.screen * 2 * gl.halfW;
+    m.S = m.def.screen * RELIEF_SIZE * 2 * gl.halfW;
     m.group.scale.set(m.S, m.S, 1);
     m.x = (BALL.x - 0.5) * 2 * gl.halfW * gl.camera.aspect;
+  }
+  // leur place, pour js/statsvide.js (la progression, sous le plus grand creux ; l'illustration, dormante)
+  if (reliefs[0]) {
+    const box3 = new THREE.Box3();
+    const below = Math.max(...reliefs.map((m) => m.group.position.y - box3.setFromObject(m.group).min.y)) / (2 * gl.halfW);
+    setFirst(BALL.x, reliefs[0].def.screen * RELIEF_SIZE, below);
   }
 }
 // un pas : chaque creux avance vers son chiffre (creusé) ou revient vers le mur plein ; chaque morceau suit l'horloge
 // de son creux (son départ, puis MAP.dig), mais ne se creuse pas tant qu'un morceau qu'il recouvre n'est pas remonté
 // (il prend alors du retard, puis se creuse à son allure) ; dit s'il bouge encore, et si l'un d'eux se voit
-function stepReliefs(dt) {
+// (RELIEF_PACE : leur allure ; 1 = celle choisie. Ils démarrent dès le début du geste : js/scroll.js, hsScrollGoal)
+const RELIEF_PACE = 1;
+function stepReliefs(real) {
+  const dt = real * RELIEF_PACE;                    // (la vague du cadran garde, elle, le temps réel)
   let busy = false, shown = false;
   const active = window.hsStats?.active ?? -1, rate = dt / MAP.dig;
   reliefs.forEach((m, idx) => {
-    const goal = active === idx ? m.total : 0;
+    // un seul creux depuis le 2026-10-11 : la carte des communes (ONLY), dès que les chiffres sont là
+    const goal = active >= 0 && idx === ONLY ? m.total : 0;
     if (goal !== m.t) m.out = goal < m.t;
     m.t = goal > m.t ? Math.min(goal, m.t + dt) : Math.max(goal, m.t - dt);
     if (m.t !== goal) busy = true;
@@ -849,8 +862,8 @@ function stepReliefs(dt) {
     // la vague du cadran : une fois creusé tout entier, une barre après l'autre remonte (et ses chiffres avec elle)
     if (m.def.bar) {
       const full = active === idx && m.cells.every((c) => c.k > 0.999);
-      m.amp = full ? Math.min(1, m.amp + dt / DIAL.ease) : Math.max(0, m.amp - dt / DIAL.ease);
-      if (m.amp > 0) m.wave = (m.wave + dt / DIAL.tour) % 1; else m.wave = 0;
+      m.amp = full ? Math.min(1, m.amp + real / DIAL.ease) : Math.max(0, m.amp - real / DIAL.ease);
+      if (m.amp > 0) m.wave = (m.wave + real / DIAL.tour) % 1; else m.wave = 0;
       if (m.amp > 0 || active === idx) busy = true;     // (elle tourne tant que le cadran est là)
     }
     let open = false;
