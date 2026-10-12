@@ -15,7 +15,8 @@ import { makeBee } from './abeilles.js';
 import './stats.js';                                // les chiffres, sous l'À propos (texte et décompte)
 import './scroll.js';                               // le défilement, doux et contrôlé (ordinateur)
 import { statObjects } from './statsmur.js';       // leur modèle 3D, sur le mur
-import { floatHero } from './herofloat.js';        // sur téléphone : pas d'îlot, ses objets flottent autour du titre
+import { renderSprites } from './herofloat.js';    // l'outil d'export des images du hero du téléphone (?sprites)
+import { staticHero } from './herostatic.js';      // sur téléphone : pas d'îlot, ses objets en images fixes
 import './services.js';                             // le diaporama des services et leurs mini-mondes
 
 const host = document.getElementById('hero-scene');
@@ -2483,12 +2484,20 @@ function updateLevitation(t, dt) {
 const draco = new DRACOLoader().setDecoderPath('js/draco/');
 draco.preload();
 const gltfLoader = new GLTFLoader().setDRACOLoader(draco);
-gltfLoader.load(MODEL, (gltf) => {
+// sur téléphone : pas de 3D dans le hero (ni modèle téléchargé, ni rendu) ; ses objets en images fixes
+const sprites = location.search.includes('sprites');
+if (!desktop && !sprites) {
+  renderer.domElement.remove();
+  staticHero(host);
+  window.__heroReady = true;
+  queueMicrotask(() => window.dispatchEvent(new Event('hero:ready')));
+}
+if (desktop || sprites) gltfLoader.load(MODEL, (gltf) => {
   const root = gltf.scene;
   // sur téléphone (et tout écran sans souris) : pas d'îlot ; ses objets flottent autour du titre (js/herofloat.js)
   if (!desktop) {
     renderer.domElement.remove();
-    floatHero(root, host);
+    window.__sprites = renderSprites(root);         // (l'outil d'export des images, ?sprites)
     window.__heroReady = true;
     window.dispatchEvent(new Event('hero:ready'));
     return;
@@ -2839,7 +2848,7 @@ function maxTiltUp(h) {
 
 // ------------------------------------------------------------ boucle : à l'écran seulement (pas une fois l'îlot parti)
 let dirty = true, visible = true, animating = false, running = false;
-const hidden = () => !visible || document.hidden || gone();
+const hidden = () => !desktop || !visible || document.hidden || gone();   // (téléphone : pas de rendu)
 function start() {
   if (running || hidden()) return;
   running = true;

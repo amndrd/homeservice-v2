@@ -66,6 +66,16 @@ html.heroFloat .hero__text { top: 50%; z-index: 1; translate: 0 -50%; }
 html.heroFloat .scene canvas { position: absolute; inset: 0; }
 html.heroFloat .scene__back { z-index: 0; filter: blur(5px); opacity: .9; }
 html.heroFloat .scene__front { z-index: 2; }
+/* le hero du téléphone en images fixes (js/herostatic.js) : chaque objet centré sur sa place ; le fond a déjà son flou
+   dans l'image (pas de filtre à calculer). Ils arrivent une fois, en grandissant, l'un après l'autre (html.intro). */
+html.heroStatic .scene__back, html.heroStatic .scene__front { position: absolute; inset: 0; pointer-events: none;
+  will-change: transform; }
+html.heroStatic .scene { overflow: clip; }   /* (comme l'ancienne toile 3D : rien ne déborde du hero) */
+html.heroStatic .scene__back { filter: none; opacity: .9; }
+html.heroStatic .scene img { position: absolute; height: auto; translate: -50% -50%; opacity: 0; scale: .55;
+  transition: opacity .5s ease var(--d, 0s), scale .9s cubic-bezier(.2, 1.4, .35, 1) var(--d, 0s); }
+html.heroStatic.intro .scene img { opacity: 1; scale: 1; }
+@media (prefers-reduced-motion: reduce) { html.heroStatic .scene img { transition: none; opacity: 1; scale: 1; } }
 .hero__text h1 { font: 800 clamp(44px, 5.4vw, 88px)/1 var(--title); letter-spacing: -.04em; margin: 0 0 22px;
   color: var(--ink); }
 .hero__text p { max-width: 34em; margin: 0 auto; font: 500 clamp(16px, 1.3vw, 20px)/1.55 var(--body); color: #3a4352;

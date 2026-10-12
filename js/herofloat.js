@@ -149,3 +149,50 @@ export function floatHero(model, host) {
   window.addEventListener('resize', layout);
   requestAnimationFrame(frame);
 }
+
+// ---------------------------------------------------------------- export des images (outil, ?sprites)
+// Le hero du téléphone est fait d'images fixes (js/herostatic.js, images/hero-mobile/) : chaque objet, rendu ici seul
+// dans sa pose de FRONT / BACK, sur fond transparent, avec la lumière et le rendu ci-dessus. Caméra orthographique :
+// la plus grande dimension de l'objet occupe SPRITE.fill de la largeur de l'image (l'image affichée fait donc
+// size / SPRITE.fill de la largeur de l'écran). Lancé par js/hero.js avec ?sprites dans l'adresse (téléphone) ; les
+// images sont lues par outils/sprites.py.
+export const SPRITE = { px: 1024, fill: 0.6 };
+export function renderSprites(model) {
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1);
+  renderer.setSize(SPRITE.px, SPRITE.px, false);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.AgXToneMapping;
+  renderer.toneMappingExposure = 2.3;
+  renderer.setClearColor(0x000000, 0);
+  const scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(LIGHT.sky, LIGHT.ground, LIGHT.skyI));
+  const sun = new THREE.DirectionalLight(LIGHT.sun, LIGHT.sunI);
+  sun.position.set(...LIGHT.dir);
+  scene.add(sun);
+  const h = 0.5 / SPRITE.fill;
+  const cam = new THREE.OrthographicCamera(-h, h, h, -h, -10, 10);
+  cam.position.set(0, 0, 5);
+  const out = [];
+  for (const [list, layer] of [[FRONT, 'front'], [BACK, 'back']]) {
+    for (const [name, x, y, size, rot] of list) {
+      const src = model.children.find((o) => o.userData.service && o.name.startsWith(name));
+      if (!src) continue;
+      const o = src.clone(true);
+      o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1);
+      o.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(o), c = box.getCenter(new THREE.Vector3());
+      const dim = box.getSize(new THREE.Vector3());
+      o.position.copy(c).negate();
+      const pivot = new THREE.Group();
+      pivot.add(o);
+      pivot.scale.setScalar(1 / Math.max(dim.x, dim.y, dim.z));
+      pivot.rotation.set(rot[0], rot[1], rot[2]);
+      scene.add(pivot);
+      renderer.render(scene, cam);
+      out.push({ name, layer, x, y, size, url: renderer.domElement.toDataURL('image/png') });
+      scene.remove(pivot);
+    }
+  }
+  return out;
+}
