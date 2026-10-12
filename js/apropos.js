@@ -144,7 +144,10 @@
   const pCanvas = document.createElement('canvas');
   pCanvas.setAttribute('aria-hidden', 'true');
   let pgl = null, PU = null, photoReady = false;
-  if (img && !reduced) {
+  // (sur téléphone et tout écran sans souris : l'image est simplement là, sans apparition ni WebGL)
+  const phone = !matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches;
+  if (img && (reduced || phone)) { img.style.transition = 'none'; img.style.opacity = '1'; }
+  if (img && !reduced && !phone) {
     photoBox.prepend(pCanvas);
     pgl = pCanvas.getContext('webgl', { alpha: true, antialias: false, premultipliedAlpha: true });
     const prog = pgl && program(pgl, `attribute vec2 aPos; varying vec2 vUv;
@@ -187,7 +190,7 @@
     }
   }
   function drawPhoto(open, alpha) {
-    if (!photoReady) { if (img) img.style.opacity = String(Math.min(alpha, open > 0.02 ? 1 : 0)); return; }
+    if (!photoReady) { if (img && !phone && !reduced) img.style.opacity = String(Math.min(alpha, open > 0.02 ? 1 : 0)); return; }
     fit(pCanvas, pgl, pCanvas, 2);
     const mpp = VOID.screen / window.innerHeight / (pCanvas.width / Math.max(1, pCanvas.clientWidth));   // m par px de toile
     const w = pCanvas.width * mpp, h = pCanvas.height * mpp;
