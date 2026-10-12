@@ -296,17 +296,16 @@
       </div>
     </div>
   </section>
-  <!-- avant / après (js/avantapres.js) : la barre suit la souris au survol, sans clic. Images à déposer :
-       images/avant-apres/avant.webp et apres.webp (même cadrage) ; d'ici là, deux aplats (gris, vert d'eau). -->
+  <!-- avant / après (js/avantapres.js) : la barre suit la souris au survol, sans clic. Images :
+       images/avant-apres/avant|apres.webp (4:3) et avant|apres-mobile.webp (4:5), recadrées depuis before.jpg / after.JPEG,
+       l'après recalé sur l'avant (même cadrage au pixel près). -->
   <section class="avant-apres" aria-labelledby="ba-titre">
     <header class="ba-head">
       <h2 id="ba-titre" data-i18n="ba.title">La différence se voit</h2>
     </header>
     <div class="ba">
-      <div class="ba__layer ba__layer--avant"><img src="images/avant-apres/avant.webp" alt="Avant" data-i18n-alt="ba.before"
-          loading="lazy"></div>
-      <div class="ba__layer ba__layer--apres"><img src="images/avant-apres/apres.webp" alt="Après" data-i18n-alt="ba.after"
-          loading="lazy"></div>
+      <div class="ba__layer ba__layer--avant"><picture><source media="(max-width: 760px), (max-aspect-ratio: 1/1)" srcset="images/avant-apres/avant-mobile.webp"><img src="images/avant-apres/avant.webp" alt="Avant" data-i18n-alt="ba.before" width="884" height="663" loading="lazy"></picture></div>
+      <div class="ba__layer ba__layer--apres"><picture><source media="(max-width: 760px), (max-aspect-ratio: 1/1)" srcset="images/avant-apres/apres-mobile.webp"><img src="images/avant-apres/apres.webp" alt="Après" data-i18n-alt="ba.after" width="884" height="663" loading="lazy"></picture></div>
       <span class="ba__tag ba__tag--avant" aria-hidden="true" data-i18n="ba.before">Avant</span>
       <span class="ba__tag ba__tag--apres" aria-hidden="true" data-i18n="ba.after">Après</span>
       <div class="ba__bar" aria-hidden="true"><span class="ba__knob">

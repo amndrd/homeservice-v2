@@ -486,7 +486,7 @@ html.veil-in::after { content: ""; position: fixed; inset: 0; z-index: 151;
 .ba-head { margin: 0 auto clamp(28px, 4vh, 44px); text-align: center; }
 .ba-head h2 { margin: 0; font: 800 clamp(30px, 3vw, 48px)/1 var(--title); letter-spacing: .04em; text-transform: uppercase;
   color: var(--ink); text-wrap: balance; }
-.ba { --pos: 50%; position: relative; width: min(1100px, 100%); margin: 0 auto; aspect-ratio: 16 / 9; overflow: hidden;
+.ba { --pos: 50%; position: relative; width: min(900px, 100%); margin: 0 auto; aspect-ratio: 4 / 3; overflow: hidden;
   border-radius: 28px; cursor: ew-resize; touch-action: pan-y; user-select: none;
   box-shadow: 0 0 0 1px rgba(15, 26, 44, .05), 0 24px 60px rgba(15, 26, 44, .08); }
 .ba__layer { position: absolute; inset: 0; display: grid; place-items: center; }
