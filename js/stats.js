@@ -26,7 +26,7 @@ const backOut = (t) => { const c = 1.9; return 1 + (c + 1) * (t - 1) ** 3 + c * 
 // [sur le mur : le premier chiffre arrive quand le haut de la section passe au-dessus de cette part de l'écran (elle
 //  est presque en place) ; ailleurs : une ligne s'allume dès qu'elle entre à l'écran (son haut passe au-dessus de cette part de l'écran), s'éteint quand
 //  elle en est ressortie par le bas (son haut redescend sous celle-ci) ; temps (s) : le texte arrive, il s'allume, le décompte, un élément de la scène surgit]
-const SHOW = { at: 0.97, off: 1, wall: 0.12, text: 0.45, on: 0.35, count: 1.6, pop: 0.4 };
+const SHOW = { at: 0.97, off: 1, wall: 0.55, text: 0.45, on: 0.35, count: 1.6, pop: 0.4 };
 // Les scènes, comme dans le site immersif (m) : [agrandissement des objets des services, de la carte, de l'enveloppe ;
 //  échelle de la page (px par m, en tailles de chiffre F : celle relevée à l'écran du site immersif) ; centre de l'emplacement
 //  de la scène, avant le bord droit des chiffres (en F) ; plongée de la caméra depuis la verticale (°) ; champ (°)]

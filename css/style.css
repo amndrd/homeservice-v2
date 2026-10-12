@@ -163,8 +163,9 @@ html:not(.stats3d) .stat__text { grid-column: 2; }
    suivant s'ajoute sous les précédents, il s'ouvre derrière le bord du vide (js/statsvide.js, dans la toile
    .stats__vide ; sans WebGL : en fondu). Le défilement s'arrête sur chaque pas (js/scroll.js). La section remonte sous la fin de l'À propos (sa marge du
    bas) : les chiffres arrivent dès qu'on a fini de le lire. */
-/* (depuis le 2026-10-11 : un seul pas, les trois chiffres arrivent ensemble ; --step 0) */
-html.statsWall .stats { --step: 0vh; --tail: 40vh; display: grid; grid-template-columns: 1fr auto;
+/* (depuis le 2026-10-11 : un seul pas, les trois chiffres arrivent ensemble ; --step 0, et plus de traîne (--tail 0) :
+   la section défile normalement, rien ne la retient à l'écran) */
+html.statsWall .stats { --step: 0vh; --tail: 0vh; display: grid; grid-template-columns: 1fr auto;
   align-items: start; width: min(1240px, 90vw); height: calc(100vh + 2 * var(--step) + var(--tail)); margin: -15vh auto 0;
   padding: 0; }
 html.statsWall .stats__stage { grid-column: 1; grid-row: 1; position: sticky; top: 0; height: 100vh; height: 100svh;
