@@ -45,9 +45,6 @@
   });
   box.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') go(at(e), EASE.follow); });
   box.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') go(0.5, EASE.home); });
-  // le curseur rond du site (js/cursor.js) se resserre et disparaît le temps qu'on est dans le cadre
-  box.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') document.documentElement.classList.add('cursor-off'); });
-  box.addEventListener('pointerleave', () => document.documentElement.classList.remove('cursor-off'));
   range.addEventListener('input', () => go(+range.value / 100, EASE.follow));
   paint();
 })();

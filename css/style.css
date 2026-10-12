@@ -466,29 +466,6 @@ html.loaded .header { transition: transform .9s cubic-bezier(.2, 1, .3, 1) .45s;
 html.veil-in::after { content: ""; position: fixed; inset: 0; z-index: 151;
   background: #0f1a2c url("../images/logo-blanc.webp") center / auto 7.5vh no-repeat; }
 
-
-/* ---------------------------------------------------------------- curseur qui suit la souris (js/cursor.js), repris
-   tel quel du site immersif (lui-même de Harborview) : anneau de 64 px sur un écran de 1728 px, trait blanc en
-   différence (il s'inverse sur les fonds clairs), point au centre ; son contour se remplit avec la progression dans
-   la page. Au-dessus de tout, voile compris. */
-.cursor-wrap { position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 100000; pointer-events: none;
-  mix-blend-mode: difference; }
-.cursor { position: relative; display: flex; align-items: center; justify-content: center; width: 0; height: 0;
-  opacity: 0; transition: opacity .35s; transform: translate(-50%, -50%); }
-.cursor.active { opacity: 1; }
-.cursor-main { position: relative; flex: none; display: flex; align-items: center; justify-content: center;
-  width: 3.7vw; height: 3.7vw; padding: 1px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 50%;
-  will-change: transform; }
-.cursor-outline { position: absolute; inset: -1px; border-radius: 50%; color: #fff; }
-.cursor-outline svg { display: block; }
-.cursor-dot { position: absolute; left: 50%; top: 50%; width: .35vw; height: .35vw; border-radius: 50%;
-  background: #fff; transform: translate(-50%, -50%); }
-/* au-dessus d'une zone qui a sa propre poignée (le slider avant / après : html.cursor-off), l'anneau se resserre
-   jusqu'à disparaître en son centre, et revient de même en sortant */
-.cursor-main { transition: scale .45s cubic-bezier(.2, .9, .3, 1), opacity .3s ease; }
-html.cursor-off .cursor-main { scale: 0; opacity: 0; transition: scale .35s cubic-bezier(.5, 0, .75, 0), opacity .3s ease .05s; }
-@media (max-width: 991px), (hover: none), (pointer: coarse) { .cursor-wrap { display: none; } }
-
 /* ---------------------------------------------------------------- avant / après (js/avantapres.js)
    Un grand rectangle centré aux coins arrondis : l'« avant » dessous, l'« après » par-dessus, découpé à droite de la
    barre (--pos). La barre suit la souris au survol (sans clic), en douceur ; une pastille blanche aux deux flèches
