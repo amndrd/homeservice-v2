@@ -9,9 +9,10 @@
 <script>try { var v = sessionStorage.getItem('hs-veil'); if (document.prerendering || v) { document.documentElement.classList.add('veil-in'); sessionStorage.removeItem('hs-veil'); } else document.documentElement.classList.add('loading'); } catch (e) { document.documentElement.classList.add('loading'); }</script>
 <!-- chargés tout de suite : la police, le script de l'îlot et son modèle (même version que MODEL dans js/hero.js) -->
 <link rel="preload" href="fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="modulepreload" href="js/hero.min.js?v=62b6f08d5d">
-<link rel="preload" href="models/ilot.glb?v=fe77098755" as="fetch" crossorigin>
-<link rel="stylesheet" href="css/style.min.css?v=f716b27375">
+<link rel="modulepreload" href="js/hero.min.js?v=be13c0d193">
+<link rel="preload" href="models/ilot.glb?v=fe77098755" as="fetch" crossorigin
+  media="(min-width: 900px) and (hover: hover) and (pointer: fine)">
+<link rel="stylesheet" href="css/style.min.css?v=b2dcd12534">
 </head>
 <body>
 
@@ -314,27 +315,99 @@
         data-i18n-aria="ba.range">
     </div>
   </section>
-</main>
-
-<!-- curseur qui suit la souris, son anneau montre la progression dans la page (js/cursor.js, repris du site immersif) -->
-<div class="cursor-wrap" id="cursor" aria-hidden="true">
-  <div class="cursor">
-    <div class="cursor-main">
-      <div class="cursor-outline">
-        <svg viewBox="0 0 60 60" width="100%"><circle r="28.5" cx="30" cy="30" stroke-width="2" fill="none"
-          stroke="currentColor"></circle></svg>
+  <!-- service sur mesure : une demande hors des cinq services, que l'équipe étudie. À droite, la carte holographique
+       noire de Harborview (js/surmesure.js), à l'horizontale ; la brillance et la bascule suivent la souris. -->
+  <section class="sur" id="sur-mesure" aria-labelledby="sur-titre">
+    <div class="sur__inner">
+      <div class="sur__text">
+        <h2 id="sur-titre" data-i18n="sur.title">Un besoin hors de nos services habituels&nbsp;?</h2>
+        <p data-i18n="sur.text">Peindre une pièce, aider à un déménagement, arroser vos plantes pendant les vacances… Décrivez-nous
+          ce dont vous avez besoin. Notre équipe étudie chaque demande et vous répond sous 24&nbsp;h pour vous dire si nous
+          pouvons la prendre en charge.</p>
+        <a class="sur__cta" href="#contact" data-veil data-i18n="sur.cta">Faire une demande sur mesure</a>
       </div>
-      <div class="cursor-dot"></div>
+      <div class="sur-card" aria-hidden="true">
+        <div class="sur-card__rotator">
+          <div class="sur-card__holo">
+            <div class="sur-card__inset"></div>
+            <img class="sur-card__logo" src="images/logo-blanc.webp" alt="" width="801" height="380">
+            <div class="sur-card__id"><span class="sur-card__name" data-i18n="sur.card.name">Service sur mesure</span>
+              <span class="sur-card__tier" data-i18n="sur.card.tier">Carte spéciale · HomeService</span></div>
+            <div class="sur-card__meta">
+              <div><span class="sur-card__k" data-i18n="sur.card.k1">Valable pour</span><span class="sur-card__v" data-i18n="sur.card.v1">Toute demande</span></div>
+              <div><span class="sur-card__k" data-i18n="sur.card.k2">Région</span><span class="sur-card__v">Bruxelles</span></div>
+            </div>
+            <div class="sur-card__shine"><div class="sur-card__pattern"></div></div>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
+  </section>
+  <!-- FAQ (js/faq.js) : une question s'ouvre en tiroir sur sa réponse ; à droite, l'équipe joignable par e-mail -->
+  <section class="faq" id="faq" aria-labelledby="faq-titre">
+    <div class="faq__inner">
+      <header class="faq__head">
+        <h2 id="faq-titre" data-i18n="faq.title">Questions fréquentes</h2>
+        <p data-i18n="faq.lead">Des réponses claires, pour avancer en toute confiance.</p>
+      </header>
+      <div class="faq__list">
+        <div class="faq__item">
+          <h3><button class="faq__q" type="button" id="faq-q0" aria-expanded="false" aria-controls="faq-a0">
+            <span data-i18n="faq.q0">Quels services proposez-vous ?</span><span class="faq__icon" aria-hidden="true"></span></button></h3>
+          <div class="faq__a" id="faq-a0" role="region" aria-labelledby="faq-q0"><div><p data-i18n="faq.a0">HomeService BXL propose le nettoyage intérieur (maisons, appartements, bureaux), le nettoyage extérieur et le jardinage, le lavage de voiture à domicile, l'aide au déménagement et le désencombrement, la livraison de courses, le montage de meubles ainsi que le bricolage et les petits travaux.</p></div></div>
+        </div>
+        <div class="faq__item">
+          <h3><button class="faq__q" type="button" id="faq-q1" aria-expanded="false" aria-controls="faq-a1">
+            <span data-i18n="faq.q1">Intervenez-vous le week-end ?</span><span class="faq__icon" aria-hidden="true"></span></button></h3>
+          <div class="faq__a" id="faq-a1" role="region" aria-labelledby="faq-q1"><div><p data-i18n="faq.a1">Oui, HomeService BXL est disponible 7 jours sur 7, y compris le week-end et les jours fériés, à Bruxelles et dans sa périphérie.</p></div></div>
+        </div>
+        <div class="faq__item">
+          <h3><button class="faq__q" type="button" id="faq-q2" aria-expanded="false" aria-controls="faq-a2">
+            <span data-i18n="faq.q2">Comment obtenir un devis ?</span><span class="faq__icon" aria-hidden="true"></span></button></h3>
+          <div class="faq__a" id="faq-a2" role="region" aria-labelledby="faq-q2"><div><p data-i18n="faq.a2">Il suffit de cliquer sur le bouton « Devis gratuit », puis de répondre à quelques questions sur votre besoin et vos coordonnées. Le devis est gratuit et sans engagement, et une réponse vous est apportée dans la journée.</p></div></div>
+        </div>
+        <div class="faq__item">
+          <h3><button class="faq__q" type="button" id="faq-q3" aria-expanded="false" aria-controls="faq-a3">
+            <span data-i18n="faq.q3">Dans quelles communes intervenez-vous ?</span><span class="faq__icon" aria-hidden="true"></span></button></h3>
+          <div class="faq__a" id="faq-a3" role="region" aria-labelledby="faq-q3"><div><p data-i18n="faq.a3">Nous intervenons dans les 19 communes de la Région de Bruxelles-Capitale (Bruxelles-Ville, Ixelles, Schaerbeek, Etterbeek, Saint-Josse-ten-Noode, Uccle, Anderlecht, Molenbeek, Forest, Saint-Gilles, Jette, Evere, Ganshoren, Berchem-Sainte-Agathe, Koekelberg, Woluwe-Saint-Lambert, Woluwe-Saint-Pierre, Auderghem, Watermael-Boitsfort) ainsi qu'en périphérie (Waterloo, Braine-l'Alleud, La Hulpe, Zaventem, Vilvoorde, Tervuren).</p></div></div>
+        </div>
+        <div class="faq__item">
+          <h3><button class="faq__q" type="button" id="faq-q4" aria-expanded="false" aria-controls="faq-a4">
+            <span data-i18n="faq.q4">Quel est le délai pour un rendez-vous ?</span><span class="faq__icon" aria-hidden="true"></span></button></h3>
+          <div class="faq__a" id="faq-a4" role="region" aria-labelledby="faq-q4"><div><p data-i18n="faq.a4">Nous répondons à chaque demande de devis en moins de 24 h et proposons généralement un rendez-vous rapide, adapté à vos disponibilités.</p></div></div>
+        </div>
+        <div class="faq__item">
+          <h3><button class="faq__q" type="button" id="faq-q5" aria-expanded="false" aria-controls="faq-a5">
+            <span data-i18n="faq.q5">Mon besoin ne figure pas dans vos services, que faire ?</span><span class="faq__icon" aria-hidden="true"></span></button></h3>
+          <div class="faq__a" id="faq-a5" role="region" aria-labelledby="faq-q5"><div><p data-i18n="faq.a5">Faites-nous une demande sur mesure en nous décrivant ce dont vous avez besoin. Notre équipe étudie chaque demande et vous répond sous 24 h pour vous dire si nous pouvons la prendre en charge.</p></div></div>
+        </div>
+        <div class="faq__item">
+          <h3><button class="faq__q" type="button" id="faq-q6" aria-expanded="false" aria-controls="faq-a6">
+            <span data-i18n="faq.q6">Dois-je être présent pendant l'intervention ?</span><span class="faq__icon" aria-hidden="true"></span></button></h3>
+          <div class="faq__a" id="faq-a6" role="region" aria-labelledby="faq-q6"><div><p data-i18n="faq.a6">Ce n'est pas obligatoire. Vous pouvez être là, ou nous confier vos clés ou un code d'accès : nous convenons ensemble de ce qui vous arrange le mieux au moment du rendez-vous.</p></div></div>
+        </div>
+        <div class="faq__item">
+          <h3><button class="faq__q" type="button" id="faq-q7" aria-expanded="false" aria-controls="faq-a7">
+            <span data-i18n="faq.q7">Le matériel et les produits sont-ils fournis ?</span><span class="faq__icon" aria-hidden="true"></span></button></h3>
+          <div class="faq__a" id="faq-a7" role="region" aria-labelledby="faq-q7"><div><p data-i18n="faq.a7">Oui, nos équipes arrivent avec le matériel et les produits nécessaires. Si vous préférez que nous utilisions les vôtres, il suffit de nous le préciser.</p></div></div>
+        </div>
+      </div>
+      <aside class="faq__aside">
+        <p class="faq__aside-t" data-i18n="faq.aside">Encore des questions ?</p>
+        <p class="faq__aside-d" data-i18n="faq.aside2">Notre équipe est là pour vous aider.</p>
+        <a class="faq__mail" href="mailto:homeservicebxl.contact@gmail.com" data-i18n="faq.mail">Nous écrire</a>
+      </aside>
+    </div>
+  </section>
+</main>
 
 <!-- fichiers construits à partir des sources (js/*.js, css/style.css) : outils/build.mjs -->
 <script src="js/veil.min.js?v=36a8298c67"></script>
-<script src="js/i18n.min.js?v=b126ed7d35"></script>
-<script src="js/apropos.min.js?v=48cc44e0d8"></script>
-<script src="js/cursor.min.js?v=a55ef403d3"></script>
-<script src="js/avantapres.min.js?v=db75d33f38"></script>
-<script type="module" src="js/hero.min.js?v=62b6f08d5d"></script>
+<script src="js/i18n.min.js?v=c2a50b9e5a"></script>
+<script src="js/apropos.min.js?v=0aebae8f26"></script>
+<script src="js/avantapres.min.js?v=bf254b0b6c"></script>
+<script src="js/surmesure.min.js?v=2703290635"></script>
+<script src="js/faq.min.js?v=da9de6c26c"></script>
+<script type="module" src="js/hero.min.js?v=be13c0d193"></script>
 </body>
 </html>
