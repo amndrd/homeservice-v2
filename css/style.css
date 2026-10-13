@@ -882,3 +882,103 @@ span.ft-marquee__item { cursor: default; }
   .ft__copy, .ft__legal { padding: 0; color: var(--ft-note); }
 }
 
+/* ---------------------------------------------------------------- la zone d'intervention (js/zone.js)
+   Un panneau plein écran, sur le crème de la page (par-dessus le menu) : la carte à gauche, bord à bord ; à droite les
+   trois zones et le bouton de réservation. Il s'ouvre en s'agrandissant depuis ce
+   qu'on a cliqué (la carte du mur, un lien) ; son contenu entre ensuite. */
+.zn { position: fixed; inset: 0; z-index: 95; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(380px, 1fr);
+  background: var(--paper); color: var(--ink); overscroll-behavior: contain; }
+.zn[hidden] { display: none; }
+.zn__close { position: absolute; top: 20px; right: 20px; z-index: 3; appearance: none; cursor: pointer; display: grid; place-items: center;
+  width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px; background: rgba(15, 26, 44, .06); color: var(--ink);
+  transition: background .2s ease, color .2s ease, rotate .3s ease; }
+.zn__close svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.zn__close:hover, .zn__close:focus-visible { outline: none; background: var(--ink); color: #fff; rotate: 90deg; }
+.zn__map { position: relative; min-height: 0; overflow: hidden; }
+.zn__svg { display: block; width: 100%; height: 100%; }
+.zn-c { stroke: var(--paper); stroke-width: 1.2; vector-effect: non-scaling-stroke; stroke-linejoin: round; cursor: pointer;
+  transition: fill .2s ease; }
+.zn-z1 { fill: color-mix(in srgb, var(--green) calc(64% + var(--k, .5) * 24%), var(--paper)); }
+.zn-z2 { fill: color-mix(in srgb, var(--green) 24%, var(--paper)); }
+.zn-z3 { fill: color-mix(in srgb, var(--ink) 7%, var(--paper)); }
+.zn-z1:hover { fill: #0b4f2c; }
+/* le passage avec la carte du mur (js/zone.js) : les communes de la région prennent le blanc du mur (.to-wall), sans
+   contour ; la périphérie, les noms et les cercles n'arrivent qu'une fois le panneau ouvert (.is-in), et partent les
+   premiers */
+.zn-z1 { transition: fill .55s ease; }
+.zn-z1:hover { transition-duration: .15s; }
+.zn.to-wall .zn-z1 { fill: #ecebe8; }
+.zn-region { transition: stroke-opacity .5s ease; }
+.zn.to-wall .zn-region { stroke-opacity: 0; }
+.zn-z2, .zn-z3, .zn-labels, .zn-rings { transition: opacity .3s ease, fill .2s ease; }
+.zn:not(.is-in) :is(.zn-z2, .zn-z3, .zn-labels, .zn-rings) { opacity: 0; }
+.zn.is-in :is(.zn-z2, .zn-z3, .zn-labels, .zn-rings) { transition: opacity .5s ease .35s, fill .2s ease; }
+.zn-z2:hover { fill: color-mix(in srgb, var(--green) 44%, var(--paper)); }
+.zn-z3:hover { fill: color-mix(in srgb, var(--ink) 15%, var(--paper)); }
+.zn-region { fill: none; stroke: var(--green); stroke-width: 2.5; vector-effect: non-scaling-stroke; stroke-linejoin: round;
+  pointer-events: none; }
+.zn-rings { pointer-events: none; }
+.zn-rings circle { fill: none; stroke: rgba(15, 26, 44, .32); stroke-width: 1.2; stroke-dasharray: 4 6; vector-effect: non-scaling-stroke; }
+.zn-rings text, .zn-labels text { font-family: var(--body); text-anchor: middle; paint-order: stroke; stroke: var(--paper);
+  stroke-linejoin: round; pointer-events: none; }
+.zn-rings text { font-size: .032px; font-weight: 800; letter-spacing: .002px; fill: #4c5564; stroke-width: .01px; dominant-baseline: middle; }
+.zn-labels text { font-size: .034px; font-weight: 700; fill: #2b4a3a; stroke-width: .007px; dominant-baseline: middle; }
+/* le nom de la commune survolée, au-dessus du doigt ou de la souris */
+.zn__tip { position: absolute; top: 0; left: 0; z-index: 2; display: flex; flex-direction: column; gap: 2px; padding: 9px 13px;
+  border-radius: 12px; background: var(--ink); color: #fff; pointer-events: none; white-space: nowrap;
+  transform: translate(-50%, calc(-100% - 14px)); opacity: 0; transition: opacity .15s ease; }
+.zn__tip.is-on { opacity: 1; }
+.zn__tip b { font: 800 14px/1.2 var(--body); }
+.zn__tip span { font: 800 10px/1.2 var(--body); letter-spacing: .12em; text-transform: uppercase; color: #8fd3ad; }
+.zn__tip[data-z="3"] span { color: rgba(255, 255, 255, .6); }
+
+.zn__side { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; justify-content: center;
+  padding: 88px clamp(28px, 4vw, 72px) 48px clamp(28px, 3vw, 56px); }
+.zn__eyebrow { margin: 0 0 14px; font: 800 11px/1.4 var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--green); }
+.zn__title { margin: 0 0 16px; font: 800 clamp(30px, 3vw, 50px)/1.04 var(--title); letter-spacing: -.01em; text-transform: uppercase;
+  text-wrap: balance; }
+.zn__lead { margin: 0 0 28px; max-width: 460px; font: 500 clamp(15px, 1.15vw, 18px)/1.6 var(--body); color: #3a4352; }
+.zn__legend { margin: 0 0 28px; padding: 0; list-style: none; border-top: 1px solid rgba(15, 26, 44, .12); }
+.zn-key { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 14px 0;
+  border-bottom: 1px solid rgba(15, 26, 44, .12); }
+.zn-key i { width: 18px; height: 18px; border-radius: 6px; }
+.zn-key[data-z="1"] i { background: color-mix(in srgb, var(--green) 76%, var(--paper)); }
+.zn-key[data-z="2"] i { background: color-mix(in srgb, var(--green) 24%, var(--paper)); }
+.zn-key[data-z="3"] i { background: color-mix(in srgb, var(--ink) 9%, var(--paper)); }
+.zn-key p { margin: 0; display: flex; flex-direction: column; gap: 2px; }
+.zn-key b { font: 800 16px/1.3 var(--body); }
+.zn-key span { font: 500 14px/1.45 var(--body); color: #6a7382; }
+.zn-key em { font: 800 15px/1 var(--body); font-style: normal; letter-spacing: .04em; color: var(--green); }
+.zn__cta { align-self: flex-start; display: inline-flex; align-items: center; height: 52px; padding: 0 26px; border-radius: 12px;
+  background: var(--green); color: #fff; font: 800 13px/1 var(--body); letter-spacing: .12em; text-transform: uppercase;
+  transition: background .2s ease; }
+.zn__cta:hover, .zn__cta:focus-visible { outline: none; background: var(--ink); }
+/* l'entrée du contenu, une fois le panneau ouvert */
+.zn__side > *, .zn__close { opacity: 0; translate: 0 14px; transition: opacity .2s ease, translate .2s ease; }
+.zn.is-in .zn__side > *, .zn.is-in .zn__close { opacity: 1; translate: 0 0;
+  transition: opacity .5s ease var(--d, .35s), translate .7s cubic-bezier(.2, 1, .3, 1) var(--d, .35s); }
+.zn__side > :nth-child(2) { --d: .42s; } .zn__side > :nth-child(3) { --d: .49s; } .zn__side > :nth-child(4) { --d: .56s; }
+.zn__side > :nth-child(5) { --d: .63s; } .zn__close { --d: .5s; }
+@media (max-width: 900px), (max-aspect-ratio: 1/1) {
+  .zn { display: block; overflow-y: auto; }
+  .zn__map { height: 46vh; height: 46svh; }
+  .zn__side { overflow: visible; padding: 28px 20px 48px; }
+  .zn__close { position: fixed; top: 14px; right: 14px; background: rgba(255, 255, 255, .9); }
+}
+@media (prefers-reduced-motion: reduce) { .zn__side > *, .zn__close { transition: none !important; } }
+
+/* au survol de la carte creusée des chiffres (js/statsmur.js) : la main, et « Voir la zone » qui suit la souris */
+html.zn-hover, html.zn-hover * { cursor: pointer !important; }
+.zn-pill { position: fixed; top: 0; left: 0; z-index: 90; display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  padding: 10px 16px 11px; border-radius: 14px; background: var(--green); color: #fff; pointer-events: none;
+  box-shadow: 0 10px 30px rgba(17, 112, 63, .28); margin: 18px 0 0 18px; opacity: 0; scale: .7; transform-origin: 0 0;
+  transition: opacity .2s ease, scale .3s cubic-bezier(.2, 1.3, .4, 1); }
+.zn-pill.is-on { opacity: 1; scale: 1; }
+.zn-pill small { font: 600 12px/1.2 var(--body); opacity: .85; }
+.zn-pill span { font: 800 12px/1.2 var(--body); letter-spacing: .12em; text-transform: uppercase; }
+.zn-pill span::after { content: ' →'; }
+/* sans la carte du mur (téléphone, tablette) : un lien sous le chiffre des communes */
+.stat__zone { display: flex; width: fit-content; margin-top: 10px; white-space: nowrap; font: 800 12px/1.2 var(--body); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--green); }
+.stat__zone::after { content: ' →'; white-space: pre; }
+html.statsWall .stat__zone { display: none; }
