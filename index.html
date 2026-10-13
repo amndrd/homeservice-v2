@@ -9,10 +9,10 @@
 <script>try { var v = sessionStorage.getItem('hs-veil'); if (document.prerendering || v) { document.documentElement.classList.add('veil-in'); sessionStorage.removeItem('hs-veil'); } else document.documentElement.classList.add('loading'); } catch (e) { document.documentElement.classList.add('loading'); }</script>
 <!-- chargés tout de suite : la police, le script de l'îlot et son modèle (même version que MODEL dans js/hero.js) -->
 <link rel="preload" href="fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="modulepreload" href="js/hero.min.js?v=be13c0d193">
+<link rel="modulepreload" href="js/hero.min.js?v=02d658a82b">
 <link rel="preload" href="models/ilot.glb?v=fe77098755" as="fetch" crossorigin
   media="(min-width: 900px) and (hover: hover) and (pointer: fine)">
-<link rel="stylesheet" href="css/style.min.css?v=b2dcd12534">
+<link rel="stylesheet" href="css/style.min.css?v=797999001f">
 </head>
 <body>
 
@@ -21,10 +21,9 @@
     <a href="#accueil" class="logo" data-veil aria-label="HomeService BXL, accueil" data-i18n-aria="home" aria-current="page"><img src="images/logo-blanc.webp" alt="HomeService BXL" width="801" height="380"></a>
     <nav class="nav" aria-label="Navigation principale" data-i18n-aria="mainNav">
       <a href="#a-propos" data-veil data-i18n="nav.about">À propos</a>
+      <a href="#chiffres" data-veil data-i18n="nav.stats">Zone</a>
       <a href="#services" data-veil data-i18n="nav.services">Services</a>
-      <a href="#fonctionnement" data-veil data-i18n="nav.how">Fonctionnement</a>
-      <a href="#zone" data-veil data-i18n="nav.zone">Zone</a>
-      <a href="#contact" data-veil data-i18n="nav.contact">Contact</a>
+      <a href="#faq" data-veil data-i18n="ft.faq">FAQ</a>
     </nav>
     <div class="lang" id="lang">
       <button class="lang__btn" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Langue"
@@ -39,7 +38,7 @@
         <li><button type="button" role="option" data-lang="nl" lang="nl"><span>NL</span>Nederlands</button></li>
       </ul>
     </div>
-    <a href="#devis" class="header__cta" data-veil data-i18n="cta">Devis gratuit</a>
+    <a href="reserver.html" class="header__cta" data-veil data-i18n="cta">Réserver un appel</a>
   </div>
 </header>
 
@@ -91,7 +90,7 @@
   <!-- les chiffres, sous l'À propos, repris du plan 1 du site immersif : chaque chiffre a sa petite scène posée sur la
        page, à sa gauche (js/stats.js, models/services.glb) ; le chiffre se décompte, les objets surgissent avec lui.
        data-n : la valeur ; data-suffix : l'unité (en vert) ; <strong> : le titre, le reste : la description -->
-  <section class="stats" aria-label="HomeService en chiffres" data-i18n-aria="stats.label">
+  <section class="stats" id="chiffres" aria-label="HomeService en chiffres" data-i18n-aria="stats.label">
     <ul class="stats__list">
       <li class="stat" data-n="5" data-scene="services">
         <span class="stat__num" aria-hidden="true"><span class="stat__count">5</span><span class="stat__unit"></span></span>
@@ -101,7 +100,7 @@
       <li class="stat" data-n="19" data-scene="communes">
         <span class="stat__num" aria-hidden="true"><span class="stat__count">19</span><span class="stat__unit"></span></span>
         <p class="stat__text"><span class="sr-only">19 </span><span data-i18n="stat.communes"><strong>communes desservies</strong>
-          Nous intervenons partout dans la région bruxelloise.</span></p>
+          Nous intervenons partout dans la région bruxelloise.</span><a class="stat__zone" href="#zone" data-i18n="zn.see">Voir la zone</a></p>
       </li>
       <li class="stat" data-n="24" data-suffix="h" data-i18n-suffix="stat.devis.suffix" data-scene="devis">
         <span class="stat__num" aria-hidden="true"><span class="stat__count">24</span><span class="stat__unit">h</span></span>
@@ -300,7 +299,7 @@
   <!-- avant / après (js/avantapres.js) : la barre suit la souris au survol, sans clic. Images :
        images/avant-apres/avant|apres.webp (4:3) et avant|apres-mobile.webp (4:5), recadrées depuis before.jpg / after.JPEG,
        l'après recalé sur l'avant (même cadrage au pixel près). -->
-  <section class="avant-apres" aria-labelledby="ba-titre">
+  <section class="avant-apres" id="avant-apres" aria-labelledby="ba-titre">
     <header class="ba-head">
       <h2 id="ba-titre" data-i18n="ba.title">La différence se voit</h2>
     </header>
@@ -324,7 +323,7 @@
         <p data-i18n="sur.text">Peindre une pièce, aider à un déménagement, arroser vos plantes pendant les vacances… Décrivez-nous
           ce dont vous avez besoin. Notre équipe étudie chaque demande et vous répond sous 24&nbsp;h pour vous dire si nous
           pouvons la prendre en charge.</p>
-        <a class="sur__cta" href="#contact" data-veil data-i18n="sur.cta">Faire une demande sur mesure</a>
+        <a class="sur__cta" href="reserver.html" data-veil data-i18n="sur.cta">Faire une demande sur mesure</a>
       </div>
       <div class="sur-card" aria-hidden="true">
         <div class="sur-card__rotator">
@@ -364,7 +363,7 @@
         <div class="faq__item">
           <h3><button class="faq__q" type="button" id="faq-q2" aria-expanded="false" aria-controls="faq-a2">
             <span data-i18n="faq.q2">Comment obtenir un devis ?</span><span class="faq__icon" aria-hidden="true"></span></button></h3>
-          <div class="faq__a" id="faq-a2" role="region" aria-labelledby="faq-q2"><div><p data-i18n="faq.a2">Il suffit de cliquer sur le bouton « Devis gratuit », puis de répondre à quelques questions sur votre besoin et vos coordonnées. Le devis est gratuit et sans engagement, et une réponse vous est apportée dans la journée.</p></div></div>
+          <div class="faq__a" id="faq-a2" role="region" aria-labelledby="faq-q2"><div><p data-i18n="faq.a2">Il suffit de cliquer sur le bouton « Réserver un appel », de décrire votre besoin en quelques questions, puis de choisir le moment d'un court appel. Le devis est gratuit et sans engagement, et une réponse vous est apportée dans la journée.</p></div></div>
         </div>
         <div class="faq__item">
           <h3><button class="faq__q" type="button" id="faq-q3" aria-expanded="false" aria-controls="faq-a3">
@@ -399,15 +398,145 @@
       </aside>
     </div>
   </section>
+  <!-- Réserver un appel (js/cta.js) : la section « Ready to book a call? » du site Harborview
+       (Projets/Harborview, .cta), reprise telle quelle : fond noir, ondes concentriques qui s'élargissent, titre et
+       description qui se dévoilent en balayage ; sur ordinateur, toute la section est un lien et, à son survol, un rond
+       orange « Book a call » suit la souris en laissant une traînée ; sur téléphone, un bouton sous le texte. -->
+  <section class="cta" id="rdv" aria-labelledby="cta-titre">
+    <div class="cta__inner">
+      <div class="cta__text">
+        <h2 class="cta__title" id="cta-titre" data-i18n="cta2.title">Prêt à réserver un appel&nbsp;?</h2>
+        <p class="cta__desc" data-i18n="cta2.text">Un court appel est le moyen le plus rapide de savoir comment nous pouvons vous aider. Pas de centre d'appels, pas de détours : une équipe à Bruxelles, au moment qui vous convient.</p>
+        <a class="cta__btn" href="reserver.html" data-veil data-i18n="cta2.btn">Réserver un appel</a>
+      </div>
+      <div class="cta__circs" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <a class="cta__link" href="reserver.html" data-veil tabindex="-1" aria-hidden="true"></a>
+    </div>
+  </section>
 </main>
+<!-- Pied de page (js/footer.js) : celui du site Harborview (Projets/Harborview, .footer), repris bloc pour bloc et adapté :
+     la devise, la langue (à la place des réseaux), le plan du site, le devis gratuit (à la place des paiements), le
+     défilé des communes et des services (à la place des secteurs et des services), la photo de l'équipe, la zone
+     d'intervention (à la place du siège), le contact, la carte en points de la Région bruxelloise (à la place de la carte
+     du monde), et le nom du site en points qui s'écartent sous la souris.
+     Écrit ici seulement : outils/build.mjs le recopie dans reserver.html. -->
+<footer class="ft" id="pied">
+  <div class="ft__inner">
+    <div class="ft__sub"><p class="ft-sweep" data-i18n="ft.sub">Un seul interlocuteur.<br>Tout votre quotidien, réglé.</p></div>
+    <div class="ft__side">
+      <span class="ft__line"></span>
+    </div>
+    <div class="ft__menu">
+      <span class="ft__line"></span>
+      <nav class="ft-item ft__nav" aria-label="Plan du site" data-i18n-aria="ft.plan">
+        <p class="ft-label ft-sweep" data-i18n="ft.plan">Plan du site</p>
+        <div class="ft-nav">
+          <a class="ft-link" href="#accueil" data-veil><span class="ft-roll"><span class="ft-roll__t" data-i18n="ft.home">Accueil</span><span class="ft-roll__b" data-i18n="ft.home" aria-hidden="true">Accueil</span></span></a>
+          <a class="ft-link" href="#a-propos" data-veil><span class="ft-roll"><span class="ft-roll__t" data-i18n="nav.about">À propos</span><span class="ft-roll__b" data-i18n="nav.about" aria-hidden="true">À propos</span></span></a>
+          <a class="ft-link" href="#services" data-veil><span class="ft-roll"><span class="ft-roll__t" data-i18n="nav.services">Services</span><span class="ft-roll__b" data-i18n="nav.services" aria-hidden="true">Services</span></span></a>
+          <a class="ft-link" href="#avant-apres" data-veil><span class="ft-roll"><span class="ft-roll__t" data-i18n="nav.ba">Avant / après</span><span class="ft-roll__b" data-i18n="nav.ba" aria-hidden="true">Avant / après</span></span></a>
+          <a class="ft-link" href="#sur-mesure" data-veil><span class="ft-roll"><span class="ft-roll__t" data-i18n="nav.sur">Sur mesure</span><span class="ft-roll__b" data-i18n="nav.sur" aria-hidden="true">Sur mesure</span></span></a>
+          <a class="ft-link" href="#faq" data-veil><span class="ft-roll"><span class="ft-roll__t" data-i18n="ft.faq">FAQ</span><span class="ft-roll__b" data-i18n="ft.faq" aria-hidden="true">FAQ</span></span></a>
+          <a class="ft-link" href="#zone" data-veil><span class="ft-roll"><span class="ft-roll__t" data-i18n="nav.zone">Zone</span><span class="ft-roll__b" data-i18n="nav.zone" aria-hidden="true">Zone</span></span></a>
+          <a class="ft-link" href="reserver.html" data-veil><span class="ft-roll"><span class="ft-roll__t" data-i18n="cta">Réserver un appel</span><span class="ft-roll__b" data-i18n="cta" aria-hidden="true">Réserver un appel</span></span></a>
+        </div>
+      </nav>
+      <div class="ft-item ft__devis">
+        <p class="ft-label ft-sweep" data-i18n="ft.devis">Devis gratuit</p>
+        <p class="ft__devis-txt ft-sweep" data-i18n="ft.devisTxt">Gratuit et sans engagement.<br>Réponse sous 24 h, 7 jours sur 7.</p>
+        <a class="ft-arrow" href="reserver.html" data-veil><span class="ft-arrow__ic"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M9.5 13.5l4-4-4-4" stroke="currentColor" stroke-width="1.3"/><path d="M13 9.5H3v-5" stroke="currentColor" stroke-width="1.3"/></svg></span><span class="ft-hl" data-i18n="ft.devisLink">Préparer mon devis</span></a>
+      </div>
+    </div>
+    <div class="ft__info">
+      <span class="ft__info-line"></span>
+      <div class="ft-switch" role="tablist">
+        <div class="ft-switch__inner">
+          <button type="button" class="ft-switch__btn is-active" role="tab" aria-selected="true" data-i18n="ft.communes">Communes</button>
+          <button type="button" class="ft-switch__btn" role="tab" aria-selected="false" data-i18n="nav.services">Services</button>
+        </div>
+        <span class="ft-switch__bg"></span>
+      </div>
+      <div class="ft-marquee">
+        <div class="ft-marquee__track is-active"><div class="ft-marquee__list"><a class="ft-marquee__item" href="#zone">Anderlecht</a><a class="ft-marquee__item" href="#zone">Auderghem</a><a class="ft-marquee__item" href="#zone">Berchem-Sainte-Agathe</a><a class="ft-marquee__item" href="#zone">Bruxelles-Ville</a><a class="ft-marquee__item" href="#zone">Etterbeek</a><a class="ft-marquee__item" href="#zone">Evere</a><a class="ft-marquee__item" href="#zone">Forest</a><a class="ft-marquee__item" href="#zone">Ganshoren</a><a class="ft-marquee__item" href="#zone">Ixelles</a><a class="ft-marquee__item" href="#zone">Jette</a><a class="ft-marquee__item" href="#zone">Koekelberg</a><a class="ft-marquee__item" href="#zone">Molenbeek-Saint-Jean</a><a class="ft-marquee__item" href="#zone">Saint-Gilles</a><a class="ft-marquee__item" href="#zone">Saint-Josse-ten-Noode</a><a class="ft-marquee__item" href="#zone">Schaerbeek</a><a class="ft-marquee__item" href="#zone">Uccle</a><a class="ft-marquee__item" href="#zone">Watermael-Boitsfort</a><a class="ft-marquee__item" href="#zone">Woluwe-Saint-Lambert</a><a class="ft-marquee__item" href="#zone">Woluwe-Saint-Pierre</a><a class="ft-marquee__item" href="#zone">Waterloo</a><a class="ft-marquee__item" href="#zone">Braine-l'Alleud</a><a class="ft-marquee__item" href="#zone">La Hulpe</a><a class="ft-marquee__item" href="#zone">Zaventem</a><a class="ft-marquee__item" href="#zone">Vilvoorde</a><a class="ft-marquee__item" href="#zone">Tervuren</a></div></div>
+        <div class="ft-marquee__track"><div class="ft-marquee__list"><span class="ft-marquee__item" data-i18n="svc.nettoyage">Nettoyage</span><span class="ft-marquee__item" data-i18n="svc.jardinage">Jardinage</span><span class="ft-marquee__item" data-i18n="svc.desencombrement">Désencombrement</span><span class="ft-marquee__item" data-i18n="bk.d.montage">Montage de meubles</span><span class="ft-marquee__item" data-i18n="svc.livraison">Livraison</span><span class="ft-marquee__item" data-i18n="ft.s.lavage">Lavage de voiture</span><span class="ft-marquee__item" data-i18n="ft.s.demenagement">Aide au déménagement</span><span class="ft-marquee__item" data-i18n="ft.s.bricolage">Bricolage et petits travaux</span></div></div>
+      </div>
+    </div>
+    <div class="ft__thumb"><div class="ft__thumb-img"><img src="images/teampic.webp" alt="L'équipe HomeService" data-i18n-alt="ft.photo" loading="lazy" width="736" height="552"></div></div>
+    <div class="ft__main">
+      <span class="ft__line ft__main-line"></span>
+      <div class="ft__zone">
+        <div class="ft-item">
+          <p class="ft-label ft-sweep" data-i18n="ft.zone">Zone d'intervention</p>
+          <p class="ft-txt ft-sweep" data-i18n="ft.zoneTxt">Les 19 communes de <span class="ft-nw">Bruxelles-Capitale</span>,<br>et sa périphérie.</p>
+          <a class="ft-arrow" href="#zone" data-veil><span class="ft-arrow__ic"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M9.5 13.5l4-4-4-4" stroke="currentColor" stroke-width="1.3"/><path d="M13 9.5H3v-5" stroke="currentColor" stroke-width="1.3"/></svg></span><span class="ft-hl" data-i18n="ft.zoneLink">Voir la zone</span></a>
+        </div>
+      </div>
+      <span class="ft__line ft__main-line ft--tablette"></span>
+      <div class="ft__contact">
+        <div class="ft-item">
+          <p class="ft-label ft-sweep" data-i18n="ft.email">E-mail</p>
+          <a class="ft-link" href="mailto:homeservicebxl.contact@gmail.com"><span class="ft-roll"><span class="ft-roll__t">homeservicebxl.contact@gmail.com</span><span class="ft-roll__b" aria-hidden="true">homeservicebxl.contact@gmail.com</span></span></a>
+        </div>
+        <div class="ft-item">
+          <p class="ft-label ft-sweep" data-i18n="ft.call">Un appel</p>
+          <a class="ft-link" href="reserver.html" data-veil><span class="ft-roll"><span class="ft-roll__t" data-i18n="cta">Réserver un appel</span><span class="ft-roll__b" data-i18n="cta" aria-hidden="true">Réserver un appel</span></span></a>
+        </div>
+        <div class="ft-item">
+          <p class="ft-label ft-sweep" data-i18n="ft.dispo">Disponibilité</p>
+          <p class="ft-txt ft-sweep" data-i18n="ft.dispoTxt">7 jours sur 7, jours fériés compris</p>
+        </div>
+      </div>
+      <div class="ft__map"><svg class="ft-map__svg" viewBox="166 5 330 330" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><pattern id="ft-trame" width="3.3" height="3.3" patternUnits="userSpaceOnUse"><circle cx="1.65" cy="1.65" r="0.95" fill="currentColor" fill-opacity="0.32"/></pattern></defs><path d="M357.4 330.0L356.9 327.3L356.8 319.3L354.8 318.0L332.3 310.1L331.4 313.5L330.3 311.7L321.7 309.1L316.7 309.0L309.8 306.5L309.5 305.1L305.2 305.1L300.4 308.9L293.3 307.1L287.2 304.7L285.0 300.2L283.0 297.7L280.0 295.4L274.7 288.4L274.0 284.2L271.4 280.0L271.6 276.1L269.8 271.8L270.3 270.1L269.2 263.0L267.7 260.2L261.2 257.4L252.9 255.7L251.3 253.9L250.0 248.3L248.4 245.9L248.3 243.5L249.5 240.8L249.6 237.9L251.5 233.1L253.0 233.2L253.0 229.1L253.8 225.9L247.8 224.8L245.5 225.2L242.8 228.1L242.1 231.5L238.2 233.5L237.4 235.0L233.4 233.6L227.1 234.7L225.6 236.4L223.1 237.4L217.1 236.2L214.0 234.4L213.3 231.1L211.4 227.8L208.4 226.4L198.6 227.2L191.0 228.8L190.0 223.1L187.8 217.6L186.3 215.5L179.4 215.7L177.4 210.9L173.0 211.7L173.5 215.0L171.7 214.8L171.1 210.2L176.0 204.6L178.1 201.5L181.8 198.8L183.5 196.4L185.2 191.8L185.5 189.0L183.8 183.6L183.8 181.1L186.4 178.0L189.7 175.8L191.3 176.7L195.9 177.2L197.2 176.1L201.8 175.1L207.2 175.1L207.3 173.5L209.1 169.8L211.8 169.5L215.0 171.7L221.9 171.7L221.1 167.8L223.5 165.7L223.3 159.1L224.5 156.0L222.7 152.0L224.7 149.2L227.0 150.6L229.4 149.5L226.6 142.3L223.2 139.0L223.1 137.2L227.6 135.6L231.6 133.5L229.6 129.8L227.7 130.0L224.5 128.5L218.7 124.8L219.4 123.1L217.2 114.4L218.9 109.4L221.0 107.8L224.3 104.0L225.8 100.5L229.8 95.6L233.5 94.1L234.3 92.0L237.0 89.9L237.7 88.0L241.6 85.3L243.8 81.7L243.0 77.4L242.5 74.2L240.6 71.1L237.9 68.3L237.2 63.8L239.0 61.8L246.6 59.5L250.9 59.3L255.8 58.2L264.1 53.4L271.1 50.3L272.8 48.8L276.6 43.8L279.1 41.8L287.1 37.3L292.5 35.8L302.4 34.1L310.4 36.0L317.2 36.6L323.1 36.4L331.8 36.8L340.4 41.4L344.6 42.8L349.9 45.4L351.0 44.6L350.7 40.6L353.5 36.6L357.3 35.3L359.7 31.1L361.7 26.2L363.8 18.6L365.6 17.5L374.0 17.4L378.7 13.6L378.7 11.3L384.8 11.4L386.1 10.0L398.6 14.4L398.9 18.4L397.0 21.8L397.6 24.9L401.5 26.1L404.4 27.7L404.8 30.9L408.1 31.7L411.8 33.5L417.5 40.0L415.2 42.4L416.3 44.0L419.1 45.2L423.0 49.6L424.4 50.5L422.8 52.8L419.8 54.4L416.7 58.8L418.0 63.3L421.0 67.8L427.0 78.9L430.3 84.5L417.1 87.3L418.8 89.6L416.7 93.8L415.4 99.5L408.1 108.0L411.5 111.9L416.3 118.4L420.3 118.5L422.4 119.3L420.5 122.0L430.7 127.6L433.1 123.6L441.1 128.3L440.3 130.0L442.4 132.9L442.1 134.2L445.8 136.9L448.9 138.1L452.1 137.9L463.0 141.7L462.6 143.8L463.8 148.7L465.2 148.8L468.3 158.0L471.0 157.3L470.6 167.1L472.2 173.1L469.1 176.6L484.1 209.0L454.4 213.2L458.3 218.0L452.3 222.9L448.2 224.1L445.1 228.5L446.8 231.2L450.2 233.6L449.8 234.4L444.8 234.9L478.8 257.3L489.2 264.7L490.9 267.9L475.3 274.3L466.4 278.2L450.2 289.5L427.2 302.7L425.2 299.2L415.2 304.5L398.0 311.5Z" fill="url(#ft-trame)"/><g class="ft-map__pulse ft-map__pulse--1"><circle cx="385" cy="15" r="5" style="--delay:0.12s"/><circle cx="335" cy="285" r="5" style="--delay:0.25s"/><circle cx="425" cy="125" r="5" style="--delay:0.05s"/><circle cx="315" cy="105" r="5" style="--delay:0.3s"/><circle cx="435" cy="225" r="5" style="--delay:0.18s"/><circle cx="425" cy="185" r="5" style="--delay:0.08s"/><circle cx="265" cy="145" r="5" style="--delay:0.22s"/></g><g class="ft-map__pulse ft-map__pulse--2"><circle cx="365" cy="235" r="5" style="--delay:0.12s"/><circle cx="385" cy="235" r="5" style="--delay:0.25s"/><circle cx="195" cy="195" r="5" style="--delay:0.05s"/><circle cx="425" cy="215" r="5" style="--delay:0.3s"/><circle cx="445" cy="205" r="5" style="--delay:0.18s"/><circle cx="355" cy="255" r="5" style="--delay:0.08s"/><circle cx="315" cy="115" r="5" style="--delay:0.22s"/></g><g class="ft-map__pulse ft-map__pulse--3"><circle cx="275" cy="155" r="5" style="--delay:0.12s"/><circle cx="305" cy="225" r="5" style="--delay:0.25s"/><circle cx="235" cy="225" r="5" style="--delay:0.05s"/><circle cx="315" cy="55" r="5" style="--delay:0.3s"/><circle cx="405" cy="215" r="5" style="--delay:0.18s"/><circle cx="295" cy="175" r="5" style="--delay:0.08s"/><circle cx="355" cy="285" r="5" style="--delay:0.22s"/></g><g class="ft-map__pulse ft-map__pulse--4"><circle cx="295" cy="255" r="5" style="--delay:0.12s"/><circle cx="355" cy="75" r="5" style="--delay:0.25s"/><circle cx="255" cy="185" r="5" style="--delay:0.05s"/><circle cx="365" cy="285" r="5" style="--delay:0.3s"/><circle cx="435" cy="215" r="5" style="--delay:0.18s"/><circle cx="465" cy="205" r="5" style="--delay:0.08s"/><circle cx="375" cy="195" r="5" style="--delay:0.22s"/></g><g class="ft-map__pulse ft-map__pulse--5"><circle cx="275" cy="285" r="5" style="--delay:0.12s"/><circle cx="445" cy="275" r="5" style="--delay:0.25s"/><circle cx="455" cy="145" r="5" style="--delay:0.05s"/><circle cx="245" cy="145" r="5" style="--delay:0.3s"/><circle cx="465" cy="255" r="5" style="--delay:0.18s"/><circle cx="435" cy="135" r="5" style="--delay:0.08s"/><circle cx="325" cy="85" r="5" style="--delay:0.22s"/></g><g class="ft-map__pulse ft-map__pulse--6"><circle cx="435" cy="125" r="5" style="--delay:0.12s"/><circle cx="325" cy="165" r="5" style="--delay:0.25s"/><circle cx="405" cy="125" r="5" style="--delay:0.05s"/><circle cx="455" cy="285" r="5" style="--delay:0.3s"/><circle cx="265" cy="195" r="5" style="--delay:0.18s"/><circle cx="425" cy="225" r="5" style="--delay:0.08s"/><circle cx="485" cy="265" r="5" style="--delay:0.22s"/></g></svg></div>
+    </div>
+    <div class="ft__bot">
+      <span class="ft__line"></span>
+      <p class="ft-mono ft__copy ft-sweep">© <span class="ft-annee">2026</span> HomeService BXL.</p>
+      <p class="ft-mono ft__legal ft-sweep" data-i18n="ft.legal">Devis gratuit et sans engagement · Bruxelles et périphérie</p>
+    </div>
+    <div class="ft__logo" aria-hidden="true"><div class="ft__logo-canvas"><canvas></canvas></div></div>
+  </div>
+</footer>
+<!-- /pied de page -->
+<!-- La zone d'intervention (js/zone.js) : un panneau plein écran, ouvert depuis la carte creusée des chiffres (la carte
+     s'agrandit jusqu'à remplir l'écran), le lien « Voir la zone » du pied de page, « Zone » du menu et les communes du
+     défilé. La carte (dessinée par js/zone.js) : Bruxelles-Capitale, sa périphérie (les communes qui la touchent),
+     au-delà ; à côté, les trois zones et leurs frais de déplacement. -->
+<div class="zn" id="zone" role="dialog" aria-modal="true" aria-labelledby="zn-titre" hidden>
+  <button class="zn__close" type="button" aria-label="Fermer" data-i18n-aria="zn.close">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </button>
+  <div class="zn__map">
+    <svg class="zn__svg" role="img" aria-label="Carte de la zone d'intervention : Bruxelles-Capitale, sa périphérie et au-delà" data-i18n-aria="zn.mapLabel"></svg>
+    <div class="zn__tip" aria-hidden="true"><b></b><span></span></div>
+  </div>
+  <div class="zn__side">
+    <p class="zn__eyebrow" data-i18n="zn.eyebrow">Zone d'intervention</p>
+    <h2 class="zn__title" id="zn-titre" data-i18n="zn.title">Bruxelles, sa périphérie, et au-delà</h2>
+    <p class="zn__lead" data-i18n="zn.lead">Nous intervenons partout. Seuls les frais de déplacement changent.</p>
+    <ul class="zn__legend">
+      <li class="zn-key" data-z="1"><i aria-hidden="true"></i><p><b data-i18n="zn.z1">Bruxelles-Capitale</b><span data-i18n="zn.z1d">Les 19 communes · frais de déplacement les plus bas</span></p><em aria-hidden="true">€</em></li>
+      <li class="zn-key" data-z="2"><i aria-hidden="true"></i><p><b data-i18n="zn.z2">Périphérie</b><span data-i18n="zn.z2d">Les communes qui touchent Bruxelles, ainsi que Wezembeek-Oppem · frais modérés</span></p><em aria-hidden="true">€€</em></li>
+      <li class="zn-key" data-z="3"><i aria-hidden="true"></i><p><b data-i18n="zn.z3">Au-delà</b><span data-i18n="zn.z3d">Partout en Belgique · frais selon la distance</span></p><em aria-hidden="true">€€€</em></li>
+    </ul>
+    <a class="zn__cta" href="reserver.html" data-veil data-i18n="cta">Réserver un appel</a>
+  </div>
+</div>
+<!-- au survol de la carte creusée des chiffres (js/statsmur.js) : « Voir la zone », qui suit la souris -->
+<div class="zn-pill" aria-hidden="true"><small></small><span data-i18n="zn.see">Voir la zone</span></div>
+
+<!-- le rond orange qui suit la souris au survol de la section ci-dessus (js/cta.js), sur ordinateur seulement -->
+<div class="hs-cursor" aria-hidden="true"><div class="hs-cursor__trail"></div><div class="hs-cursor__main"><span class="hs-cursor__label" data-i18n="cta2.cursor">Réserver<br>un appel</span></div></div>
 
 <!-- fichiers construits à partir des sources (js/*.js, css/style.css) : outils/build.mjs -->
 <script src="js/veil.min.js?v=36a8298c67"></script>
-<script src="js/i18n.min.js?v=c2a50b9e5a"></script>
+<script src="js/i18n.min.js?v=979f4fb34b"></script>
 <script src="js/apropos.min.js?v=0aebae8f26"></script>
 <script src="js/avantapres.min.js?v=bf254b0b6c"></script>
 <script src="js/surmesure.min.js?v=2703290635"></script>
 <script src="js/faq.min.js?v=da9de6c26c"></script>
-<script type="module" src="js/hero.min.js?v=be13c0d193"></script>
+<script src="js/footer.min.js?v=bda54810eb"></script>
+<script src="js/cta.min.js?v=3d0d365b73"></script>
+<script src="js/zone.min.js?v=2ba1d94ba0"></script>
+<script type="module" src="js/hero.min.js?v=02d658a82b"></script>
 </body>
 </html>
