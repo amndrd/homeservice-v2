@@ -7,7 +7,7 @@
 <!-- même arrivée que l'accueil : sous le voile après une transition, sinon l'écran de chargement (voir js/veil.js) -->
 <script>try { var v = sessionStorage.getItem('hs-veil'); if (document.prerendering || v) { document.documentElement.classList.add('veil-in'); sessionStorage.removeItem('hs-veil'); } else document.documentElement.classList.add('loading'); } catch (e) { document.documentElement.classList.add('loading'); }</script>
 <link rel="stylesheet" href="css/style.min.css?v=797999001f">
-<link rel="stylesheet" href="css/reserver.min.css?v=79fdf7ea66">
+<link rel="stylesheet" href="css/reserver.min.css?v=e1eca8feb7">
 </head>
 <body class="page-bk">
 
@@ -39,7 +39,8 @@
 
 <!-- Réserver un appel et préparer son devis (js/reserver.js). Le module de réservation de la page /contact du site
      Harborview (Projets/Harborview/assets/booking.*, lui-même repris du booker de Cal.com), précédé d'un écran où l'on
-     compose son devis : services, lieu, surface, commune. Puis le jour et l'heure d'un appel de
+     compose son devis : services, lieu, surface, code postal ; puis la ou les dates de l'intervention (les 7 prochains
+     jours : urgence, frais en plus). Puis le jour et l'heure d'un appel de
      15 min, les coordonnées, et la demande complète, prête à partir. Fond : les ondes de la section « Book a call ». -->
 <main class="bk-page" id="main">
   <div class="bk-ondes" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
@@ -52,8 +53,9 @@
 
   <ol class="bk-fil" aria-label="Étapes" data-i18n-aria="bk.steps">
     <li class="bk-fil-item"><span>1</span><b data-i18n="bk.step1">Votre devis</b></li>
-    <li class="bk-fil-item"><span>2</span><b data-i18n="bk.step2">Le moment</b></li>
-    <li class="bk-fil-item"><span>3</span><b data-i18n="bk.step3">Vos coordonnées</b></li>
+    <li class="bk-fil-item"><span>2</span><b data-i18n="bk.stepDates">Vos dates</b></li>
+    <li class="bk-fil-item"><span>3</span><b data-i18n="bk.step2">Le moment</b></li>
+    <li class="bk-fil-item"><span>4</span><b data-i18n="bk.step3">Vos coordonnées</b></li>
   </ol>
 
   <div class="bk" id="bk" data-step="devis">
@@ -94,27 +96,9 @@
           </div>
         </div>
         <div class="bk-champ" data-champ="commune">
-          <label class="bk-label" for="bk-commune"><span data-i18n="bk.d.commune">Votre commune</span> <span>*</span></label>
-          <select class="bk-input bk-select" id="bk-commune">
-            <option value="" data-i18n="bk.d.choisir">Choisir…</option>
-            <optgroup label="Bruxelles-Capitale" data-i18n-label="bk.d.region">
-              <option>Anderlecht</option><option>Auderghem</option><option>Berchem-Sainte-Agathe</option>
-              <option>Bruxelles-Ville</option><option>Etterbeek</option><option>Evere</option><option>Forest</option>
-              <option>Ganshoren</option><option>Ixelles</option><option>Jette</option><option>Koekelberg</option>
-              <option>Molenbeek-Saint-Jean</option><option>Saint-Gilles</option><option>Saint-Josse-ten-Noode</option>
-              <option>Schaerbeek</option><option>Uccle</option><option>Watermael-Boitsfort</option>
-              <option>Woluwe-Saint-Lambert</option><option>Woluwe-Saint-Pierre</option>
-            </optgroup>
-            <optgroup label="Périphérie" data-i18n-label="bk.d.peripherie">
-              <option>Asse</option><option>Beersel</option><option>Dilbeek</option><option>Drogenbos</option>
-              <option>Grimbergen</option><option>Hoeilaart</option><option>Kraainem</option>
-              <option>Leeuw-Saint-Pierre</option><option>Linkebeek</option><option>Machelen</option>
-              <option>Overijse</option><option>Rhode-Saint-Genèse</option><option>Tervuren</option>
-              <option>Vilvorde</option><option>Wemmel</option><option>Wezembeek-Oppem</option><option>Zaventem</option>
-            </optgroup>
-            <option value="autre" data-i18n="bk.d.autreCommune">Autre commune</option>
-          </select>
-          <p class="bk-erreur" data-i18n="bk.d.err.commune">Dites-nous où nous intervenons.</p>
+          <label class="bk-label" for="bk-commune"><span data-i18n="bk.d.cp">Code postal</span> <span>*</span></label>
+          <input class="bk-input bk-cp" id="bk-commune" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="4" placeholder="1050">
+          <p class="bk-erreur" data-i18n="bk.d.err.cp">Indiquez votre code postal (4 chiffres).</p>
         </div>
         <div class="bk-champ">
           <label class="bk-label" for="bk-besoin" data-i18n="bk.d.besoin">Votre besoin en quelques mots</label>
@@ -130,7 +114,42 @@
       </aside>
     </div></div>
 
-    <!-- 2. le jour et l'heure de l'appel -->
+    <!-- 2. les dates de l'intervention : une ou plusieurs, dans un calendrier ; les 7 prochains jours sont l'urgence
+         (frais en plus) -->
+    <div class="bk-ecran bk-ecran--dates"><div class="bk-devis bk-dates">
+      <div class="bk-corps">
+        <h2 class="bk-titre" data-i18n="bk.dt.title">Quand intervenir ?</h2>
+        <p class="bk-dates__lead" data-i18n="bk.dt.lead">Choisissez la ou les dates qui vous conviennent le mieux.</p>
+        <div class="bk-champ" data-champ="dates">
+          <div class="bk-cal-tete">
+            <div class="bk-mois" id="bk-d-mois"></div>
+            <div class="bk-nav">
+              <button type="button" id="bk-d-prec" aria-label="Mois précédent" data-i18n-aria="bk.prec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18"><path d="M15 5l-7 7 7 7"/></svg></button>
+              <button type="button" id="bk-d-suiv" aria-label="Mois suivant" data-i18n-aria="bk.suiv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18"><path d="M9 5l7 7-7 7"/></svg></button>
+            </div>
+          </div>
+          <div class="bk-jours" id="bk-d-jours"></div>
+          <div class="bk-grille bk-grille--dates" id="bk-d-grille"></div>
+          <ul class="bk-legende">
+            <li><i class="bk-legende__urgent" aria-hidden="true"></i><span data-i18n="bk.dt.urgent">Urgence : les 7 prochains jours, avec des frais en plus</span></li>
+            <li><i class="bk-legende__choisi" aria-hidden="true"></i><span data-i18n="bk.dt.choisi">Date choisie</span></li>
+          </ul>
+          <p class="bk-erreur" data-i18n="bk.dt.err">Choisissez au moins une date.</p>
+        </div>
+        <div class="bk-actions">
+          <button type="button" class="bk-btn bk-btn--fantome" data-aller="devis" data-i18n="bk.retour">Retour</button>
+          <button type="button" class="bk-btn" id="bk-dates-suivant" data-i18n="bk.continuer">Continuer</button>
+        </div>
+      </div>
+      <aside class="bk-resume" aria-live="polite">
+        <p class="bk-resume__tete" data-i18n="bk.dt.vos">Vos dates</p>
+        <ul class="bk-choix-dates" id="bk-choix-dates"></ul>
+        <p class="bk-urgence" id="bk-urgence" hidden><b data-i18n="bk.dt.urgT">Intervention en urgence</b> <span data-i18n="bk.dt.urgD">Des frais supplémentaires s'appliquent : leur montant vous est précisé pendant l'appel.</span></p>
+        <p class="bk-resume__note" data-i18n="bk.dt.note">Nous confirmons la date retenue pendant l'appel.</p>
+      </aside>
+    </div></div>
+
+    <!-- 3. le jour et l'heure de l'appel -->
     <div class="bk-ecran bk-ecran--quand"><div class="bk-quand">
       <aside class="bk-aside">
         <div class="bk-marque"><img src="images/logo-blanc.webp" alt="" width="801" height="380"></div>
@@ -165,7 +184,7 @@
       </div>
     </div></div>
 
-    <!-- 3. les coordonnées -->
+    <!-- 4. les coordonnées -->
     <div class="bk-ecran bk-ecran--confirmer"><div class="bk-confirmer">
       <aside class="bk-recap">
         <p class="bk-recap-hote">HomeService BXL</p>
@@ -235,7 +254,7 @@
 
 <!-- fichiers construits à partir des sources (js/*.js, css/*.css) : outils/build.mjs -->
 <script src="js/veil.min.js?v=36a8298c67"></script>
-<script src="js/i18n.min.js?v=979f4fb34b"></script>
-<script src="js/reserver.min.js?v=78def6d9cc"></script>
+<script src="js/i18n.min.js?v=e29e479776"></script>
+<script src="js/reserver.min.js?v=9a2844db03"></script>
 </body>
 </html>

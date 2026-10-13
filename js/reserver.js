@@ -1,7 +1,8 @@
 // Réserver un appel et préparer son devis (reserver.html). Le module de réservation de la page /contact du site
 // Harborview (Projets/Harborview/assets/booking.js, repris du booker de Cal.com), précédé d'un écran de devis.
-// Quatre écrans : le devis (services, lieu, surface, commune, détails ; le résumé se compose à
-// droite), le jour et l'heure d'un appel de 15 min, les coordonnées, puis la demande complète.
+// Cinq écrans : le devis (services, lieu, surface, code postal, détails ; le résumé se compose à
+// droite), la ou les dates de l'intervention (un calendrier ; les 7 prochains jours sont l'urgence, avec des frais en
+// plus), le jour et l'heure d'un appel de 15 min, les coordonnées, puis la demande complète.
 //
 // Le site est statique : rien ne part vers un serveur. Le dernier écran rédige donc l'e-mail de la demande (devis,
 // créneau, coordonnées) vers l'adresse de l'équipe, et fabrique les liens d'ajout à l'agenda. Le jour où une vraie
@@ -21,37 +22,39 @@
     horizon: 60,         // jours ouverts à la réservation
     joursOuvres: null,   // null = 7 jours sur 7 ; sinon [1, 2, 3, 4, 5] par exemple
   };
+  // les dates de l'intervention : [jours d'urgence à partir d'aujourd'hui (frais en plus), jours ouverts au choix]
+  const INTERV = { urgence: 7, horizon: 90 };
   const MAIL = 'homeservicebxl.contact@gmail.com';
 
   const D = {
     fr: {
-      locale: 'fr-BE', sep: ' : ', pick: 'Choisissez un jour pour voir les heures.', none: 'Plus aucun créneau ce jour-là.',
+      locale: 'fr-BE', urg: 'urgence', aucune: "Aucune date pour l'instant.", retirer: 'Retirer', sep: ' : ', pick: 'Choisissez un jour pour voir les heures.', none: 'Plus aucun créneau ce jour-là.',
       call: (n) => `Appel de 15 min entre HomeService BXL et ${n}`, tel: 'Par téléphone', host: 'Hôte',
       vide: 'Choisissez vos services : votre devis se compose ici.',
       k: { services: 'Services', lieu: 'Lieu', surface: 'Surface',
-        commune: 'Commune', besoin: 'Détails' },
+        commune: 'Code postal', dates: 'Dates', besoin: 'Détails' },
       sujet: (n) => `Réservation d'un appel – devis – ${n}`,
       intro: "Bonjour,\n\nJe souhaite réserver un appel de 15 minutes pour préparer mon devis.",
       appel: 'Appel', devis: 'Mon devis', moi: 'Mes coordonnées', nom: 'Nom', email: 'E-mail', telK: 'Téléphone',
       adresse: 'Adresse', fin: 'Merci !', agenda: 'Réservé sur HomeService BXL',
     },
     en: {
-      locale: 'en-GB', sep: ': ', pick: 'Pick a day to see the times.', none: 'Nothing left on this day.',
+      locale: 'en-GB', urg: 'urgent', aucune: 'No dates yet.', retirer: 'Remove', sep: ': ', pick: 'Pick a day to see the times.', none: 'Nothing left on this day.',
       call: (n) => `15 min call between HomeService BXL and ${n}`, tel: 'Phone call', host: 'Host',
       vide: 'Pick your services: your quote takes shape here.',
       k: { services: 'Services', lieu: 'Place', surface: 'Size',
-        commune: 'Municipality', besoin: 'Details' },
+        commune: 'Postcode', dates: 'Dates', besoin: 'Details' },
       sujet: (n) => `Call booking – quote – ${n}`,
       intro: "Hello,\n\nI'd like to book a 15-minute call to prepare my quote.",
       appel: 'Call', devis: 'My quote', moi: 'My details', nom: 'Name', email: 'Email', telK: 'Phone',
       adresse: 'Address', fin: 'Thank you!', agenda: 'Booked on HomeService BXL',
     },
     nl: {
-      locale: 'nl-BE', sep: ': ', pick: 'Kies een dag om de uren te zien.', none: 'Geen tijdstippen meer op deze dag.',
+      locale: 'nl-BE', urg: 'spoed', aucune: 'Nog geen data.', retirer: 'Verwijderen', sep: ': ', pick: 'Kies een dag om de uren te zien.', none: 'Geen tijdstippen meer op deze dag.',
       call: (n) => `Gesprek van 15 min tussen HomeService BXL en ${n}`, tel: 'Telefonisch', host: 'Gastheer',
       vide: 'Kies uw diensten: hier krijgt uw offerte vorm.',
       k: { services: 'Diensten', lieu: 'Plaats', surface: 'Oppervlakte',
-        commune: 'Gemeente', besoin: 'Details' },
+        commune: 'Postcode', dates: 'Data', besoin: 'Details' },
       sujet: (n) => `Gesprek inplannen – offerte – ${n}`,
       intro: 'Hallo,\n\nIk wil graag een gesprek van 15 minuten inplannen om mijn offerte voor te bereiden.',
       appel: 'Gesprek', devis: 'Mijn offerte', moi: 'Mijn gegevens', nom: 'Naam', email: 'E-mail', telK: 'Telefoon',
@@ -75,7 +78,7 @@
   try { fuseau = Intl.DateTimeFormat().resolvedOptions().timeZone || fuseau; } catch {}
 
   const etat = {
-    services: new Set(), lieu: '', surface: '',
+    services: new Set(), lieu: '', surface: '', dates: new Set(), dMois: minuit(new Date()),
     jour: null, creneau: null, format24: true, canal: 'tel', moisVu: minuit(new Date()),
   };
 
@@ -103,7 +106,14 @@
     resume();
   }));
   const commune = q('#bk-commune'), besoin = q('#bk-besoin');
-  commune.addEventListener('change', () => { if (commune.value) marqueFaute(commune, false); resume(); });
+  // le code postal : quatre chiffres (on ne garde que les chiffres tapés)
+  const cpOk = () => /^\d{4}$/.test(commune.value);
+  commune.addEventListener('input', () => {
+    const v = commune.value.replace(/\D/g, '').slice(0, 4);
+    if (v !== commune.value) commune.value = v;
+    if (cpOk()) marqueFaute(commune, false);
+    resume();
+  });
   besoin.addEventListener('input', resume);
 
   // les choix du devis, dans l'ordre de l'écran : [clé, libellé de la clé, valeur affichée]
@@ -112,7 +122,8 @@
     const svc = [...etat.services].map((v) => libelle('services', v));
     if (svc.length) out.push(['services', k.services, svc.join(', ')]);
     for (const g of GROUPES.slice(1)) if (etat[g]) out.push([g, k[g], libelle(g, etat[g])]);
-    if (commune.value) out.push(['commune', k.commune, commune.selectedOptions[0].textContent.trim()]);
+    if (cpOk()) out.push(['commune', k.commune, commune.value]);
+    if (etat.dates.size) out.push(['dates', k.dates, datesTriees().map(dateCourte).join(', ')]);
     if (besoin.value.trim()) out.push(['besoin', k.besoin, besoin.value.trim()]);
     return out;
   }
@@ -127,12 +138,93 @@
 
   q('#bk-suivant').addEventListener('click', () => {
     let ok = marqueFaute(q('[data-groupe="services"]'), !etat.services.size);
-    ok = marqueFaute(commune, !commune.value) && ok;
+    ok = marqueFaute(commune, !cpOk()) && ok;
     if (!ok) { q('.est-fautif')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+    allerA('dates');
+  });
+
+  // ------------------------------------------------------------ 2. les dates de l'intervention
+  // une ou plusieurs, d'aujourd'hui à INTERV.horizon jours ; les INTERV.urgence premiers jours sont l'urgence
+  const cle = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const deCle = (k) => { const [y, m, j] = k.split('-').map(Number); return new Date(y, m - 1, j); };
+  const ecart = (d) => Math.round((minuit(d) - minuit(new Date())) / 86400000);
+  const urgent = (d) => { const e = ecart(d); return e >= 0 && e < INTERV.urgence; };
+  const datesTriees = () => [...etat.dates].sort().map(deCle);
+  const dateCourte = (d) => maj(fmt({ weekday: 'short', day: 'numeric', month: 'short' }).format(d)) + (urgent(d) ? ` (${t().urg})` : '');
+  function dessineDates() {
+    const vue = etat.dMois, auj = minuit(new Date());
+    q('#bk-d-mois').innerHTML = texte(maj(fmt({ month: 'long' }).format(vue))) + ' <em>' + vue.getFullYear() + '</em>';
+    q('#bk-d-jours').innerHTML = Array.from({ length: 7 }, (_, i) =>
+      `<span>${texte(fmt({ weekday: 'short' }).format(new Date(2024, 0, 1 + i)).replace('.', ''))}</span>`).join('');
+    q('#bk-d-prec').disabled = vue.getFullYear() === auj.getFullYear() && vue.getMonth() === auj.getMonth();
+    const limite = new Date(auj);
+    limite.setDate(limite.getDate() + INTERV.horizon);
+    q('#bk-d-suiv').disabled = new Date(vue.getFullYear(), vue.getMonth() + 1, 1) > limite;
+    const premier = new Date(vue.getFullYear(), vue.getMonth(), 1), debut = new Date(premier);
+    debut.setDate(1 - ((premier.getDay() + 6) % 7));
+    const grille = q('#bk-d-grille');
+    grille.innerHTML = '';
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(debut);
+      d.setDate(debut.getDate() + i);
+      if (i >= 35 && d.getMonth() !== vue.getMonth()) break;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'bk-case';
+      b.textContent = d.getDate();
+      b.dataset.cle = cle(d);
+      b.setAttribute('aria-label', dateLongue(d) + (urgent(d) ? ` (${t().urg})` : ''));
+      if (d < auj || d > limite) b.disabled = true;
+      else {
+        b.classList.add('est-libre');
+        if (urgent(d)) b.classList.add('est-urgent');
+        const on = etat.dates.has(b.dataset.cle);
+        b.classList.toggle('est-choisi', on);
+        b.setAttribute('aria-pressed', String(on));
+      }
+      if (memeJour(d, auj)) b.classList.add('est-aujourdhui');
+      grille.appendChild(b);
+    }
+    listeDates();
+  }
+  // à droite : les dates choisies (chacune se retire), et l'avertissement de l'urgence
+  function listeDates() {
+    const T = t(), l = datesTriees();
+    q('#bk-choix-dates').innerHTML = l.length
+      ? l.map((d) => `<li${urgent(d) ? ' class="est-urgent"' : ''}><span>${texte(maj(fmt({ weekday: 'long', day: 'numeric', month: 'long' }).format(d)))}</span>`
+        + (urgent(d) ? `<em>${texte(T.urg)}</em>` : '')
+        + `<button type="button" data-cle="${cle(d)}" aria-label="${texte(T.retirer)}">×</button></li>`).join('')
+      : `<li class="bk-choix-dates__vide">${texte(T.aucune)}</li>`;
+    q('#bk-urgence').hidden = !l.some(urgent);
+  }
+  function basculeDate(k) {
+    if (etat.dates.has(k)) etat.dates.delete(k); else etat.dates.add(k);
+    if (etat.dates.size) marqueFaute(q('#bk-d-grille'), false);
+    dessineDates();
+    resume();
+  }
+  q('#bk-d-grille').addEventListener('click', (e) => {
+    const b = e.target.closest('.bk-case');
+    if (b && !b.disabled) basculeDate(b.dataset.cle);
+  });
+  q('#bk-choix-dates').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-cle]');
+    if (b) basculeDate(b.dataset.cle);
+  });
+  q('#bk-d-prec').addEventListener('click', () => {
+    etat.dMois = new Date(etat.dMois.getFullYear(), etat.dMois.getMonth() - 1, 1);
+    dessineDates();
+  });
+  q('#bk-d-suiv').addEventListener('click', () => {
+    etat.dMois = new Date(etat.dMois.getFullYear(), etat.dMois.getMonth() + 1, 1);
+    dessineDates();
+  });
+  q('#bk-dates-suivant').addEventListener('click', () => {
+    if (!marqueFaute(q('#bk-d-grille'), !etat.dates.size)) return;
     allerA('quand');
   });
 
-  // ------------------------------------------------------------ 2. calendrier et créneaux
+  // ------------------------------------------------------------ 3. calendrier et créneaux
   function creneaux(d) {
     const out = [], tot = (DISPO.fin - DISPO.debut) * 60 - DISPO.duree;
     const plancher = new Date();
@@ -254,7 +346,7 @@
     remplitRecap();
   });
 
-  // ------------------------------------------------------------ 3. coordonnées
+  // ------------------------------------------------------------ 4. coordonnées
   const fin = () => new Date(etat.creneau.getTime() + DISPO.duree * 60000);
   const canalTexte = () => (etat.canal === 'tel' ? t().tel : 'Google Meet');
   function remplitRecap() {
@@ -283,7 +375,7 @@
     envoyer();
   });
 
-  // ------------------------------------------------------------ 4. la demande
+  // ------------------------------------------------------------ 5. la demande
   const horodate = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   function liensAgenda(debut, fin2, titre, detail, lieu) {
     const e = encodeURIComponent, d1 = horodate(debut), d2 = horodate(fin2);
@@ -333,11 +425,12 @@
   // ------------------------------------------------------------ navigation entre écrans
   function allerA(etape, defile = true) {
     el.dataset.step = etape;
-    const n = ['devis', 'quand', 'confirmer'].indexOf(etape);
+    const n = ['devis', 'dates', 'quand', 'confirmer'].indexOf(etape);
     document.querySelectorAll('.bk-fil-item').forEach((item, i) => {
       item.classList.toggle('est-actif', i === n);
       item.classList.toggle('est-fait', n < 0 || i < n);
     });
+    if (etape === 'dates') dessineDates();
     if (etape === 'quand') { dessineMois(); dessineCreneaux(); }
     const haut = document.querySelector('.bk-fil').getBoundingClientRect().top;
     if (defile && (haut < 0 || haut > innerHeight * 0.6)) document.querySelector('.bk-fil').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -347,6 +440,7 @@
   // la langue change : tout ce que ce script a écrit est récrit
   addEventListener('hs:lang', () => {
     resume();
+    dessineDates();
     dessineMois();
     dessineCreneaux();
     remplitRecap();
@@ -369,13 +463,7 @@
   // arrivée depuis un bouton « Demander un devis » d'un service : ?service=nettoyage le présélectionne
   const pre = new URLSearchParams(location.search).get('service');
   if (pre) q(`[data-groupe="services"] [data-v="${CSS.escape(pre)}"]`)?.click();
-  // arrivée depuis la zone d'intervention (js/zone.js) : ?commune=Ixelles la choisit ; une commune hors de la liste
-  // (au-delà de la périphérie) : « Autre commune », et son nom dans les détails
-  const venue = new URLSearchParams(location.search).get('commune');
-  if (venue) {
-    const opt = [...commune.options].find((o) => o.value === venue || o.textContent.trim() === venue);
-    commune.value = opt ? opt.value : 'autre';
-    if (!opt && !besoin.value) { besoin.value = `${t().k.commune}${t().sep}${venue}\n`; besoin.dispatchEvent(new Event('input')); }
-    commune.dispatchEvent(new Event('change'));
-  }
+  // arrivée depuis la zone d'intervention (js/zone.js) : ?cp=1050 remplit le code postal de la commune choisie
+  const venue = new URLSearchParams(location.search).get('cp');
+  if (venue && /^\d{4}$/.test(venue)) { commune.value = venue; commune.dispatchEvent(new Event('input')); }
 })();
