@@ -34,20 +34,30 @@ mkdirSync(join(site, 'js/draco'), { recursive: true });
 for (const f of ['draco_decoder.wasm', 'draco_wasm_wrapper.js'])
   copyFileSync(join(three, 'examples/jsm/libs/draco/gltf', f), join(site, 'js/draco', f));
 
-for (const f of ['veil', 'i18n', 'apropos', 'avantapres', 'surmesure', 'faq'])
+for (const f of ['veil', 'i18n', 'apropos', 'avantapres', 'surmesure', 'faq', 'cta', 'footer', 'reserver'])
   await build({ entryPoints: [join(site, `js/${f}.js`)], outfile: join(site, `js/${f}.min.js`), minify: true,
     target: 'es2020', legalComments: 'none', logLevel: 'info' });
-await build({ entryPoints: [join(site, 'css/style.css')], outfile: join(site, 'css/style.min.css'), minify: true,
-  logLevel: 'info' });
+// la zone d'intervention et ses données (un seul fichier)
+await build({ entryPoints: [join(site, 'js/zone.js')], outfile: join(site, 'js/zone.min.js'), bundle: true, format: 'iife',
+  minify: true, target: 'es2020', legalComments: 'none', logLevel: 'info' });
+for (const f of ['style', 'reserver'])
+  await build({ entryPoints: [join(site, `css/${f}.css`)], outfile: join(site, `css/${f}.min.css`), minify: true,
+    logLevel: 'info' });
 
-// les versions dans index.html
-const page = join(site, 'index.html');
-let html = readFileSync(page, 'utf8');
-for (const f of ['js/hero.min.js', 'js/veil.min.js', 'js/i18n.min.js', 'js/apropos.min.js', 'js/avantapres.min.js', 'js/surmesure.min.js', 'js/faq.min.js', 'css/style.min.css',
-  'models/ilot.glb']) {
-  const re = new RegExp(`${f.replace(/\./g, '\\.')}\\?v=[\\w-]+`, 'g');
-  if (!re.test(html)) throw new Error(`${f} absent de index.html`);
-  html = html.replace(re, `${f}?v=${version(f)}`);
+// les versions dans les pages : l'accueil, et la page de réservation d'un appel
+const pages = {
+  'index.html': ['js/hero.min.js', 'js/veil.min.js', 'js/i18n.min.js', 'js/apropos.min.js', 'js/avantapres.min.js',
+    'js/surmesure.min.js', 'js/faq.min.js', 'js/footer.min.js', 'js/cta.min.js', 'js/zone.min.js', 'css/style.min.css', 'models/ilot.glb'],
+  'reserver.html': ['js/veil.min.js', 'js/i18n.min.js', 'js/reserver.min.js', 'css/style.min.css', 'css/reserver.min.css'],
+};
+for (const [p, files] of Object.entries(pages)) {
+  const page = join(site, p);
+  let html = readFileSync(page, 'utf8');
+  for (const f of files) {
+    const re = new RegExp(`${f.replace(/\./g, '\\.')}\\?v=[\\w-]+`, 'g');
+    if (!re.test(html)) throw new Error(`${f} absent de ${p}`);
+    html = html.replace(re, `${f}?v=${version(f)}`);
+  }
+  writeFileSync(page, html);
+  console.log(`${p} : versions à jour`);
 }
-writeFileSync(page, html);
-console.log('index.html : versions à jour');
