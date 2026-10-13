@@ -348,6 +348,7 @@ function draw(dt) {
   if (dig.busy) busy = true;
   if (dig.shown) shown = true;
   if (stepVoid(dt)) busy = true;
+  if (stepGlow(dt)) busy = true;
   if (stepOutline(dt)) busy = true;
   gl.renderer.domElement.style.visibility = shown ? '' : 'hidden';
   gl.renderer.render(gl.scene, gl.camera);
@@ -682,23 +683,24 @@ function makeRelief(def) {
     side: THREE.DoubleSide,
     stencilWrite: true, stencilRef: STENCIL_MAP, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp,
     uniforms: { uIds: { value: ids.texture }, uDepth: { value: new Float32Array(n) }, uTone: { value: tone }, uPaper: { value: new THREE.Color('#f7f7f5') },
+      uGlow: { value: new Float32Array(n) }, uGreen: { value: new THREE.Color(GLOW.color) },
       uSun: { value: sunDir }, uAt: { value: new THREE.Vector3() }, uS: { value: 1 }, uShade: { value: MAP.shade }, uCast: { value: MAP.cast }, uTint: { value: MAP.tint }, uSpread: { value: MAP.spread2 },
       uSoft: { value: MAP.soft }, uEdge: { value: E }, uTexel: { value: (2 * E) / N },
       uAO: { value: def.ao ?? 0 }, uAOR: { value: def.aoR ?? 0.01 } },
     vertexShader: `
       attribute vec3 inward; attribute float cid;
-      uniform float uTone[${n}];
-      varying vec3 vW; varying vec3 vIn; varying float vTone;
+      uniform float uTone[${n}]; uniform float uGlow[${n}];
+      varying vec3 vW; varying vec3 vIn; varying float vTone; varying float vGlow;
       void main() {
         vec4 w = modelMatrix * vec4(position, 1.0);
         vW = w.xyz; vIn = inward;
-        for (int i = 0; i < ${n}; i++) if (float(i) == cid) vTone = uTone[i];
+        for (int i = 0; i < ${n}; i++) if (float(i) == cid) { vTone = uTone[i]; vGlow = uGlow[i]; }
         gl_Position = projectionMatrix * viewMatrix * w;
       }`,
     fragmentShader: `
       uniform sampler2D uIds; uniform float uDepth[${n}];
-      uniform vec3 uPaper, uSun, uAt; uniform float uS, uShade, uCast, uTint, uSpread, uSoft, uEdge, uTexel, uAO, uAOR;
-      varying vec3 vW; varying vec3 vIn; varying float vTone;
+      uniform vec3 uPaper, uGreen, uSun, uAt; uniform float uS, uShade, uCast, uTint, uSpread, uSoft, uEdge, uTexel, uAO, uAOR;
+      varying vec3 vW; varying vec3 vIn; varying float vTone; varying float vGlow;
       // la profondeur du fond en ce point du creux (en hauteurs de creux ; 0 : le mur)
       float floorAt(vec2 q) {
         float id = floor(texture2D(uIds, (q + uEdge) / (2.0 * uEdge)).r * 255.0 + 0.5);
@@ -739,7 +741,7 @@ function makeRelief(def) {
           }
           occ /= 24.0;
         }
-        gl_FragColor = vec4(uPaper * vTone * (1.0 - uShade * (1.0 - facing)) * (1.0 - uCast * shut) * (1.0 - uTint * z) * (1.0 - uAO * occ), 1.0);
+        gl_FragColor = vec4(mix(uPaper * vTone, uGreen, vGlow) * (1.0 - uShade * (1.0 - facing)) * (1.0 - uCast * shut) * (1.0 - uTint * z) * (1.0 - uAO * occ), 1.0);
         #include <colorspace_fragment>
       }`,
   });
@@ -943,7 +945,7 @@ function makeOutline() {
   mesh.renderOrder = 10;
   mesh.visible = false;
   m.group.add(mesh);
-  zn = { m, mesh, mat, p: 0, a: 0, on: false, x: -1, y: -1 };
+  zn = { m, mesh, mat, p: 0, a: 0, on: false, x: -1, y: -1, autoT: -1, due: false, timer: 0 };
   addEventListener('pointermove', (e) => {
     if (e.pointerType !== 'mouse') return;
     zn.x = e.clientX; zn.y = e.clientY;
@@ -985,6 +987,7 @@ function setHover(nis) {
   const on = nis != null;
   if (on !== zn.on) {
     zn.on = on;
+    if (!on) autoSoon(AUTO.every);                 // (le prochain tracé tout seul : un peu plus tard)
     document.documentElement.classList.toggle('zn-hover', on);
     wake();
   }
@@ -1003,14 +1006,71 @@ function mapRect() {
   }
   return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
 }
-// un pas : le contour se trace (souris sur la carte) ou s'efface
+// un pas : le contour se trace (souris sur la carte) ou s'efface ; sans souris, il fait de lui-même le tour de la
+// région de temps en temps (AUTO : tracé, tenue, effacement, intervalle, en s), pour montrer que la carte répond
+const AUTO = { draw: 1.3, hold: 0.9, fade: 0.6, every: 9 };
+function autoSoon(sec) {
+  if (!zn) return;
+  clearTimeout(zn.timer);
+  zn.timer = setTimeout(() => { zn.timer = 0; zn.due = true; wake(); }, sec * 1000);
+}
+// la carte est là, creusée, allumée, à l'écran, et rien d'autre ne se passe
+function mapIdle() {
+  const m = zn?.m;
+  return !!(gl && m && gl.seen && m.group.visible && glow.done && !window.hsZone?.isOpen() && (window.hsStats?.active ?? -1) >= 0
+    && m.cells.every((c) => c.k >= ZN.ready));
+}
 function stepOutline(dt) {
   if (!zn) return false;
-  if (zn.on) { zn.a = Math.min(1, zn.a + dt / 0.15); zn.p = Math.min(1, zn.p + dt / ZN.draw); }
-  else { zn.a = Math.max(0, zn.a - dt / ZN.fade); if (zn.a === 0) zn.p = 0; }
+  if (zn.on) {
+    zn.autoT = -1; zn.due = false;
+    zn.a = Math.min(1, zn.a + dt / 0.15); zn.p = Math.min(1, zn.p + dt / ZN.draw);
+  } else if (zn.autoT >= 0) {
+    const T = AUTO, t = (zn.autoT += dt);
+    zn.p = Math.min(1, t / T.draw);
+    zn.a = t < T.draw + T.hold ? Math.min(1, t / 0.15) : Math.max(0, 1 - (t - T.draw - T.hold) / T.fade);
+    if (t >= T.draw + T.hold + T.fade || !mapIdle()) { zn.autoT = -1; zn.a = 0; zn.p = 0; autoSoon(T.every); }
+  } else {
+    zn.a = Math.max(0, zn.a - dt / ZN.fade); if (zn.a === 0) zn.p = 0;
+    // l'heure du tracé tout seul : s'il n'y a rien d'autre (sinon, il attend que la carte soit de nouveau libre)
+    if (zn.due && zn.a === 0 && mapIdle()) { zn.due = false; zn.autoT = 0; }
+  }
   const e = 1 - (1 - zn.p) ** 3;
   zn.mat.uniforms.uP.value = zn.p >= 1 ? 1.001 : e;
   zn.mat.uniforms.uA.value = zn.a;
   zn.mesh.visible = zn.a > 0;
-  return zn.on ? zn.p < 1 || zn.a < 1 : zn.a > 0;
+  return zn.on ? zn.p < 1 || zn.a < 1 : zn.autoT >= 0 || zn.a > 0;
+}
+
+// ------------------------------------------------------------ la carte s'allume
+// Une fois creusée, les communes passent au vert une à une, du centre vers les bords (comme le chiffre qui se
+// compte), puis redeviennent blanches ; puis le contour fait le tour de la région. À chaque fois qu'elle se creuse.
+// [la couleur, sa force, l'écart entre deux communes, montée, tenue, descente (s)]
+const GLOW = { color: '#1c7d4a', max: 0.82, step: 0.07, rise: 0.25, hold: 0.25, fall: 0.8 };
+const glow = { t: -1, done: false, order: null };
+const smooth = (x) => x * x * (3 - 2 * x);
+function stepGlow(dt) {
+  const m = reliefs[ONLY];
+  if (!m) return false;
+  const u = m.inside.uniforms.uGlow.value;
+  if (!(m.group.visible && m.cells.every((c) => c.k > 0.999))) {
+    if (glow.t >= 0 || glow.done) { glow.t = -1; glow.done = false; u.fill(0); }
+    return false;
+  }
+  if (glow.done) return false;
+  if (!glow.order) {
+    const by = COMMUNES.map((c, i) => i).sort((a, b) => COMMUNES[a].d - COMMUNES[b].d);
+    glow.order = COMMUNES.map((c, i) => by.indexOf(i));
+  }
+  glow.t = glow.t < 0 ? 0 : glow.t + dt;
+  const G = GLOW, end = G.rise + G.hold + G.fall;
+  let live = false;
+  for (let i = 0; i < u.length; i++) {
+    const x = glow.t - glow.order[i] * G.step;
+    const e = x <= 0 ? 0 : x < G.rise ? smooth(x / G.rise) : x < G.rise + G.hold ? 1 : x < end ? 1 - smooth((x - G.rise - G.hold) / G.fall) : 0;
+    if (x < end) live = true;
+    u[i] = e * G.max;
+  }
+  if (!live) { glow.done = true; u.fill(0); autoSoon(0.5); }
+  return live;
 }
