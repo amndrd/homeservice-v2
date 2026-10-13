@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fr-BE" data-i18n-title="title.book">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Réserver un appel – HomeService BXL</title>
+<!-- même arrivée que l'accueil : sous le voile après une transition, sinon l'écran de chargement (voir js/veil.js) -->
+<script>try { var v = sessionStorage.getItem('hs-veil'); if (document.prerendering || v) { document.documentElement.classList.add('veil-in'); sessionStorage.removeItem('hs-veil'); } else document.documentElement.classList.add('loading'); } catch (e) { document.documentElement.classList.add('loading'); }</script>
+<link rel="stylesheet" href="css/style.min.css?v=797999001f">
+<link rel="stylesheet" href="css/reserver.min.css?v=79fdf7ea66">
+</head>
+<body class="page-bk">
+
+<header class="header" id="header">
+  <div class="header__bar">
+    <a href="index.html" class="logo" data-veil aria-label="HomeService BXL, accueil" data-i18n-aria="home"><img src="images/logo-blanc.webp" alt="HomeService BXL" width="801" height="380"></a>
+    <nav class="nav" aria-label="Navigation principale" data-i18n-aria="mainNav">
+      <a href="index.html#a-propos" data-veil data-i18n="nav.about">À propos</a>
+      <a href="index.html#chiffres" data-veil data-i18n="nav.stats">Zone</a>
+      <a href="index.html#services" data-veil data-i18n="nav.services">Services</a>
+      <a href="index.html#faq" data-veil data-i18n="ft.faq">FAQ</a>
+    </nav>
+    <div class="lang" id="lang">
+      <button class="lang__btn" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Langue"
+        data-i18n-aria="langBtn">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>
+        <span class="lang__code">FR</span>
+        <svg class="lang__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+      </button>
+      <ul class="lang__menu" role="listbox">
+        <li><button type="button" role="option" data-lang="fr" lang="fr"><span>FR</span>Français</button></li>
+        <li><button type="button" role="option" data-lang="en" lang="en"><span>EN</span>English</button></li>
+        <li><button type="button" role="option" data-lang="nl" lang="nl"><span>NL</span>Nederlands</button></li>
+      </ul>
+    </div>
+    <a href="reserver.html" class="header__cta" data-veil data-i18n="cta" aria-current="page">Réserver un appel</a>
+  </div>
+</header>
+
+<!-- Réserver un appel et préparer son devis (js/reserver.js). Le module de réservation de la page /contact du site
+     Harborview (Projets/Harborview/assets/booking.*, lui-même repris du booker de Cal.com), précédé d'un écran où l'on
+     compose son devis : services, lieu, surface, commune. Puis le jour et l'heure d'un appel de
+     15 min, les coordonnées, et la demande complète, prête à partir. Fond : les ondes de la section « Book a call ». -->
+<main class="bk-page" id="main">
+  <div class="bk-ondes" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+
+  <header class="bk-intro">
+    <p class="bk-intro__eyebrow" data-i18n="bk.eyebrow">Réserver un appel</p>
+    <h1 class="bk-intro__title" data-i18n="bk.title">Votre devis, en un appel</h1>
+    <p class="bk-intro__lead" data-i18n="bk.lead">Dites-nous ce dont vous avez besoin, choisissez un moment : nous vous appelons 15 minutes pour affiner votre devis, gratuit et sans engagement.</p>
+  </header>
+
+  <ol class="bk-fil" aria-label="Étapes" data-i18n-aria="bk.steps">
+    <li class="bk-fil-item"><span>1</span><b data-i18n="bk.step1">Votre devis</b></li>
+    <li class="bk-fil-item"><span>2</span><b data-i18n="bk.step2">Le moment</b></li>
+    <li class="bk-fil-item"><span>3</span><b data-i18n="bk.step3">Vos coordonnées</b></li>
+  </ol>
+
+  <div class="bk" id="bk" data-step="devis">
+
+    <!-- 1. le devis -->
+    <div class="bk-ecran bk-ecran--devis"><div class="bk-devis">
+      <div class="bk-corps">
+        <h2 class="bk-titre" data-i18n="bk.d.title">Personnalisez votre devis</h2>
+        <div class="bk-champ" data-champ="services">
+          <span class="bk-label"><span data-i18n="bk.d.services">De quoi avez-vous besoin ?</span> <span>*</span></span>
+          <div class="bk-pastilles" data-groupe="services" data-multi>
+            <button type="button" class="bk-pastille" data-v="nettoyage" aria-pressed="false" data-i18n="svc.nettoyage">Nettoyage</button>
+            <button type="button" class="bk-pastille" data-v="jardinage" aria-pressed="false" data-i18n="svc.jardinage">Jardinage</button>
+            <button type="button" class="bk-pastille" data-v="desencombrement" aria-pressed="false" data-i18n="svc.desencombrement">Désencombrement</button>
+            <button type="button" class="bk-pastille" data-v="montage" aria-pressed="false" data-i18n="bk.d.montage">Montage de meubles</button>
+            <button type="button" class="bk-pastille" data-v="livraison" aria-pressed="false" data-i18n="svc.livraison">Livraison</button>
+          </div>
+          <p class="bk-erreur" data-i18n="bk.d.err.services">Choisissez au moins un service : nous affinerons pendant l'appel.</p>
+        </div>
+        <div class="bk-deux">
+          <div class="bk-champ">
+            <span class="bk-label" data-i18n="bk.d.lieu">Le lieu</span>
+            <div class="bk-pastilles" data-groupe="lieu">
+              <button type="button" class="bk-pastille" data-v="appartement" aria-pressed="false" data-i18n="bk.d.appartement">Appartement</button>
+              <button type="button" class="bk-pastille" data-v="maison" aria-pressed="false" data-i18n="bk.d.maison">Maison</button>
+              <button type="button" class="bk-pastille" data-v="bureau" aria-pressed="false" data-i18n="bk.d.bureau">Bureau</button>
+              <button type="button" class="bk-pastille" data-v="autre" aria-pressed="false" data-i18n="bk.d.autre">Autre</button>
+            </div>
+          </div>
+          <div class="bk-champ">
+            <span class="bk-label" data-i18n="bk.d.surface">La surface</span>
+            <div class="bk-pastilles" data-groupe="surface">
+              <button type="button" class="bk-pastille" data-v="s50" aria-pressed="false" data-i18n="bk.d.s50">Moins de 50 m²</button>
+              <button type="button" class="bk-pastille" data-v="s100" aria-pressed="false" data-i18n="bk.d.s100">50 à 100 m²</button>
+              <button type="button" class="bk-pastille" data-v="s200" aria-pressed="false" data-i18n="bk.d.s200">100 à 200 m²</button>
+              <button type="button" class="bk-pastille" data-v="s200p" aria-pressed="false" data-i18n="bk.d.s200p">Plus de 200 m²</button>
+            </div>
+          </div>
+        </div>
+        <div class="bk-champ" data-champ="commune">
+          <label class="bk-label" for="bk-commune"><span data-i18n="bk.d.commune">Votre commune</span> <span>*</span></label>
+          <select class="bk-input bk-select" id="bk-commune">
+            <option value="" data-i18n="bk.d.choisir">Choisir…</option>
+            <optgroup label="Bruxelles-Capitale" data-i18n-label="bk.d.region">
+              <option>Anderlecht</option><option>Auderghem</option><option>Berchem-Sainte-Agathe</option>
+              <option>Bruxelles-Ville</option><option>Etterbeek</option><option>Evere</option><option>Forest</option>
+              <option>Ganshoren</option><option>Ixelles</option><option>Jette</option><option>Koekelberg</option>
+              <option>Molenbeek-Saint-Jean</option><option>Saint-Gilles</option><option>Saint-Josse-ten-Noode</option>
+              <option>Schaerbeek</option><option>Uccle</option><option>Watermael-Boitsfort</option>
+              <option>Woluwe-Saint-Lambert</option><option>Woluwe-Saint-Pierre</option>
+            </optgroup>
+            <optgroup label="Périphérie" data-i18n-label="bk.d.peripherie">
+              <option>Asse</option><option>Beersel</option><option>Dilbeek</option><option>Drogenbos</option>
+              <option>Grimbergen</option><option>Hoeilaart</option><option>Kraainem</option>
+              <option>Leeuw-Saint-Pierre</option><option>Linkebeek</option><option>Machelen</option>
+              <option>Overijse</option><option>Rhode-Saint-Genèse</option><option>Tervuren</option>
+              <option>Vilvorde</option><option>Wemmel</option><option>Wezembeek-Oppem</option><option>Zaventem</option>
+            </optgroup>
+            <option value="autre" data-i18n="bk.d.autreCommune">Autre commune</option>
+          </select>
+          <p class="bk-erreur" data-i18n="bk.d.err.commune">Dites-nous où nous intervenons.</p>
+        </div>
+        <div class="bk-champ">
+          <label class="bk-label" for="bk-besoin" data-i18n="bk.d.besoin">Votre besoin en quelques mots</label>
+          <textarea class="bk-textarea" id="bk-besoin" placeholder="Ex. : grand nettoyage avant un déménagement, trois chambres, vitres comprises." data-i18n-placeholder="bk.d.besoinPh"></textarea>
+        </div>
+        <div class="bk-actions"><button type="button" class="bk-btn" id="bk-suivant" data-i18n="bk.continuer">Continuer</button></div>
+      </div>
+      <!-- le devis se compose à droite à mesure qu'on choisit -->
+      <aside class="bk-resume" aria-live="polite">
+        <p class="bk-resume__tete" data-i18n="bk.r.title">Votre devis</p>
+        <dl class="bk-resume__liste" id="bk-resume"></dl>
+        <p class="bk-resume__note" data-i18n="bk.r.note">Gratuit et sans engagement. Le prix exact vous est donné pendant l'appel, ou par écrit sous 24 h.</p>
+      </aside>
+    </div></div>
+
+    <!-- 2. le jour et l'heure de l'appel -->
+    <div class="bk-ecran bk-ecran--quand"><div class="bk-quand">
+      <aside class="bk-aside">
+        <div class="bk-marque"><img src="images/logo-blanc.webp" alt="" width="801" height="380"></div>
+        <p class="bk-recap-hote">HomeService BXL</p>
+        <h2 class="bk-recap-titre" data-i18n="bk.call">Appel de 15 min</h2>
+        <div class="bk-recap-ligne"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>15 min</span></div>
+        <div class="bk-recap-ligne"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 4h4l2 5-2.5 1.5a12 12 0 005 5L15 13l5 2v4a1 1 0 01-1 1A16 16 0 014 5a1 1 0 011-1z"/></svg><span data-i18n="bk.canaux">Téléphone ou Google Meet</span></div>
+        <div class="bk-recap-ligne"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18-2.5-2.7-2.5-15.3 0-18z"/></svg><span class="bk-fuseau"></span></div>
+        <div class="bk-recap-ligne"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12V5a2 2 0 012-2h7l9 9-9 9-9-9z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg><span class="bk-services"></span></div>
+        <button type="button" class="bk-lien" data-aller="devis" data-i18n="bk.modifierDevis">Modifier le devis</button>
+      </aside>
+      <div class="bk-cal">
+        <div class="bk-cal-tete">
+          <div class="bk-mois" id="bk-mois"></div>
+          <div class="bk-nav">
+            <button type="button" id="bk-prec" aria-label="Mois précédent" data-i18n-aria="bk.prec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18"><path d="M15 5l-7 7 7 7"/></svg></button>
+            <button type="button" id="bk-suiv" aria-label="Mois suivant" data-i18n-aria="bk.suiv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18"><path d="M9 5l7 7-7 7"/></svg></button>
+          </div>
+        </div>
+        <div class="bk-jours" id="bk-jours"></div>
+        <div class="bk-grille" id="bk-grille"></div>
+      </div>
+      <div class="bk-creneaux">
+        <div class="bk-creneaux-tete">
+          <div class="bk-creneaux-jour" id="bk-jour"></div>
+          <div class="bk-format">
+            <button type="button" data-format="12" aria-pressed="false">12h</button>
+            <button type="button" data-format="24" aria-pressed="true">24h</button>
+          </div>
+        </div>
+        <div class="bk-liste" id="bk-liste"></div>
+      </div>
+    </div></div>
+
+    <!-- 3. les coordonnées -->
+    <div class="bk-ecran bk-ecran--confirmer"><div class="bk-confirmer">
+      <aside class="bk-recap">
+        <p class="bk-recap-hote">HomeService BXL</p>
+        <h2 class="bk-recap-titre" data-i18n="bk.call">Appel de 15 min</h2>
+        <div class="bk-recap-ligne"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg><span><span id="bk-recap-date"></span><br><span id="bk-recap-heure"></span></span></div>
+        <div class="bk-recap-ligne"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>15 min</span></div>
+        <div class="bk-recap-ligne"><span id="bk-recap-canal-ic"></span><span id="bk-recap-canal"></span></div>
+        <div class="bk-recap-ligne"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18-2.5-2.7-2.5-15.3 0-18z"/></svg><span class="bk-fuseau"></span></div>
+        <div class="bk-recap-ligne"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12V5a2 2 0 012-2h7l9 9-9 9-9-9z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg><span class="bk-services"></span></div>
+      </aside>
+      <form class="bk-form" novalidate>
+        <div class="bk-champ">
+          <label class="bk-label" for="bk-nom"><span data-i18n="bk.c.nom">Votre nom</span> <span>*</span></label>
+          <input class="bk-input" id="bk-nom" type="text" autocomplete="name" placeholder="Marie Dupont">
+          <p class="bk-erreur" data-i18n="bk.c.err.nom">Il nous faut un nom pour l'invitation.</p>
+        </div>
+        <div class="bk-champ">
+          <label class="bk-label" for="bk-email"><span data-i18n="bk.c.email">Adresse e-mail</span> <span>*</span></label>
+          <input class="bk-input" id="bk-email" type="email" autocomplete="email" placeholder="marie@exemple.be">
+          <p class="bk-erreur" data-i18n="bk.c.err.email">Cette adresse ne semble pas correcte.</p>
+        </div>
+        <div class="bk-champ">
+          <span class="bk-label" data-i18n="bk.c.canal">Comment vous appeler ?</span>
+          <div class="bk-choix">
+            <button type="button" class="bk-option" data-canal="tel" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 4h4l2 5-2.5 1.5a12 12 0 005 5L15 13l5 2v4a1 1 0 01-1 1A16 16 0 014 5a1 1 0 011-1z"/></svg><span data-i18n="bk.c.tel">Par téléphone</span></button>
+            <button type="button" class="bk-option" data-canal="meet" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="M15 10.5l6-3.5v10l-6-3.5z"/></svg>Google Meet</button>
+          </div>
+        </div>
+        <div class="bk-champ" id="bk-champ-tel">
+          <label class="bk-label" for="bk-tel"><span data-i18n="bk.c.numero">Numéro de téléphone</span> <span>*</span></label>
+          <input class="bk-input" id="bk-tel" type="tel" autocomplete="tel" placeholder="+32 470 00 00 00">
+          <p class="bk-erreur" data-i18n="bk.c.err.tel">Il nous faut un numéro pour vous appeler.</p>
+        </div>
+        <div class="bk-champ">
+          <label class="bk-label" for="bk-adresse" data-i18n="bk.c.adresse">Adresse de l'intervention</label>
+          <input class="bk-input" id="bk-adresse" type="text" autocomplete="street-address" placeholder="Facultatif" data-i18n-placeholder="bk.c.facultatif">
+        </div>
+        <div class="bk-actions">
+          <button type="button" class="bk-btn bk-btn--fantome" data-aller="quand" data-i18n="bk.retour">Retour</button>
+          <button type="submit" class="bk-btn" id="bk-confirmer" data-i18n="bk.confirmer">Confirmer</button>
+        </div>
+      </form>
+    </div></div>
+
+    <!-- 4. la demande, prête à partir -->
+    <div class="bk-ecran bk-ecran--fait">
+      <div class="bk-fin-tete">
+        <div class="bk-rond bk-rond--ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="24" height="24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+        <h2 class="bk-fin-titre" data-i18n="bk.f.title">Votre demande est prête</h2>
+        <p class="bk-fin-desc" data-i18n="bk.f.desc">Il ne reste qu'à nous l'envoyer : l'e-mail est déjà rédigé, avec votre devis et votre créneau. Nous vous confirmons l'appel dans la journée.</p>
+      </div>
+      <div class="bk-detail">
+        <dl>
+          <dt data-i18n="bk.f.quoi">Quoi</dt><dd id="bk-quoi"></dd>
+          <dt data-i18n="bk.f.quand">Quand</dt><dd><span id="bk-quand-d"></span><br><span id="bk-quand-h"></span> <small id="bk-quand-tz"></small></dd>
+          <dt data-i18n="bk.f.qui">Qui</dt><dd id="bk-qui"></dd>
+          <dt data-i18n="bk.f.ou">Où</dt><dd id="bk-ou"></dd>
+          <dt data-i18n="bk.f.devis">Devis</dt><dd id="bk-devis"></dd>
+        </dl>
+        <div class="bk-contact-lien"><a class="bk-btn bk-btn--large" id="bk-envoyer" href="mailto:homeservicebxl.contact@gmail.com" data-i18n="bk.f.envoyer">Envoyer la demande</a></div>
+        <div class="bk-agenda"><span class="bk-agenda-label" data-i18n="bk.f.agenda">Ajouter à l'agenda</span><a id="bk-cal-google" href="#" target="_blank" rel="noopener" title="Google Agenda" aria-label="Google Agenda"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12.2 10.4v3.3h4.7c-.2 1.2-1.4 3.6-4.7 3.6a5.3 5.3 0 010-10.6c1.5 0 2.6.7 3.2 1.2l2.2-2.1A8.4 8.4 0 0012.2 3.4a8.6 8.6 0 100 17.2c5 0 8.3-3.5 8.3-8.4 0-.6-.1-1.1-.2-1.6h-8.1z"/></svg></a><a id="bk-cal-outlook" href="#" target="_blank" rel="noopener" title="Outlook" aria-label="Outlook"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" opacity=".55" d="M13.4 5.6h6.2c.5 0 .9.4.9.9v11c0 .5-.4.9-.9.9h-6.2V5.6z"/><path fill="currentColor" d="M3 4.6l9.2-1.6v18l-9.2-1.6V4.6zm4.6 4.2c-1.6 0-2.6 1.3-2.6 3.2s1 3.2 2.6 3.2 2.6-1.3 2.6-3.2-1-3.2-2.6-3.2zm0 1.4c.8 0 1.2.7 1.2 1.8s-.4 1.8-1.2 1.8-1.2-.7-1.2-1.8.4-1.8 1.2-1.8z"/></svg></a><a id="bk-cal-ics" href="#" download="homeservice-appel.ics" title="iCal (.ics)" aria-label="iCal (.ics)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg></a></div>
+      </div>
+      <div class="bk-changer"><span data-i18n="bk.f.changer">Un changement ?</span> <button type="button" data-aller="quand" data-i18n="bk.f.creneau">Modifier le créneau</button> <span data-i18n="bk.f.ou2">ou</span> <button type="button" data-aller="devis" data-i18n="bk.f.devis2">le devis</button></div>
+    </div>
+  </div>
+</main>
+
+<!-- fichiers construits à partir des sources (js/*.js, css/*.css) : outils/build.mjs -->
+<script src="js/veil.min.js?v=36a8298c67"></script>
+<script src="js/i18n.min.js?v=979f4fb34b"></script>
+<script src="js/reserver.min.js?v=78def6d9cc"></script>
+</body>
+</html>
