@@ -622,3 +622,263 @@ html.veil-in::after { content: ""; position: fixed; inset: 0; z-index: 151;
   .faq__a p { padding-right: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .faq__a, .faq__a p, .faq__icon { transition: none; } }
+
+/* ---------------------------------------------------------------- réserver un appel (js/cta.js)
+   L'idée de la section « Ready to book a call? » de Harborview (ondes, dévoilement en lignes, rond qui suit la souris),
+   habillée comme le reste du site : une grande carte bleu nuit aux coins arrondis posée sur le crème (comme l'encart
+   de la FAQ, en grand), Manrope, l'orange et le vert du site. --hv : rem proportionnels de Harborview (10 px pour 1728
+   px de large, 991 px sur tablette, 393 px sur téléphone), gardés pour les ondes et le rond. */
+@font-face { font-family: 'BT Steinhart Mono'; src: url(../fonts/steinhart-mono-400.woff2) format('woff2'); font-weight: 400;
+  font-style: normal; font-display: swap; }
+:root { --hv: calc(100vw / 172.8); }
+@media (max-width: 991px) { :root { --hv: calc(100vw / 99.1); } }
+@media (max-width: 767px) { :root { --hv: calc(100vw / 39.3); } }
+.cta { position: relative; z-index: 5; padding: 0 5vw clamp(56px, 10vh, 120px); color: #fff; font-family: var(--body); }
+.cta__inner { position: relative; display: grid; place-items: center; width: min(1440px, 100%); margin: 0 auto; overflow: clip;
+  border-radius: 32px; background: var(--ink); box-shadow: 0 24px 60px rgba(15, 26, 44, .16); }
+.cta__text { grid-area: 1 / 1; position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: clamp(440px, 37.5vw, 600px); padding: clamp(64px, 9vw, 140px) 24px; text-align: center; }
+.cta__title { max-width: 14ch; margin: 0 0 22px; font: 800 clamp(40px, 4.6vw, 76px)/1.02 var(--title); letter-spacing: -.01em;
+  text-transform: uppercase; color: #fff; }
+.cta__desc { max-width: 520px; margin: 0; font: 500 clamp(16px, 1.3vw, 20px)/1.6 var(--body); color: rgba(255, 255, 255, .72); }
+/* six cercles d'un même diamètre, décalés de 2,5 s sur leur cycle de 15 s : ils naissent au centre et grandissent
+   jusqu'au triple en s'allumant puis en s'éteignant (images-clés « wave » de Harborview) ; ils s'effacent en haut et
+   en bas de la carte */
+.cta__circs { position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; pointer-events: none;
+  -webkit-mask: linear-gradient(#0000 0%, #000 18% 82%, #0000 100%); mask: linear-gradient(#0000 0%, #000 18% 82%, #0000 100%); }
+.cta__circs span { position: absolute; width: calc(50 * var(--hv)); aspect-ratio: 1; border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 50%; animation: cta-wave 15s linear infinite; }
+.cta__circs span:nth-child(2) { animation-delay: -2.5s; }
+.cta__circs span:nth-child(3) { animation-delay: -5s; }
+.cta__circs span:nth-child(4) { animation-delay: -7.5s; }
+.cta__circs span:nth-child(5) { animation-delay: -10s; }
+.cta__circs span:nth-child(6) { animation-delay: -12.5s; }
+@keyframes cta-wave {
+  0% { transform: scale(1); opacity: 0; }
+  20%, 80% { opacity: .65; }
+  60% { opacity: 1; }
+  100% { transform: scale(3); opacity: 0; }
+}
+/* sur ordinateur, toute la carte est le lien ; le bouton n'apparaît que sur tablette et téléphone */
+.cta__link { position: absolute; inset: 0; z-index: 2; }
+.cta__btn { display: none; align-items: center; height: 52px; margin-top: 30px; padding: 0 26px; border-radius: 12px;
+  background: #fff; color: var(--ink); font: 800 13px/1 var(--body); letter-spacing: .12em; text-transform: uppercase;
+  transition: background .2s ease, color .2s ease; }
+.cta__btn:hover, .cta__btn:focus-visible { outline: none; background: var(--green); color: #fff; }
+/* dévoilement (js/cta.js) : chaque ligne se colore de gauche à droite, précédée d'un liseré orange */
+.cta-line { --p: 0; display: block; color: transparent; background: linear-gradient(90deg, var(--fin, #fff) 0%, var(--fin, #fff) 30%,
+  var(--orange) 40%, transparent 50%, transparent 60%, transparent 100%);
+  background-size: 350% 100%; background-position-x: calc((100 - var(--p)) * 1%); -webkit-background-clip: text; background-clip: text; }
+@media (max-width: 991px) {
+  .cta__btn { display: inline-flex; }
+  .cta__link { display: none; }
+}
+@media (max-width: 760px), (max-aspect-ratio: 1/1) { .cta { padding: 0 20px 64px; } }
+@media (max-width: 767px) {
+  .cta__inner { border-radius: 24px; }
+  .cta__text { min-height: 0; padding: 72px 22px 64px; }
+  .cta__title { font-size: clamp(32px, 9vw, 40px); }
+  .cta__circs span { width: calc(32 * var(--hv)); }
+}
+@media (prefers-reduced-motion: reduce) { .cta__circs span { animation-duration: 60s; } }
+
+/* le rond qui suit la souris (repris du curseur de Harborview : .cursor-main.has-link, sa traînée) : invisible hors de
+   la carte ; à son survol il grandit de 6,4 à 12 rem en se remplissant de l'orange du site, son texte apparaît */
+.hs-cursor { display: none; position: fixed; inset: 0; z-index: 90; pointer-events: none; }
+@media (min-width: 992px) and (hover: hover) and (pointer: fine) { .hs-cursor { display: block; } }
+.hs-cursor__main { position: absolute; top: 0; left: 0; z-index: 1; display: flex; align-items: center; justify-content: center;
+  width: calc(6.4 * var(--hv)); height: calc(6.4 * var(--hv)); border-radius: 50%; opacity: 0; will-change: transform;
+  transition: opacity .35s, height .35s, background-color .35s, width .35s; }
+.hs-cursor.is-link .hs-cursor__main { width: calc(12 * var(--hv)); height: calc(12 * var(--hv)); background-color: var(--orange); opacity: 1; }
+.hs-cursor__label { width: calc(10.2 * var(--hv)); color: #fff; text-align: center; opacity: 0; transform: scale(0);
+  font: 800 calc(1.3 * var(--hv))/1.3 var(--title); letter-spacing: .08em; text-transform: uppercase;
+  transition: transform .4s ease-in-out, opacity .4s ease-in-out; }
+.hs-cursor.is-link .hs-cursor__label { opacity: 1; transform: scale(1); }
+.hs-cursor__trail i { position: fixed; top: 0; left: 0; border-radius: 50%; background-color: var(--orange); filter: blur(2.5px);
+  will-change: transform, opacity; pointer-events: none; }
+
+/* ---------------------------------------------------------------- pied de page (js/footer.js)
+   Celui du site Harborview (Projets/Harborview : .footer et ses blocs dans la feuille Webflow, les styles embarqués de
+   index.html), mesure pour mesure en --hv (voir la section « Book a call ») : grille de 16 colonnes, marges de 4 rem,
+   gouttières de 2 rem. Les blocs sans rapport avec ce site sont remplacés (voir index.html). Habillé comme le reste du
+   site : sur le crème de la page, Manrope, bleu nuit, le vert en accent, coins arrondis ; les petites étiquettes ont
+   le style du compteur des services (« 01 / 05 »). Le texte a des tailles plancher (lisible sur les petits écrans). */
+.ft { --ft-bg: var(--paper); --ft-main: var(--ink); --ft-soft: #3a4352; --ft-light: rgba(15, 26, 44, .12);
+  --ft-dis: rgba(15, 26, 44, .16); --ft-note: #6a7382; --ft-brand: var(--green); --ft-switch: rgba(15, 26, 44, .05);
+  --ft-pill: #fff; --ft-gap: calc(2 * var(--hv));
+  position: relative; z-index: 5; overflow: clip; background: var(--ft-bg); color: var(--ft-main);
+  font: 500 clamp(15px, 1.05vw, 17px)/1.4 var(--body); }
+.ft p { margin: 0; }
+.ft a { color: inherit; }
+.ft button { appearance: none; margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.ft__inner { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); column-gap: var(--ft-gap);
+  padding: calc(4.8 * var(--hv)) calc(4 * var(--hv)); }
+.ft__line, .ft__info-line { display: block; width: 100%; height: max(1px, calc(.1 * var(--hv))); background: var(--ft-light);
+  transform-origin: left; }
+.ft-label { font: 800 11px/1.4 var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--ft-note); }
+.ft-mono { font: 800 11px/1.4 var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--ft-note); }
+.ft-txt { font-size: clamp(16px, 1.2vw, 19px); font-weight: 700; line-height: 1.35; }
+.ft-nw { white-space: nowrap; }
+.ft-item { display: flex; flex-direction: column; align-items: flex-start; gap: calc(1.2 * var(--hv)); }
+
+/* les blocs dans la grille */
+.ft__sub { grid-column: 1 / 4; grid-row: 1; margin-bottom: calc(3 * var(--hv)); font-size: clamp(16px, 1.2vw, 19px); font-weight: 700;
+  line-height: 1.4; color: var(--ft-main); }
+.ft__side { grid-column: 1 / 4; grid-row: 2; }
+.ft__side .ft__line, .ft__menu > .ft__line { margin-bottom: calc(6.4 * var(--hv)); }
+.ft__menu { grid-column: 5 / 17; grid-row: 2; display: grid; grid-template-columns: subgrid; align-content: start;
+  margin-bottom: calc(6.4 * var(--hv)); }
+.ft__menu > .ft__line { grid-column: 1 / -1; }
+.ft__nav { grid-column: 1 / 7; }
+.ft__devis { grid-column: 9 / 13; }
+.ft__devis-txt { font-size: clamp(15px, 1.05vw, 17px); font-weight: 500; line-height: 1.55; color: var(--ft-soft); }
+.ft__info { grid-column: 5 / 17; grid-row: 3; display: flex; flex-direction: column; align-items: flex-start; min-width: 0;
+  padding: calc(2.4 * var(--hv)) 0; }
+.ft__info-line { display: none; }
+.ft__thumb { grid-column: 1 / 4; grid-row: 4; margin-top: calc(4.8 * var(--hv)); }
+.ft__thumb-img { aspect-ratio: 586 / 370; overflow: hidden; border-radius: 18px; }
+.ft__thumb-img img { width: 100%; height: 100%; object-fit: cover; }
+.ft__main { grid-column: 5 / 17; grid-row: 4; display: grid; grid-template-columns: subgrid; padding-bottom: calc(4.8 * var(--hv)); }
+.ft__main-line { grid-column: 1 / -1; margin-bottom: calc(4.8 * var(--hv)); }
+.ft--tablette { display: none; }
+.ft__zone { grid-column: 1 / 5; display: grid; align-content: start; row-gap: calc(6.4 * var(--hv)); }
+.ft__contact { grid-column: 5 / 9; display: flex; flex-direction: column; justify-content: space-between; gap: calc(3.2 * var(--hv)); }
+.ft__map { grid-column: 9 / 13; }
+.ft__bot { grid-column: 1 / 17; grid-row: 5; display: grid; grid-template-columns: subgrid; align-items: center; }
+.ft__bot .ft__line { grid-column: 1 / -1; }
+.ft__copy { grid-column: 1 / 5; padding: calc(2 * var(--hv)) 0; }
+.ft__legal { grid-column: 5 / -1; padding: calc(2 * var(--hv)) 0; }
+.ft__logo { grid-column: 1 / 17; grid-row: 6; margin-top: calc(2.8 * var(--hv)); }
+
+/* les liens : le texte roule vers le haut au survol, son double arrive du bas */
+.ft-link { display: flex; color: inherit; }
+.ft-roll { display: grid; overflow: hidden; font-size: clamp(16px, 1.2vw, 19px); font-weight: 700; line-height: 1.2; }
+/* de quoi loger les accents des capitales (« À propos ») sans décaler la ligne */
+.ft-roll { padding-top: .25em; margin-top: -.25em; }
+.ft-roll > span { grid-area: 1 / 1; transition: transform .7s cubic-bezier(.22, 1, .36, 1); }
+.ft-roll__b { transform: translateY(calc(100% + .3em)); }
+.ft-link.is-current { color: var(--ft-brand); }
+@media (hover: hover) and (min-width: 992px) {
+  .ft-link:hover .ft-roll__t { transform: translateY(calc(-100% - .3em)); }
+  .ft-link:hover .ft-roll__b { transform: translateY(0); }
+}
+.ft-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(1.2 * var(--hv)) var(--ft-gap); width: 100%; }
+.ft-slashes { display: flex; flex-wrap: wrap; align-items: center; gap: calc(.4 * var(--hv)); }
+.ft-slash { font-size: clamp(16px, 1.2vw, 19px); font-weight: 700; line-height: 1.2; margin-left: calc(.4 * var(--hv)); }
+
+/* le lien fléché (« Direction on Google ») : la flèche se redessine, le trait glisse sous le texte */
+.ft-arrow { display: flex; align-items: center; color: inherit; }
+.ft-arrow__ic { flex: none; display: flex; width: 15px; height: 15px; margin-right: 8px; color: var(--ft-brand); }
+.ft-arrow__ic svg { width: 100%; stroke-dasharray: 14.28; stroke-dashoffset: 0; }
+.ft-hl { --line-spacing: 10px; position: relative; display: inline-block; overflow: hidden; vertical-align: bottom;
+  font-size: clamp(15px, 1.05vw, 17px); font-weight: 700; line-height: 1.4; }
+.ft-hl::before, .ft-hl::after { content: ''; position: absolute; bottom: .1em; display: block; width: 100%;
+  height: max(1px, calc(.1 * var(--hv))); background: currentColor; transition: transform .6s cubic-bezier(.66, 0, .15, 1); }
+.ft-hl::before { left: 0; }
+.ft-hl::after { left: calc(-1 * var(--line-spacing)); transform: translateX(-100%); }
+@media (hover: hover) and (min-width: 992px) {
+  .ft-arrow:hover .ft-arrow__ic svg { stroke-dashoffset: 29px; transition: stroke-dashoffset .6s cubic-bezier(.59, .23, .22, .96); }
+  .ft-arrow:hover .ft-hl::before { transform: translateX(calc(100% + var(--line-spacing))); }
+  .ft-arrow:hover .ft-hl::after { transform: translateX(var(--line-spacing)); }
+}
+
+/* le sélecteur Services / Communes et le défilé */
+.ft-switch { position: relative; display: flex; margin-bottom: calc(1 * var(--hv)); padding: calc(.4 * var(--hv)); border-radius: 100vmax;
+  background: var(--ft-switch); }
+.ft-switch__inner { position: relative; z-index: 2; display: flex; }
+.ft-switch__btn { width: calc(8.8 * var(--hv)); padding: calc(1 * var(--hv)) 0 !important; color: var(--ft-soft) !important;
+  font: 400 calc(1 * var(--hv))/1.4 'BT Steinhart Mono', Arial, sans-serif !important; text-transform: uppercase; transition: color .4s; }
+.ft-switch__btn.is-active { pointer-events: none; color: var(--ft-main) !important; }
+@media (hover: hover) and (min-width: 992px) { .ft-switch__btn:hover { color: var(--ft-main) !important; } }
+.ft-switch__bg { position: absolute; z-index: 1; top: calc(.4 * var(--hv)); bottom: calc(.4 * var(--hv)); left: calc(.4 * var(--hv));
+  width: calc(8.8 * var(--hv)); border-radius: 100vmax; background: var(--ft-pill); pointer-events: none;
+  transform: translateX(calc(var(--i, 0) * 100%)); transition: transform .45s cubic-bezier(.33, 1, .68, 1); }
+.ft-switch__bg.is-squash { animation: ft-squash .45s cubic-bezier(.33, 1, .68, 1); }
+@keyframes ft-squash { 0% { scale: 1 1; } 44% { scale: .95 .85; } 100% { scale: 1 1; } }
+.ft-marquee { display: grid; width: calc(100% + 1 * var(--hv) + 4 * var(--hv)); margin-left: calc(-1 * var(--hv));
+  margin-right: calc(-4 * var(--hv)); padding-left: calc(1 * var(--hv)); overflow: hidden; color: var(--ft-dis);
+  -webkit-mask-image: linear-gradient(90deg, #0000 0%, #000 calc(10 * var(--hv)) calc(100% - 10 * var(--hv)), #0000 100%);
+  mask-image: linear-gradient(90deg, #0000 0%, #000 calc(10 * var(--hv)) calc(100% - 10 * var(--hv)), #0000 100%); }
+.ft-marquee__track { grid-area: 1 / 1; display: flex; opacity: 0; pointer-events: none; transition: opacity .4s cubic-bezier(.445, .05, .55, .95); }
+.ft-marquee__track.is-active { opacity: 1; pointer-events: auto; }
+.ft-marquee__list { flex: none; display: flex; align-items: center; gap: calc(1.2 * var(--hv)); padding-right: calc(1.2 * var(--hv)); }
+.ft-marquee__list.is-moving { animation: ft-marquee var(--dur, 30s) linear infinite; }
+@keyframes ft-marquee { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+.ft-marquee__item { display: flex; align-items: center; gap: calc(1.2 * var(--hv)); white-space: nowrap;
+  font: 500 calc(3.2 * var(--hv))/1.2 'Helvetica Neue', Arial, sans-serif; transition: color .3s; }
+.ft-marquee__item::after { content: '•'; color: var(--ft-dis); }
+.ft-marquee__item:hover { color: var(--ft-brand); }
+span.ft-marquee__item { cursor: default; }
+@media (prefers-reduced-motion: reduce) { .ft-marquee__list.is-moving { animation-duration: 600s; } }
+
+/* la carte en points de la Région bruxelloise (des points qui battent) */
+.ft__map { min-width: 0; }
+.ft-map__svg { display: block; width: auto; height: calc(20.3 * var(--hv)); max-width: 100%; color: var(--ft-main); overflow: visible; }
+.ft-map__pulse circle { fill: var(--green); fill-opacity: .28; transform-box: fill-box; transform-origin: center;
+  animation: ft-pulse 3s cubic-bezier(.445, .05, .55, .95) calc(var(--delay, 0s) - var(--stagger, 0s)) infinite alternate; }
+.ft-map__pulse--1 { --stagger: -.3s; } .ft-map__pulse--2 { --stagger: -2.1s; } .ft-map__pulse--3 { --stagger: -4.7s; }
+.ft-map__pulse--4 { --stagger: -1.4s; } .ft-map__pulse--5 { --stagger: -6.2s; } .ft-map__pulse--6 { --stagger: -3.5s; }
+@keyframes ft-pulse { 0% { transform: scale(0); } 50% { transform: scale(1); } 100% { transform: scale(0); } }
+@media (prefers-reduced-motion: reduce) { .ft-map__pulse circle { animation: none; transform: scale(.6); } }
+
+/* le nom du site en points (js/footer.js) : la toile déborde de son cadre pour que les points s'y dispersent */
+.ft__logo-canvas { position: relative; height: calc(12.75 * var(--hv)); }
+.ft__logo-canvas canvas { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+
+/* apparitions (js/footer.js) : traits qui se tirent, blocs qui montent, photo qui se découvre */
+.ft-hide { visibility: hidden; }
+.ft-line-anim { transform: scaleX(0); }
+.ft-up { opacity: 0; translate: 0 var(--from, calc(3.2 * var(--hv))); }
+.ft-left { opacity: 0; translate: calc(3.2 * var(--hv)) 0; }
+.ft-thumb-anim { clip-path: inset(20%); }
+.ft-thumb-anim img { scale: 1.4; opacity: 0; }
+
+/* tablette (paliers de Harborview) */
+@media (max-width: 991px) {
+  .ft__inner { padding-inline: calc(2.4 * var(--hv)); }
+  .ft__nav { grid-column: 1 / 7; }
+  .ft-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ft__devis { grid-column: 7 / 13; }
+  .ft__info { padding-top: 0; }
+  .ft__info-line { display: block; margin-bottom: calc(2.4 * var(--hv)); }
+  .ft__main { row-gap: calc(4.8 * var(--hv)); }
+  .ft__main-line { margin-bottom: calc(2.4 * var(--hv)); }
+  .ft__zone { grid-column: 1 / 7; }
+  .ft__contact { grid-column: 7 / 13; }
+  .ft__map { grid-column: 1 / -1; }
+  .ft__thumb { margin-top: calc(2.4 * var(--hv)); }
+  .ft__copy { grid-column: 1 / 7; } .ft__legal { grid-column: 7 / -1; }
+}
+/* téléphone : une seule colonne, dans l'ordre de Harborview (défilé, plan, devis, contact, zone, carte, nom, mentions) */
+@media (max-width: 767px) {
+  .ft { --ft-gap: calc(1.6 * var(--hv)); }
+  .ft__inner { display: flex; flex-direction: column; padding: calc(4 * var(--hv)) calc(1.6 * var(--hv)) 0; }
+  .ft__sub { order: 1; margin: 0; }
+  .ft__info { order: 2; margin-top: calc(3.2 * var(--hv)); padding: 0; }
+  .ft__info-line { order: 9; margin: calc(2.4 * var(--hv)) 0 0; }
+  .ft-switch { margin-bottom: calc(.8 * var(--hv)); }
+  .ft-marquee { margin-right: calc(-1.6 * var(--hv)); margin-left: calc(-1.6 * var(--hv)); padding-left: calc(1.6 * var(--hv));
+    width: calc(100% + 3.2 * var(--hv)); }
+  .ft-marquee__item { font-size: calc(2.8 * var(--hv)); }
+  .ft-switch { margin-bottom: calc(.8 * var(--hv)); }
+  .ft__menu { order: 3; display: flex; flex-direction: column; margin: calc(3.2 * var(--hv)) 0 0; }
+  .ft__menu > .ft__line { display: none; }
+  .ft-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ft__devis { margin-top: calc(3.2 * var(--hv)); padding-top: calc(3.2 * var(--hv)); border-top: max(1px, calc(.1 * var(--hv))) solid var(--ft-light); }
+  .ft__side { order: 4; margin-top: calc(3.2 * var(--hv)); }
+  .ft__side .ft__line { margin-bottom: calc(3.2 * var(--hv)); }
+  .ft__thumb { display: none; }
+  .ft__main { order: 5; display: flex; flex-direction: column; padding: 0; margin-top: calc(3.2 * var(--hv)); }
+  .ft__main-line { margin-bottom: calc(3.2 * var(--hv)); }
+  /* (pas de barre entre la zone et la carte : la carte suit directement « Voir la zone ») */
+  .ft__contact { order: -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(2.4 * var(--hv)) var(--ft-gap); }
+  .ft__contact .ft-item:first-child { grid-column: 1 / -1; }
+  .ft__zone { row-gap: calc(2.4 * var(--hv)); }
+  .ft__map { margin-top: calc(-2.4 * var(--hv)); }
+  .ft-map__svg { height: calc(24 * var(--hv)); width: auto; margin: 0 auto; }
+  .ft-txt, .ft-roll, .ft-slash { font-size: 16px; }
+  .ft__logo { display: none; }                     /* (pas de nom en points sur téléphone) */
+  .ft__bot { order: 7; display: flex; flex-direction: column; align-items: flex-start; gap: calc(2 * var(--hv)); padding: calc(2 * var(--hv)) 0; }
+  .ft__copy, .ft__legal { padding: 0; color: var(--ft-note); }
+}
+
