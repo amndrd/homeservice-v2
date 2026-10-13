@@ -2,8 +2,8 @@
 // js/zonedata.js) : les 19 communes de Bruxelles-Capitale (vert plein), sa périphérie (les communes qui la touchent,
 // ainsi que Wezembeek-Oppem ; vert clair) et, autour, les communes suivantes (au-delà), qui s'effacent vers les bords ; des cercles de 10 et 20 km
 // autour du centre de la région. Au survol (ou au toucher) d'une commune : son nom et sa zone ; un clic la choisit. À
-// droite : les trois zones et leurs frais de déplacement, et « Réserver un appel » (qui emmène la commune choisie sur
-// la carte, s'il y en a une, sur la page de réservation).
+// droite : les trois zones et leurs frais de déplacement, et « Réserver un appel » (qui emmène le code postal de la
+// commune choisie sur la carte, s'il y en a une, sur la page de réservation).
 // On l'ouvre depuis la carte creusée des chiffres (js/statsmur.js : la carte du mur s'agrandit jusqu'à remplir
 // l'écran, et y revient à la fermeture), « Voir la zone » du pied de page, « Zone » du menu, une commune du défilé du
 // pied de page (elle est alors choisie), ou une adresse qui finit par #zone (depuis la page de réservation). La croix
@@ -113,7 +113,7 @@ import { KM, ZONE, REGION } from './zonedata.js';
   // la commune choisie (sans marque sur la carte) : « Réserver un appel » l'emmène
   function select(c) {
     selected = c;
-    cta.href = 'reserver.html' + (c ? `?commune=${encodeURIComponent(c.fr)}` : '');
+    cta.href = 'reserver.html' + (c ? `?cp=${c.pc[0]}` : '');
   }
   // les communes par leur nom (celles du défilé du pied de page)
   const norm = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
