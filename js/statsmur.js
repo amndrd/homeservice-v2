@@ -138,6 +138,7 @@ function init(found) {
   gl = { renderer, scene, camera, sun, wall, ball, stage, phase: 'idle', t0: 0, extent, voidX: 0, voidK: 0 };
   if (BLOCK_ON) makeBlock();
   makeReliefs();
+  makeOutline();
   layout();
   new ResizeObserver(layout).observe(document.body);
   window.addEventListener('scroll', wake, { passive: true });
@@ -347,6 +348,7 @@ function draw(dt) {
   if (dig.busy) busy = true;
   if (dig.shown) shown = true;
   if (stepVoid(dt)) busy = true;
+  if (stepOutline(dt)) busy = true;
   gl.renderer.domElement.style.visibility = shown ? '' : 'hidden';
   gl.renderer.render(gl.scene, gl.camera);
   return busy;
@@ -888,4 +890,127 @@ function stepReliefs(real) {
     if (open) shown = true;
   });
   return { busy, shown };
+}
+
+// ------------------------------------------------------------ la carte cliquable : « Voir la zone » (js/zone.js)
+// Une fois la carte creusée, la souris au-dessus de la région : un contour vert se dessine tout autour (un ruban posé
+// sur le mur, juste à l'extérieur du trou, tracé en ZN.draw s), la main, et « Voir la zone » (avec le nom de la commune
+// survolée) suit la souris ; un clic ouvre la zone d'intervention, qui part de la place de la carte. Hors de la région,
+// le contour s'efface.
+// [largeur du ruban (part de la hauteur de la carte), durée du tracé, de l'effacement (s), part du creusement à
+//  partir de laquelle la carte répond]
+const ZN = { width: 0.007, draw: 0.6, fade: 0.25, ready: 0.9 };
+let zn = null;
+function makeOutline() {
+  const m = reliefs[ONLY];
+  if (!m) return;
+  const pts = REGION, n = pts.length;
+  // le sens du contour : la normale extérieure de chaque côté
+  let area = 0;
+  for (let i = 0; i < n; i++) { const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % n]; area += x0 * y1 - x1 * y0; }
+  const sgn = area > 0 ? 1 : -1;
+  const nrm = pts.map((p, i) => {
+    const [x0, y0] = p, [x1, y1] = pts[(i + 1) % n], l = Math.hypot(x1 - x0, y1 - y0) || 1;
+    return [sgn * (y1 - y0) / l, -sgn * (x1 - x0) / l];
+  });
+  const pos = [], along = [], idx = [];
+  let total = 0;
+  const lens = [0];
+  for (let i = 1; i <= n; i++) { const [a, b] = pts[i - 1], [c, d] = pts[i % n]; total += Math.hypot(c - a, d - b); lens.push(total); }
+  for (let i = 0; i <= n; i++) {
+    const k = i % n, a = nrm[(k - 1 + n) % n], b = nrm[k];
+    let mx = a[0] + b[0], my = a[1] + b[1];
+    const ml = Math.hypot(mx, my) || 1;
+    mx /= ml; my /= ml;
+    const len = Math.min(2, 1 / Math.max(0.3, mx * b[0] + my * b[1])) * ZN.width;
+    const [x, y] = pts[k];
+    pos.push(x, y, 0, x + mx * len, y + my * len, 0);
+    along.push(lens[i] / total, lens[i] / total);
+    if (i < n) idx.push(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('along', new THREE.Float32BufferAttribute(along, 1));
+  g.setIndex(idx);
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uP: { value: 0 }, uA: { value: 0 } },
+    vertexShader: 'attribute float along; varying float vA; void main() { vA = along; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    // (le vert du site, tel quel : pas de conversion de couleurs ici)
+    fragmentShader: 'uniform float uP, uA; varying float vA; void main() { if (vA > uP) discard; gl_FragColor = vec4(0.0667, 0.4392, 0.2471, uA); }',
+    transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(g, mat);
+  mesh.position.z = 0.002;
+  mesh.renderOrder = 10;
+  mesh.visible = false;
+  m.group.add(mesh);
+  zn = { m, mesh, mat, p: 0, a: 0, on: false, x: -1, y: -1 };
+  addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    zn.x = e.clientX; zn.y = e.clientY;
+    hoverMap();
+  }, { passive: true });
+  addEventListener('scroll', hoverMap, { passive: true });
+  document.documentElement.addEventListener('mouseleave', () => { zn.x = -1; hoverMap(); });
+  addEventListener('click', (e) => {
+    if (!zn.on || e.button !== 0 || e.target.closest?.('a, button, input, select, textarea')) return;
+    setHover(null);
+    window.hsZone?.open({ from: mapRect, map: true });
+  });
+}
+// le point de la carte sous la souris : la commune (son code), ou null hors de la région (ou carte pas prête)
+const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2(), _hit = new THREE.Vector3();
+const _plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+const inPoly = (x, y, ring) => {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+};
+function pickMap(x, y) {
+  const m = zn?.m;
+  if (!gl || !m || x < 0 || !gl.seen || !m.group.visible || window.hsZone?.isOpen()) return null;
+  if (m.cells.some((c) => c.k < ZN.ready) || (window.hsStats?.active ?? -1) < 0) return null;
+  _ndc.set((x / window.innerWidth) * 2 - 1, -(y / window.innerHeight) * 2 + 1);
+  _ray.setFromCamera(_ndc, gl.camera);
+  _plane.constant = -m.group.position.z;
+  if (!_ray.ray.intersectPlane(_plane, _hit)) return null;
+  const u = (_hit.x - m.group.position.x) / m.S, v = (_hit.y - m.group.position.y) / m.S;
+  if (!inPoly(u, v, REGION)) return null;
+  const c = COMMUNES.find((k) => k.p.some((ring) => inPoly(u, v, ring)));
+  return c ? c.nis : 21004;
+}
+function setHover(nis) {
+  const on = nis != null;
+  if (on !== zn.on) {
+    zn.on = on;
+    document.documentElement.classList.toggle('zn-hover', on);
+    wake();
+  }
+  window.hsZone?.hover(zn.x, zn.y, nis);
+}
+function hoverMap() { if (zn) setHover(pickMap(zn.x, zn.y)); }
+// la place de la carte à l'écran (le cadre de la région)
+const _v = new THREE.Vector3();
+function mapRect() {
+  const m = zn.m;
+  let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+  for (const [x, y] of REGION) {
+    _v.set(m.group.position.x + x * m.S, m.group.position.y + y * m.S, m.group.position.z).project(gl.camera);
+    const sx = (_v.x + 1) / 2 * window.innerWidth, sy = (1 - _v.y) / 2 * window.innerHeight;
+    l = Math.min(l, sx); r = Math.max(r, sx); t = Math.min(t, sy); b = Math.max(b, sy);
+  }
+  return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
+}
+// un pas : le contour se trace (souris sur la carte) ou s'efface
+function stepOutline(dt) {
+  if (!zn) return false;
+  if (zn.on) { zn.a = Math.min(1, zn.a + dt / 0.15); zn.p = Math.min(1, zn.p + dt / ZN.draw); }
+  else { zn.a = Math.max(0, zn.a - dt / ZN.fade); if (zn.a === 0) zn.p = 0; }
+  const e = 1 - (1 - zn.p) ** 3;
+  zn.mat.uniforms.uP.value = zn.p >= 1 ? 1.001 : e;
+  zn.mat.uniforms.uA.value = zn.a;
+  zn.mesh.visible = zn.a > 0;
+  return zn.on ? zn.p < 1 || zn.a < 1 : zn.a > 0;
 }
