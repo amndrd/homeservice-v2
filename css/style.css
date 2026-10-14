@@ -196,7 +196,7 @@ html.statsVoid .stat__num, html.statsVoid .stat__text { opacity: 0; }
 .stats__snap { position: absolute; left: 0; width: 1px; height: 1px; pointer-events: none; }
 
 @media (max-width: 760px), (max-aspect-ratio: 1/1) {
-  .stats { padding: 3vh 20px 12vh; --F: clamp(36px, 11vw, 52px); }
+  .stats { padding: 3vh 20px 6vh; --F: clamp(36px, 11vw, 52px); }
   .stats__list { margin: 0 auto; }
   html:not(.stats3d) .stat { grid-template-columns: calc(1.75 * var(--F)) minmax(0, 1fr); height: auto;
     padding: calc(.7 * var(--F)) 0; }
@@ -439,6 +439,62 @@ html.svc-lock { overflow: hidden; }
 .lang__menu button[aria-selected="true"]::after { content: ""; width: 6px; height: 6px; margin-left: auto;
   border-radius: 50%; background: var(--orange); }
 
+/* sur ordinateur, le panneau du menu ne compte pas : ses enfants restent dans la barre ; les trois barres sont cachées */
+.header__menu { display: contents; }
+.burger { display: none; }
+
+/* ---------------------------------------------------------------- navbar sur téléphone (js/veil.js)
+   Plus de barre : le logo en noir en haut à gauche, trois barres à droite. Ouvert, le gris sombre de la barre
+   d'ordinateur descend du haut jusqu'en bas de l'écran, puis les boutons apparaissent en fondu (logo et barres
+   passent en blanc, les barres forment une croix). Fermé : les boutons s'effacent d'abord, puis le panneau remonte. */
+@media (max-width: 760px) {
+  .header { top: 0; }
+  .header__bar { width: 100%; max-width: none; justify-content: space-between; padding: 22px 24px; border: 0;
+    border-radius: 0; background: none; box-shadow: none; }
+  .logo { position: relative; z-index: 2; height: auto; margin: 0; padding: 0; }
+  .logo img { height: 38px; filter: brightness(0); transition: filter .3s ease .25s; }
+  .burger { position: relative; z-index: 2; display: grid; place-content: center; gap: 6px; width: 44px; height: 44px;
+    margin-right: -8px; padding: 0; border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .burger span { display: block; width: 24px; height: 2px; border-radius: 2px; background: var(--ink);
+    transition: transform .4s var(--ease), opacity .2s ease, background .3s ease .25s; }
+
+  .header__menu { position: fixed; inset: 0; z-index: 1; display: flex; flex-direction: column; justify-content: center;
+    gap: 36px; padding: 96px 28px 40px; background: var(--bar); clip-path: inset(0 0 100% 0); visibility: hidden;
+    transition: clip-path .6s cubic-bezier(.7, 0, .2, 1) .3s, visibility 0s linear .9s; }
+  /* les boutons : en colonne, grands, en fondu (d'abord partis à la fermeture, après le panneau à l'ouverture) */
+  .header__menu > * { opacity: 0; transform: translateY(12px); transition: opacity .3s ease, transform .3s ease; }
+  .nav { flex-direction: column; align-items: flex-start; gap: 4px; overflow: visible; }
+  .nav a { height: auto; padding: 6px 0; border-radius: 0; font: 700 34px/1.15 var(--title); letter-spacing: -.01em; }
+  .nav a.active { background: none; color: var(--orange); }
+  .lang { margin: 0; }
+  .lang__btn { display: none; }
+  .lang__menu { position: static; display: flex; gap: 8px; min-width: 0; padding: 0; border: 0; background: none;
+    box-shadow: none; opacity: 1; visibility: visible; transform: none; transition: none; }
+  /* les trois langues en pastilles (le code seul : le nom complet est masqué par font-size: 0) */
+  .lang__menu button { width: auto; height: 40px; padding: 0 16px; border: 1px solid var(--bar-line); border-radius: 100vmax;
+    font-size: 0; }
+  .lang__menu button span { width: auto; font-size: 13px; opacity: 1; }
+  .lang__menu button[aria-selected="true"] { border-color: #fff; background: #fff; color: #000; }
+  .lang__menu button[aria-selected="true"]::after { display: none; }
+  .header__cta { align-self: flex-start; height: 50px; margin: 0; padding: 0 24px; border-radius: 12px; font-size: 16px; }
+
+  .header.menu-ouvert .header__menu { clip-path: inset(0 0 0 0); visibility: visible;
+    transition: clip-path .6s cubic-bezier(.7, 0, .2, 1), visibility 0s; }
+  .header.menu-ouvert .header__menu > * { opacity: 1; transform: none; transition: opacity .4s ease, transform .4s ease; }
+  .header.menu-ouvert .nav { transition-delay: .45s; }
+  .header.menu-ouvert .lang { transition-delay: .52s; }
+  .header.menu-ouvert .header__cta { transition-delay: .59s; }
+  .header.menu-ouvert .logo img { filter: none; transition-delay: .1s; }
+  .header.menu-ouvert .burger span { background: #fff; transition-delay: 0s, 0s, .1s; }
+  .header.menu-ouvert .burger span:nth-child(1) { transform: translateY(8px) rotate(45deg); }
+  .header.menu-ouvert .burger span:nth-child(2) { opacity: 0; }
+  .header.menu-ouvert .burger span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+  html.menu-ouvert, html.menu-ouvert body { overflow: hidden; }
+}
+
+/* les animations sans fin d'une section hors de l'écran sont en pause (js/veil.js : .hors-ecran) */
+.hors-ecran, .hors-ecran *, .hors-ecran *::before, .hors-ecran *::after { animation-play-state: paused !important; }
+
 /* ---------------------------------------------------------------- écran de chargement (repris du site immersif)
    Fond noir, logo blanc, cercle qui tourne ; à l'arrivée sur le site seulement (pas après une transition), jusqu'à ce
    que la page soit prête (l'îlot chargé, sur l'accueil), puis il s'efface en fondu (js/veil.js). Dessiné en CSS sur
@@ -486,30 +542,36 @@ html.veil-in::after { content: ""; position: fixed; inset: 0; z-index: 151;
 .ba-head { margin: 0 auto clamp(28px, 4vh, 44px); text-align: center; }
 .ba-head h2 { margin: 0; font: 800 clamp(30px, 3vw, 48px)/1 var(--title); letter-spacing: .04em; text-transform: uppercase;
   color: var(--ink); text-wrap: balance; }
-.ba { --pos: 50%; position: relative; width: min(900px, 100%); margin: 0 auto; aspect-ratio: 4 / 3; overflow: hidden;
-  border-radius: 28px; cursor: ew-resize; touch-action: pan-y; user-select: none;
-  box-shadow: 0 0 0 1px rgba(15, 26, 44, .05), 0 24px 60px rgba(15, 26, 44, .08); }
-.ba__layer { position: absolute; inset: 0; display: grid; place-items: center; }
-.ba__layer img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-.ba__layer--avant { background: #e4e2dc; }
-.ba__layer--apres { background: #cfe8d8; clip-path: inset(0 0 0 var(--pos)); }
-.ba__tag { position: absolute; top: 18px; z-index: 2; padding: 8px 14px; border-radius: 10px; background: rgba(255, 255, 255, .88);
-  font: 800 11px/1 var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); pointer-events: none; }
-.ba__tag--avant { left: 18px; }
-.ba__tag--apres { right: 18px; }
-.ba__bar { position: absolute; top: 0; bottom: 0; left: var(--pos); z-index: 3; width: 2px; translate: -50% 0; background: #fff;
-  box-shadow: 0 0 12px rgba(15, 26, 44, .18); pointer-events: none; }
-.ba__knob { position: absolute; top: 50%; left: 50%; translate: -50% -50%; display: grid; place-items: center; width: 52px;
-  height: 52px; border-radius: 50%; background: #fff; color: var(--ink); box-shadow: 0 6px 20px rgba(15, 26, 44, .18); }
-.ba__knob svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round;
-  stroke-linejoin: round; }
-.ba__range { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit;
-  pointer-events: none; }
-.ba:focus-within .ba__knob { outline: 2px solid #11703f; outline-offset: 3px; }
+/* le carrousel : une piste qui défile à l'horizontale, un chantier par écran (au doigt, on glisse ; sinon les flèches) */
+.ch { width: min(880px, 100%); margin: 0 auto; }
+.ch__piste { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+  scrollbar-width: none; }
+.ch__piste::-webkit-scrollbar { display: none; }
+.ch__chantier { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; }
+.ch__paire { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* chaque côté : 4:5, coins arrondis ; une vidéo ne se touche pas (pas de pause, pas de plein écran) */
+.ch__media { position: relative; margin: 0; aspect-ratio: 4 / 5; overflow: hidden; border-radius: 28px; background: #e4e2dc; }
+.ch__media img, .ch__media video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  pointer-events: none; user-select: none; }
+.ch__media video::-webkit-media-controls, .ch__media video::-webkit-media-controls-start-playback-button { display: none !important; }
+.ba__tag { position: absolute; top: 18px; left: 18px; z-index: 2; padding: 8px 14px; border-radius: 10px;
+  background: rgba(255, 255, 255, .88); font: 800 11px/1 var(--body); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink); pointer-events: none; }
+/* dessous : la barre de progression (remplie jusqu'au chantier affiché), le compteur, les flèches */
+.ch__bas { display: flex; align-items: center; gap: 18px; margin-top: 22px; }
+.ch__progres { position: relative; flex: 1; height: 3px; overflow: hidden; border-radius: 3px; background: rgba(15, 26, 44, .12); }
+.ch__progres span { position: absolute; inset: 0; transform-origin: left; transform: scaleX(var(--p, .5));
+  border-radius: inherit; background: var(--ink); }
+.ch__compte { margin: 0; font: 600 13px/1 var(--body); letter-spacing: .04em; color: #6a7382; font-variant-numeric: tabular-nums; }
+.ch__compte b { color: var(--ink); font-weight: 800; }
+.ch__nav { display: flex; gap: 2px; margin-right: -8px; }
+.ch__nav .svc-arrow:disabled { opacity: .25; cursor: default; transform: none; color: var(--ink); }
 @media (max-width: 760px), (max-aspect-ratio: 1/1) {
-  .avant-apres { padding: 4vh 20px 12vh; }
-  .ba { aspect-ratio: 4 / 5; border-radius: 22px; }
-  .ba__knob { width: 46px; height: 46px; }
+  /* plus serrée sur téléphone : environ 100 px de vide de chaque côté (le bas des services compris) */
+  .avant-apres { margin-top: -2vh; padding: 0 20px 6vh; }
+  .ch__paire { gap: 6px; }
+  .ch__media { border-radius: 18px; }
+  .ba__tag { top: 10px; left: 10px; padding: 6px 9px; font-size: 9px; border-radius: 8px; }
 }
 
 /* ---------------------------------------------------------------- service sur mesure (js/surmesure.js)
@@ -575,7 +637,13 @@ html.veil-in::after { content: ""; position: fixed; inset: 0; z-index: 151;
   background-position: 50%; background-repeat: repeat; background-size: 11.3cqw; }
 @media (max-width: 760px), (max-aspect-ratio: 1/1) {
   .sur { padding: 6vh 20px 12vh; }
-  .sur__inner { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  /* empilé : le titre, la carte, puis la description et le bouton (le bloc de texte s'efface pour que la carte s'y glisse) */
+  .sur__inner { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .sur__text { display: contents; }
+  .sur__text h2 { order: 1; margin-bottom: 28px; }
+  .sur-card { order: 2; margin-bottom: 32px; }
+  .sur__text p { order: 3; }
+  .sur__cta { order: 4; justify-self: start; }
 }
 @media (prefers-reduced-motion: reduce) { .sur-card__shine { display: none; } }
 
