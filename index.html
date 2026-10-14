@@ -9,36 +9,43 @@
 <script>try { var v = sessionStorage.getItem('hs-veil'); if (document.prerendering || v) { document.documentElement.classList.add('veil-in'); sessionStorage.removeItem('hs-veil'); } else document.documentElement.classList.add('loading'); } catch (e) { document.documentElement.classList.add('loading'); }</script>
 <!-- chargés tout de suite : la police, le script de l'îlot et son modèle (même version que MODEL dans js/hero.js) -->
 <link rel="preload" href="fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="modulepreload" href="js/hero.min.js?v=9c11f6473d">
-<link rel="preload" href="models/ilot.glb?v=fe77098755" as="fetch" crossorigin
+<link rel="modulepreload" href="js/hero.min.js?v=35c1a1ad1a">
+<!-- sur ordinateur, l'îlot 3D est le hero : son code (three.js, morceau à part) est préchargé avec le point d'entrée -->
+<link rel="modulepreload" href="js/chunks/hero-W6CVDNTD.js" media="(min-width: 900px) and (hover: hover) and (pointer: fine)">
+<link rel="preload" href="models/ilot.glb?v=03c9895e49" as="fetch" crossorigin
   media="(min-width: 900px) and (hover: hover) and (pointer: fine)">
-<link rel="stylesheet" href="css/style.min.css?v=797999001f">
+<link rel="stylesheet" href="css/style.min.css?v=e1ead53e97">
 </head>
 <body>
 
 <header class="header" id="header">
   <div class="header__bar">
     <a href="#accueil" class="logo" data-veil aria-label="HomeService BXL, accueil" data-i18n-aria="home" aria-current="page"><img src="images/logo-blanc.webp" alt="HomeService BXL" width="801" height="380"></a>
-    <nav class="nav" aria-label="Navigation principale" data-i18n-aria="mainNav">
-      <a href="#a-propos" data-veil data-i18n="nav.about">À propos</a>
-      <a href="#chiffres" data-veil data-i18n="nav.stats">Zone</a>
-      <a href="#services" data-veil data-i18n="nav.services">Services</a>
-      <a href="#faq" data-veil data-i18n="ft.faq">FAQ</a>
-    </nav>
-    <div class="lang" id="lang">
-      <button class="lang__btn" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Langue"
-        data-i18n-aria="langBtn">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>
-        <span class="lang__code">FR</span>
-        <svg class="lang__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
-      </button>
-      <ul class="lang__menu" role="listbox">
-        <li><button type="button" role="option" data-lang="fr" lang="fr"><span>FR</span>Français</button></li>
-        <li><button type="button" role="option" data-lang="en" lang="en"><span>EN</span>English</button></li>
-        <li><button type="button" role="option" data-lang="nl" lang="nl"><span>NL</span>Nederlands</button></li>
-      </ul>
+    <!-- sur téléphone : le logo en noir, trois barres à droite ; elles ouvrent ce panneau sombre en plein écran
+         (js/veil.js). Sur ordinateur, le panneau s'efface (display: contents) et la barre reste celle d'origine. -->
+    <div class="header__menu" id="menu">
+      <nav class="nav" aria-label="Navigation principale" data-i18n-aria="mainNav">
+        <a href="#a-propos" data-veil data-i18n="nav.about">À propos</a>
+        <a href="#chiffres" data-veil data-i18n="nav.stats">Zone</a>
+        <a href="#services" data-veil data-i18n="nav.services">Services</a>
+        <a href="#faq" data-veil data-i18n="ft.faq">FAQ</a>
+      </nav>
+      <div class="lang" id="lang">
+        <button class="lang__btn" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Langue"
+          data-i18n-aria="langBtn">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>
+          <span class="lang__code">FR</span>
+          <svg class="lang__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+        </button>
+        <ul class="lang__menu" role="listbox">
+          <li><button type="button" role="option" data-lang="fr" lang="fr"><span>FR</span>Français</button></li>
+          <li><button type="button" role="option" data-lang="en" lang="en"><span>EN</span>English</button></li>
+          <li><button type="button" role="option" data-lang="nl" lang="nl"><span>NL</span>Nederlands</button></li>
+        </ul>
+      </div>
+      <a href="reserver.html" class="header__cta" data-veil data-i18n="cta">Réserver un appel</a>
     </div>
-    <a href="reserver.html" class="header__cta" data-veil data-i18n="cta">Réserver un appel</a>
+    <button class="burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu"><span></span><span></span><span></span></button>
   </div>
 </header>
 
@@ -296,22 +303,87 @@
       </div>
     </div>
   </section>
-  <!-- avant / après (js/avantapres.js) : la barre suit la souris au survol, sans clic. Images :
-       images/avant-apres/avant|apres.webp (4:3) et avant|apres-mobile.webp (4:5), recadrées depuis before.jpg / after.JPEG,
-       l'après recalé sur l'avant (même cadrage au pixel près). -->
+  <!-- avant / après (js/avantapres.js) : un carrousel de chantiers, chacun une paire « Avant » | « Après » côte à côte.
+       Chaque côté est une photo ou une vidéo (muette, en boucle, sans commandes : elle ne joue qu'à l'écran). Médias en
+       4:5 dans images/avant-apres/ : <chantier>-avant|apres.webp ; une vidéo = .av1.mp4 (AV1), .mp4 (H.264, pour les
+       navigateurs sans AV1) et .webp (son affiche, la première image) ; chacun aussi en -560 (560 px de large) pour le
+       téléphone. Les adresses sont dans data-* : js/avantapres.js les pose quand la section approche (rien n'est
+       téléchargé avant). Ajouter un chantier : copier un <article>. -->
   <section class="avant-apres" id="avant-apres" aria-labelledby="ba-titre">
     <header class="ba-head">
       <h2 id="ba-titre" data-i18n="ba.title">La différence se voit</h2>
     </header>
-    <div class="ba">
-      <div class="ba__layer ba__layer--avant"><picture><source media="(max-width: 760px), (max-aspect-ratio: 1/1)" srcset="images/avant-apres/avant-mobile.webp"><img src="images/avant-apres/avant.webp" alt="Avant" data-i18n-alt="ba.before" width="884" height="663" loading="lazy"></picture></div>
-      <div class="ba__layer ba__layer--apres"><picture><source media="(max-width: 760px), (max-aspect-ratio: 1/1)" srcset="images/avant-apres/apres-mobile.webp"><img src="images/avant-apres/apres.webp" alt="Après" data-i18n-alt="ba.after" width="884" height="663" loading="lazy"></picture></div>
-      <span class="ba__tag ba__tag--avant" aria-hidden="true" data-i18n="ba.before">Avant</span>
-      <span class="ba__tag ba__tag--apres" aria-hidden="true" data-i18n="ba.after">Après</span>
-      <div class="ba__bar" aria-hidden="true"><span class="ba__knob">
-        <svg viewBox="0 0 24 24"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg></span></div>
-      <input class="ba__range" type="range" min="2" max="98" value="50" aria-label="Comparer avant et après"
-        data-i18n-aria="ba.range">
+    <div class="ch" aria-roledescription="carrousel" aria-label="Nos chantiers" data-i18n-aria="ba.list">
+      <div class="ch__piste">
+        <article class="ch__chantier">
+          <div class="ch__paire">
+            <figure class="ch__media"><img data-src="images/avant-apres/jardin-avant.webp" data-srcset="images/avant-apres/jardin-avant-560.webp 560w, images/avant-apres/jardin-avant.webp 864w" sizes="(max-width: 760px) calc(50vw - 23px), 435px" alt="Le jardin avant" data-i18n-alt="ba.c1.before" width="864" height="1080">
+              <figcaption class="ba__tag" data-i18n="ba.before">Avant</figcaption></figure>
+            <figure class="ch__media"><video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
+                data-poster="images/avant-apres/jardin-apres.webp" data-poster-mobile="images/avant-apres/jardin-apres-560.webp" width="720" height="900" aria-label="Le jardin après" data-i18n-aria="ba.c1.after">
+                <source data-src="images/avant-apres/jardin-apres-560.av1.mp4" media="(max-width: 760px)" type='video/mp4; codecs="av01.0.04M.08"'>
+                <source data-src="images/avant-apres/jardin-apres.av1.mp4" type='video/mp4; codecs="av01.0.04M.08"'>
+                <source data-src="images/avant-apres/jardin-apres-560.mp4" media="(max-width: 760px)" type="video/mp4">
+                <source data-src="images/avant-apres/jardin-apres.mp4" type="video/mp4"></video>
+              <figcaption class="ba__tag" data-i18n="ba.after">Après</figcaption></figure>
+          </div>
+        </article>
+        <article class="ch__chantier">
+          <div class="ch__paire">
+            <figure class="ch__media"><video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
+                data-poster="images/avant-apres/haie-avant.webp" data-poster-mobile="images/avant-apres/haie-avant-560.webp" width="720" height="900" aria-label="La haie avant" data-i18n-aria="ba.c2.before">
+                <source data-src="images/avant-apres/haie-avant-560.av1.mp4" media="(max-width: 760px)" type='video/mp4; codecs="av01.0.04M.08"'>
+                <source data-src="images/avant-apres/haie-avant.av1.mp4" type='video/mp4; codecs="av01.0.04M.08"'>
+                <source data-src="images/avant-apres/haie-avant-560.mp4" media="(max-width: 760px)" type="video/mp4">
+                <source data-src="images/avant-apres/haie-avant.mp4" type="video/mp4"></video>
+              <figcaption class="ba__tag" data-i18n="ba.before">Avant</figcaption></figure>
+            <figure class="ch__media"><video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
+                data-poster="images/avant-apres/haie-apres.webp" data-poster-mobile="images/avant-apres/haie-apres-560.webp" width="720" height="900" aria-label="La haie après" data-i18n-aria="ba.c2.after">
+                <source data-src="images/avant-apres/haie-apres-560.av1.mp4" media="(max-width: 760px)" type='video/mp4; codecs="av01.0.04M.08"'>
+                <source data-src="images/avant-apres/haie-apres.av1.mp4" type='video/mp4; codecs="av01.0.04M.08"'>
+                <source data-src="images/avant-apres/haie-apres-560.mp4" media="(max-width: 760px)" type="video/mp4">
+                <source data-src="images/avant-apres/haie-apres.mp4" type="video/mp4"></video>
+              <figcaption class="ba__tag" data-i18n="ba.after">Après</figcaption></figure>
+          </div>
+        </article>
+        <article class="ch__chantier">
+          <div class="ch__paire">
+            <figure class="ch__media"><video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
+                data-poster="images/avant-apres/entree-avant.webp" data-poster-mobile="images/avant-apres/entree-avant-560.webp" width="720" height="900" aria-label="L'entrée avant" data-i18n-aria="ba.c3.before">
+                <source data-src="images/avant-apres/entree-avant-560.av1.mp4" media="(max-width: 760px)" type='video/mp4; codecs="av01.0.04M.08"'>
+                <source data-src="images/avant-apres/entree-avant.av1.mp4" type='video/mp4; codecs="av01.0.04M.08"'>
+                <source data-src="images/avant-apres/entree-avant-560.mp4" media="(max-width: 760px)" type="video/mp4">
+                <source data-src="images/avant-apres/entree-avant.mp4" type="video/mp4"></video>
+              <figcaption class="ba__tag" data-i18n="ba.before">Avant</figcaption></figure>
+            <figure class="ch__media"><video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
+                data-poster="images/avant-apres/entree-apres.webp" data-poster-mobile="images/avant-apres/entree-apres-560.webp" width="720" height="900" aria-label="L'entrée après" data-i18n-aria="ba.c3.after">
+                <source data-src="images/avant-apres/entree-apres-560.av1.mp4" media="(max-width: 760px)" type='video/mp4; codecs="av01.0.04M.08"'>
+                <source data-src="images/avant-apres/entree-apres.av1.mp4" type='video/mp4; codecs="av01.0.04M.08"'>
+                <source data-src="images/avant-apres/entree-apres-560.mp4" media="(max-width: 760px)" type="video/mp4">
+                <source data-src="images/avant-apres/entree-apres.mp4" type="video/mp4"></video>
+              <figcaption class="ba__tag" data-i18n="ba.after">Après</figcaption></figure>
+          </div>
+        </article>
+        <article class="ch__chantier">
+          <div class="ch__paire">
+            <figure class="ch__media"><img data-src="images/avant-apres/debarras-avant.webp" data-srcset="images/avant-apres/debarras-avant-560.webp 560w, images/avant-apres/debarras-avant.webp 884w" sizes="(max-width: 760px) calc(50vw - 23px), 435px" alt="Le sous-sol avant" data-i18n-alt="ba.c4.before" width="884" height="1105">
+              <figcaption class="ba__tag" data-i18n="ba.before">Avant</figcaption></figure>
+            <figure class="ch__media"><img data-src="images/avant-apres/debarras-apres.webp" data-srcset="images/avant-apres/debarras-apres-560.webp 560w, images/avant-apres/debarras-apres.webp 884w" sizes="(max-width: 760px) calc(50vw - 23px), 435px" alt="Le sous-sol après" data-i18n-alt="ba.c4.after" width="884" height="1105">
+              <figcaption class="ba__tag" data-i18n="ba.after">Après</figcaption></figure>
+          </div>
+        </article>
+      </div>
+      <!-- sous le carrousel : la barre de progression (elle suit le défilement), le compteur, les flèches -->
+      <div class="ch__bas">
+        <div class="ch__progres" aria-hidden="true"><span></span></div>
+        <p class="ch__compte" aria-live="polite"><b>01</b> / <span>04</span></p>
+        <div class="ch__nav">
+          <button class="svc-arrow" type="button" data-step="-1" aria-label="Chantier précédent" data-i18n-aria="ba.prev">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg></button>
+          <button class="svc-arrow" type="button" data-step="1" aria-label="Chantier suivant" data-i18n-aria="ba.next">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg></button>
+        </div>
+      </div>
     </div>
   </section>
   <!-- service sur mesure : une demande hors des cinq services, que l'équipe étudie. À droite, la carte holographique
@@ -323,7 +395,7 @@
         <p data-i18n="sur.text">Peindre une pièce, aider à un déménagement, arroser vos plantes pendant les vacances… Décrivez-nous
           ce dont vous avez besoin. Notre équipe étudie chaque demande et vous répond sous 24&nbsp;h pour vous dire si nous
           pouvons la prendre en charge.</p>
-        <a class="sur__cta" href="reserver.html" data-veil data-i18n="sur.cta">Faire une demande sur mesure</a>
+        <a class="sur__cta" href="reserver.html?demande=sur-mesure" data-veil data-i18n="sur.cta">Faire une demande sur mesure</a>
       </div>
       <div class="sur-card" aria-hidden="true">
         <div class="sur-card__rotator">
@@ -528,15 +600,15 @@
 <div class="hs-cursor" aria-hidden="true"><div class="hs-cursor__trail"></div><div class="hs-cursor__main"><span class="hs-cursor__label" data-i18n="cta2.cursor">Réserver<br>un appel</span></div></div>
 
 <!-- fichiers construits à partir des sources (js/*.js, css/style.css) : outils/build.mjs -->
-<script src="js/veil.min.js?v=36a8298c67"></script>
-<script src="js/i18n.min.js?v=e29e479776"></script>
+<script src="js/veil.min.js?v=f39b14a70e"></script>
+<script src="js/i18n.min.js?v=c99db26eec"></script>
 <script src="js/apropos.min.js?v=0aebae8f26"></script>
-<script src="js/avantapres.min.js?v=bf254b0b6c"></script>
+<script src="js/avantapres.min.js?v=0c85cb961d"></script>
 <script src="js/surmesure.min.js?v=2703290635"></script>
 <script src="js/faq.min.js?v=da9de6c26c"></script>
 <script src="js/footer.min.js?v=bda54810eb"></script>
 <script src="js/cta.min.js?v=3d0d365b73"></script>
 <script src="js/zone.min.js?v=f06f3e7dde"></script>
-<script type="module" src="js/hero.min.js?v=9c11f6473d"></script>
+<script type="module" src="js/hero.min.js?v=35c1a1ad1a"></script>
 </body>
 </html>
