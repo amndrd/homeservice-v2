@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://homeservicebxl.com/</loc>
+    <lastmod>2026-10-14</lastmod>
+    <xhtml:link rel="alternate" hreflang="fr-BE" href="https://homeservicebxl.com/"/>
+    <xhtml:link rel="alternate" hreflang="nl-BE" href="https://homeservicebxl.com/nl"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://homeservicebxl.com/"/>
+  </url>
+  <url>
+    <loc>https://homeservicebxl.com/nl</loc>
+    <lastmod>2026-10-14</lastmod>
+    <xhtml:link rel="alternate" hreflang="fr-BE" href="https://homeservicebxl.com/"/>
+    <xhtml:link rel="alternate" hreflang="nl-BE" href="https://homeservicebxl.com/nl"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://homeservicebxl.com/"/>
+  </url>
+  <url>
+    <loc>https://homeservicebxl.com/reserver.html</loc>
+    <lastmod>2026-10-14</lastmod>
+    <xhtml:link rel="alternate" hreflang="fr-BE" href="https://homeservicebxl.com/reserver.html"/>
+    <xhtml:link rel="alternate" hreflang="nl-BE" href="https://homeservicebxl.com/afspraak"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://homeservicebxl.com/reserver.html"/>
+  </url>
+  <url>
+    <loc>https://homeservicebxl.com/afspraak</loc>
+    <lastmod>2026-10-14</lastmod>
+    <xhtml:link rel="alternate" hreflang="fr-BE" href="https://homeservicebxl.com/reserver.html"/>
+    <xhtml:link rel="alternate" hreflang="nl-BE" href="https://homeservicebxl.com/afspraak"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://homeservicebxl.com/reserver.html"/>
+  </url>
+</urlset>
