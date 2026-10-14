@@ -244,5 +244,48 @@
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
+  // ------------------------------------------------------------ menu du téléphone (les trois barres, css/style.css)
+  // Les barres ouvrent ou ferment le panneau (.menu-ouvert sur le header, et sur <html> pour bloquer le défilement).
+  // Un lien du logo ou du menu, menu ouvert : les boutons s'effacent et le panneau remonte. Vers une section de la
+  // même page, le saut se fait tout de suite, caché par le panneau qui couvre encore l'écran ; vers une autre page,
+  // le voile habituel part une fois le panneau remonté. Les langues, elles, changent sans fermer le menu.
+  const header = document.getElementById('header');
+  const burger = header?.querySelector('.burger');
+  if (burger) {
+    const SORTIE = 900;                            // ms : les boutons s'effacent (.3 s), puis le panneau remonte (.6 s)
+    const ouvert = () => header.classList.contains('menu-ouvert');
+    const bascule = (on) => {
+      header.classList.toggle('menu-ouvert', on);
+      root.classList.toggle('menu-ouvert', on);
+      burger.setAttribute('aria-expanded', String(on));
+    };
+    burger.addEventListener('click', () => bascule(!ouvert()));
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ouvert()) bascule(false); });
+    matchMedia('(max-width: 760px)').addEventListener('change', (m) => { if (!m.matches) bascule(false); });
+    // à la capture : avant le passage du voile que chaque lien déclenche lui-même
+    header.addEventListener('click', (e) => {
+      const a = e.target.closest('a[href]');
+      if (!a || !ouvert() || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      bascule(false);
+      const url = new URL(a.href, location.href);
+      if (url.pathname !== location.pathname) { setTimeout(() => go(a.href), SORTIE); return; }
+      const el = url.hash ? document.getElementById(decodeURIComponent(url.hash.slice(1))) : null;
+      window.scrollTo({ top: el ? el.getBoundingClientRect().top + window.scrollY : 0, behavior: 'instant' });
+      if (url.hash) history.replaceState(null, '', url.hash);
+    }, true);
+  }
+
+  // ------------------------------------------------------------ animations sans fin, en pause hors de l'écran
+  // Les ondes de « Réserver un appel », le défilé et les points pulsants de la carte du pied de page, l'invitation à
+  // défiler : des animations CSS infinies, qui tournaient même hors de l'écran (les 56 points de la carte, en SVG,
+  // forçaient le navigateur à tout recomposer à chaque image, d'où des saccades au défilement sur téléphone). Hors de
+  // l'écran, leur section porte .hors-ecran (css : animation-play-state: paused) ; à l'écran, rien ne change.
+  const pause = new IntersectionObserver((es) => {
+    for (const e of es) e.target.classList.toggle('hors-ecran', !e.isIntersecting);
+  }, { rootMargin: '120px 0px' });
+  document.querySelectorAll('.hero, .cta, .ft, .bk-ondes').forEach((el) => pause.observe(el));
+
   window.hsVeil = { cover, clear, busy: () => busy };
 })();
