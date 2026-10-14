@@ -1,0 +1,23 @@
+{
+  "name": "HomeService BXL – Services à domicile à Bruxelles",
+  "short_name": "HomeService BXL",
+  "description": "Nettoyage, jardinage, débarras, montage de meubles et livraison à Bruxelles et en périphérie. Un seul interlocuteur, 7 jours sur 7. Devis gratuit en un appel.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f7f5",
+  "theme_color": "#f7f7f5",
+  "lang": "fr-BE",
+  "icons": [
+    {
+      "src": "/images/icones/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/icones/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
