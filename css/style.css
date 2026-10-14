@@ -133,6 +133,32 @@ html.intro.scrolled .scroll-hint { opacity: 0; transform: translate(-50%, 10px);
 .about__photo img, .about__photo canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .about__photo img { object-fit: cover; border-radius: 18px; opacity: 0; transition: opacity .6s ease; }
 .about__photo--gl img { visibility: hidden; }
+/* ---------------------------------------------------------------- qui sommes-nous (index.html, .equipe)
+   Entre l'À propos et les chiffres : à gauche la photo de l'équipe, à droite le titre, la présentation et la signature ;
+   sur téléphone : le titre, la photo, puis le texte. */
+.equipe { position: relative; z-index: 4; padding: 6vh 5vw 12vh; color: var(--ink); }
+.equipe__inner { width: min(1240px, 100%); margin: 0 auto; display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  grid-template-areas: "photo tete" "photo texte"; grid-template-rows: auto 1fr; column-gap: clamp(28px, 5vw, 88px); row-gap: 26px;
+  align-items: start; }
+.equipe__photo { grid-area: photo; margin: 0; aspect-ratio: 736 / 981; overflow: hidden; border-radius: 24px; background: #e4e2dc; }
+.equipe__photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.equipe__tete { grid-area: tete; align-self: end; }
+.equipe__texte { grid-area: texte; }
+.equipe__eyebrow { margin: 0 0 14px; font: 800 12px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--green); }
+.equipe__tete h2 { margin: 0; font: 800 clamp(30px, 3vw, 48px)/1.05 var(--title); letter-spacing: .02em; text-transform: uppercase;
+  text-wrap: balance; }
+.equipe__texte p { margin: 0 0 18px; font: 500 clamp(16px, 1.25vw, 19px)/1.65 var(--body); color: #3a4352; text-wrap: pretty; }
+.equipe__signe { display: flex; flex-direction: column; gap: 2px; margin-top: 26px !important; font-size: 14px !important; line-height: 1.4 !important; }
+.equipe__signe b { font: 800 16px/1.3 var(--title); color: var(--ink); }
+@media (max-width: 900px) {
+  .equipe__inner { grid-template-columns: minmax(0, 1fr); grid-template-areas: "tete" "photo" "texte"; grid-template-rows: auto;
+    row-gap: 22px; }
+  .equipe__photo { aspect-ratio: 4 / 4.4; border-radius: 20px; }   /* un peu moins haute sur téléphone */
+}
+@media (max-width: 760px), (max-aspect-ratio: 1/1) and (max-width: 1000px) {
+  .equipe { padding: 4vh 20px 8vh; }
+}
+
 /* ---------------------------------------------------------------- les chiffres (js/stats.js)
    Repris du plan 1 du site immersif, aux mêmes proportions (relevées à l'écran), toutes en tailles de chiffre (--F) :
    une ligne tous les 3,7 F ; à gauche, la petite scène 3D posée sur la page (centrée ~2,8 F avant le bord droit des
@@ -574,6 +600,49 @@ html.veil-in::after { content: ""; position: fixed; inset: 0; z-index: 151;
   .ba__tag { top: 10px; left: 10px; padding: 6px 9px; font-size: 9px; border-radius: 8px; }
 }
 
+/* ---------------------------------------------------------------- tarifs indicatifs (index.html, .tarifs)
+   Une carte par service, à ses couleurs (celles des formes de la section Services) : une fourchette par prestation ;
+   dessous, ce qui fait varier le prix et la porte d'entrée : le prix exact se fixe pendant l'appel. */
+.tarifs { position: relative; z-index: 5; padding: 4vh 5vw 14vh; color: var(--ink); }
+.tarifs__head { max-width: 760px; margin: 0 auto clamp(28px, 4vh, 44px); text-align: center; }
+.tarifs__eyebrow { margin: 0 0 12px; font: 800 12px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--green); }
+.tarifs__head h2 { margin: 0; font: 800 clamp(30px, 3vw, 48px)/1.05 var(--title); letter-spacing: .04em; text-transform: uppercase;
+  text-wrap: balance; }
+.tarifs__lead { margin: 18px auto 0; max-width: 40em; font: 500 clamp(15px, 1.15vw, 18px)/1.6 var(--body); color: #3a4352;
+  text-wrap: pretty; }
+.tarifs__grille { width: min(1240px, 100%); margin: 0 auto; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
+.tarif { grid-column: span 2; padding: 26px 26px 22px; border-radius: 24px; background: #fff;
+  box-shadow: 0 0 0 1px rgba(15, 26, 44, .05), 0 18px 40px rgba(15, 26, 44, .06); }
+.tarif:nth-child(4) { grid-column: 2 / span 2; }                   /* la seconde rangée (deux cartes) : centrée */
+.tarif[data-svc="nettoyage"] { --c2: #fbe6da; --c3: #e0825e; }
+.tarif[data-svc="jardinage"] { --c2: #e2eefa; --c3: #4a86c5; }
+.tarif[data-svc="desencombrement"] { --c2: #c4e6d0; --c3: #11703f; }
+.tarif[data-svc="montage"] { --c2: #eeeafb; --c3: #7a6cc9; }
+.tarif[data-svc="livraison"] { --c2: #fbefc6; --c3: #b8860b; }
+.tarif__ic { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; background: var(--c2); color: var(--c3); }
+.tarif__ic svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tarif h3 { margin: 16px 0 10px; font: 800 19px/1.2 var(--title); }
+.tarif ul { margin: 0; padding: 0; list-style: none; }
+.tarif li { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 11px 0;
+  border-top: 1px solid rgba(15, 26, 44, .08); font: 500 14px/1.4 var(--body); color: #3a4352; }
+.tarif li b { flex: none; max-width: 52%; text-align: right; font-weight: 800; color: var(--ink); }
+.tarif li small { display: block; font-weight: 600; font-size: 11.5px; color: #6a7382; }
+.tarifs__note { margin: 26px auto 0; text-align: center; font: 500 14px/1.5 var(--body); color: #6a7382; }
+.tarifs__note a { color: var(--green); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.tarifs__cta { display: table; margin: 22px auto 0; height: 50px; padding: 0 26px; border-radius: 12px; background: var(--ink); color: #fff;
+  font: 700 15px/50px var(--body); transition: background .2s ease; }
+.tarifs__cta:hover, .tarifs__cta:focus-visible { outline: none; background: #11703f; }
+@media (max-width: 1000px) {
+  .tarifs__grille { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tarif, .tarif:nth-child(4) { grid-column: auto; }
+  .tarif:last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 760px), (max-aspect-ratio: 1/1) and (max-width: 1000px) {
+  .tarifs { padding: 2vh 20px 10vh; }
+  .tarifs__grille { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .tarif, .tarif:last-child { grid-column: auto; padding: 22px 20px 18px; border-radius: 20px; }
+}
+
 /* ---------------------------------------------------------------- service sur mesure (js/surmesure.js)
    À gauche le titre, la description et la demande ; à droite la carte holographique noire du site Harborview
    (Projets/Harborview/assets/license-card.css), seule et à l'horizontale, agrandie (sa longueur passe de 453 à 600 px :
@@ -803,9 +872,6 @@ html.veil-in::after { content: ""; position: fixed; inset: 0; z-index: 151;
 .ft__info { grid-column: 5 / 17; grid-row: 3; display: flex; flex-direction: column; align-items: flex-start; min-width: 0;
   padding: calc(2.4 * var(--hv)) 0; }
 .ft__info-line { display: none; }
-.ft__thumb { grid-column: 1 / 4; grid-row: 4; margin-top: calc(4.8 * var(--hv)); }
-.ft__thumb-img { aspect-ratio: 586 / 370; overflow: hidden; border-radius: 18px; }
-.ft__thumb-img img { width: 100%; height: 100%; object-fit: cover; }
 .ft__main { grid-column: 5 / 17; grid-row: 4; display: grid; grid-template-columns: subgrid; padding-bottom: calc(4.8 * var(--hv)); }
 .ft__main-line { grid-column: 1 / -1; margin-bottom: calc(4.8 * var(--hv)); }
 .ft--tablette { display: none; }
@@ -893,13 +959,11 @@ span.ft-marquee__item { cursor: default; }
 .ft__logo-canvas { position: relative; height: calc(12.75 * var(--hv)); }
 .ft__logo-canvas canvas { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
 
-/* apparitions (js/footer.js) : traits qui se tirent, blocs qui montent, photo qui se découvre */
+/* apparitions (js/footer.js) : traits qui se tirent, blocs qui montent */
 .ft-hide { visibility: hidden; }
 .ft-line-anim { transform: scaleX(0); }
 .ft-up { opacity: 0; translate: 0 var(--from, calc(3.2 * var(--hv))); }
 .ft-left { opacity: 0; translate: calc(3.2 * var(--hv)) 0; }
-.ft-thumb-anim { clip-path: inset(20%); }
-.ft-thumb-anim img { scale: 1.4; opacity: 0; }
 
 /* tablette (paliers de Harborview) */
 @media (max-width: 991px) {
@@ -914,7 +978,6 @@ span.ft-marquee__item { cursor: default; }
   .ft__zone { grid-column: 1 / 7; }
   .ft__contact { grid-column: 7 / 13; }
   .ft__map { grid-column: 1 / -1; }
-  .ft__thumb { margin-top: calc(2.4 * var(--hv)); }
   .ft__copy { grid-column: 1 / 7; } .ft__legal { grid-column: 7 / -1; }
 }
 /* téléphone : une seule colonne, dans l'ordre de Harborview (défilé, plan, devis, contact, zone, carte, nom, mentions) */
@@ -935,7 +998,6 @@ span.ft-marquee__item { cursor: default; }
   .ft__devis { margin-top: calc(3.2 * var(--hv)); padding-top: calc(3.2 * var(--hv)); border-top: max(1px, calc(.1 * var(--hv))) solid var(--ft-light); }
   .ft__side { order: 4; margin-top: calc(3.2 * var(--hv)); }
   .ft__side .ft__line { margin-bottom: calc(3.2 * var(--hv)); }
-  .ft__thumb { display: none; }
   .ft__main { order: 5; display: flex; flex-direction: column; padding: 0; margin-top: calc(3.2 * var(--hv)); }
   .ft__main-line { margin-bottom: calc(3.2 * var(--hv)); }
   /* (pas de barre entre la zone et la carte : la carte suit directement « Voir la zone ») */
