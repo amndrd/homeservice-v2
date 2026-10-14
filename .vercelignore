@@ -31,3 +31,11 @@ css/reserver.css
 js/footer.js
 js/zone.js
 js/zonedata.js
+*.MOV
+*.HEIC
+js/entree.js
+js/draco.js
+# ni servis ni référencés par les pages : sources de photos, ancienne image de chantier
+before.jpg
+after.JPEG
+images/en-construction.webp
