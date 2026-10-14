@@ -113,6 +113,8 @@ html.intro.scrolled .scroll-hint { opacity: 0; transform: translate(-50%, 10px);
 .section__tag::before { content: ""; width: 28px; height: 2px; background: currentColor; }
 
 /* texte réservé aux lecteurs d'écran */
+/* le surtitre vert d'une section (Qui sommes-nous, Services, Tarifs, FAQ), au-dessus de son titre */
+.surtitre { margin: 0 0 14px; font: 800 12px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--green); }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0);
   white-space: nowrap; border: 0; }
 
@@ -144,7 +146,6 @@ html.intro.scrolled .scroll-hint { opacity: 0; transform: translate(-50%, 10px);
 .equipe__photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .equipe__tete { grid-area: tete; align-self: end; }
 .equipe__texte { grid-area: texte; }
-.equipe__eyebrow { margin: 0 0 14px; font: 800 12px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--green); }
 .equipe__tete h2 { margin: 0; font: 800 clamp(30px, 3vw, 48px)/1.05 var(--title); letter-spacing: .02em; text-transform: uppercase;
   text-wrap: balance; }
 .equipe__texte p { margin: 0 0 18px; font: 500 clamp(16px, 1.25vw, 19px)/1.65 var(--body); color: #3a4352; text-wrap: pretty; }
@@ -605,7 +606,6 @@ html.veil-in::after { content: ""; position: fixed; inset: 0; z-index: 151;
    dessous, ce qui fait varier le prix et la porte d'entrée : le prix exact se fixe pendant l'appel. */
 .tarifs { position: relative; z-index: 5; padding: 4vh 5vw 14vh; color: var(--ink); }
 .tarifs__head { max-width: 760px; margin: 0 auto clamp(28px, 4vh, 44px); text-align: center; }
-.tarifs__eyebrow { margin: 0 0 12px; font: 800 12px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--green); }
 .tarifs__head h2 { margin: 0; font: 800 clamp(30px, 3vw, 48px)/1.05 var(--title); letter-spacing: .04em; text-transform: uppercase;
   text-wrap: balance; }
 .tarifs__lead { margin: 18px auto 0; max-width: 40em; font: 500 clamp(15px, 1.15vw, 18px)/1.6 var(--body); color: #3a4352;
@@ -725,7 +725,7 @@ html.veil-in::after { content: ""; position: fixed; inset: 0; z-index: 151;
   column-gap: clamp(32px, 6vw, 96px); align-items: start; }
 .faq__head { grid-column: 1; margin-bottom: clamp(24px, 4vh, 40px); }
 .faq__head h2 { margin: 0 0 14px; font: 800 clamp(30px, 3vw, 48px)/1.05 var(--title); letter-spacing: .02em; text-transform: uppercase; }
-.faq__head p { margin: 0; font: 500 clamp(16px, 1.3vw, 20px)/1.6 var(--body); color: #3a4352; }
+.faq__head p:not(.surtitre) { margin: 0; font: 500 clamp(16px, 1.3vw, 20px)/1.6 var(--body); color: #3a4352; }
 .faq__list { grid-column: 1; border-top: 1px solid rgba(15, 26, 44, .12); }
 .faq__item { border-bottom: 1px solid rgba(15, 26, 44, .12); }
 .faq__item h3 { margin: 0; }
