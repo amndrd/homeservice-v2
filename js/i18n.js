@@ -42,17 +42,28 @@
       'bk.dt.note': 'We confirm the chosen date during the call.',
       'bk.continuer': 'Continue', 'bk.r.title': 'Your quote',
       'bk.r.note': "Free and with no commitment. You'll get the exact price on the call, or in writing within 24 h.",
-      'bk.call': '15 min call', 'bk.canaux': 'Phone or Google Meet', 'bk.modifierDevis': 'Edit the quote',
+      'bk.call': '15 min call', 'bk.canaux': 'Phone call', 'bk.modifierDevis': 'Edit the quote',
       'bk.prec': 'Previous month', 'bk.suiv': 'Next month',
       'bk.c.nom': 'Your name', 'bk.c.err.nom': 'We need a name for the invite.', 'bk.c.email': 'Email address',
-      'bk.c.err.email': 'That address does not look right.', 'bk.c.canal': 'How should we call you?', 'bk.c.tel': 'Phone call',
+      'bk.c.err.email': 'That address does not look right.',
       'bk.c.numero': 'Phone number', 'bk.c.err.tel': 'We need a number to call you on.', 'bk.c.adresse': 'Address of the job',
-      'bk.c.facultatif': 'Optional', 'bk.retour': 'Back', 'bk.confirmer': 'Confirm',
-      'bk.f.title': 'Your request is ready',
-      'bk.f.desc': "All that's left is to send it: the email is already written, with your quote and your time slot. We'll confirm the call the same day.",
+      'bk.c.facultatif': 'Optional', 'bk.retour': 'Back', 'bk.c.envoyer': 'Send my request',
+      'bk.c.err.envoi': "The request didn't go through. Try again in a moment, or email us directly:",
+      'bk.f.title': 'Your request has been sent',
+      'bk.f.desc': "We've received your quote and your time slot. We'll call you on the number you gave, at the time you chose.",
       'bk.f.quoi': 'What', 'bk.f.quand': 'When', 'bk.f.qui': 'Who', 'bk.f.ou': 'Where', 'bk.f.devis': 'Quote',
-      'bk.f.envoyer': 'Send the request', 'bk.f.agenda': 'Add to calendar', 'bk.f.changer': 'Need to make a change?',
+      'bk.f.agenda': 'Add to calendar', 'bk.f.changer': 'Need to make a change?',
       'bk.f.creneau': 'Change the time', 'bk.f.ou2': 'or', 'bk.f.devis2': 'the quote',
+      'bk.s.title': 'Custom, in one call',
+      'bk.s.lead': "Whatever it is, describe it: we'll review your request and call you for 15 minutes to talk it through, free and with no commitment.",
+      'bk.s.step1': 'Your request', 'bk.s.dtitle': 'Your custom request', 'bk.s.quoi': 'What can we do for you?',
+      'bk.s.quoiPh': 'E.g. repaint a bedroom, clear out a cellar, water my plants for three weeks, put up a garden shed…',
+      'bk.s.aide': "Anything that doesn't fit our services. The more details you give (what, how much, constraints), the more useful the call.",
+      'bk.s.err': 'Describe your request in a few words.',
+      'bk.s.note': "Free and with no commitment. We review every request: on the call, we'll tell you whether we can take it on, and at what price.",
+      'bk.s.modifier': 'Edit the request',
+      'bk.s.fdesc': "We've received your request and your time slot. We'll look into it and call you on the number you gave, at the time you chose.",
+      'bk.s.fdevis': 'Request', 'bk.s.fdevis2': 'the request',
       'title.home': 'HomeService BXL', 'title.about': 'About – HomeService BXL',
       'title.services': 'Services – HomeService BXL', 'title.how': 'How it works – HomeService BXL',
       'title.zone': 'Area – HomeService BXL', 'title.contact': 'Contact – HomeService BXL',
@@ -70,7 +81,12 @@
       'svcd.desencombrement': 'Cellar, attic or a whole home: we sort, pack, clear out, and recycle everything we can.',
       'svcd.montage': 'Flat-pack furniture, shelves, wall fixings: we assemble, mount and adjust, while you put your feet up.',
       'svcd.livraison': 'Groceries, parcels or bulky purchases: we pick them up and deliver to your door, whenever suits you.',
-      'ba.title': 'See the difference', 'ba.before': 'Before', 'ba.after': 'After', 'ba.range': 'Compare before and after',
+      'ba.title': 'See the difference', 'ba.before': 'Before', 'ba.after': 'After', 'ba.list': 'Our jobs',
+      'ba.c1.before': 'The garden before', 'ba.c1.after': 'The garden after',
+      'ba.c2.before': 'The hedge before', 'ba.c2.after': 'The hedge after',
+      'ba.c3.before': 'The front garden before', 'ba.c3.after': 'The front garden after',
+      'ba.c4.before': 'The basement before', 'ba.c4.after': 'The basement after',
+      'ba.prev': 'Previous job', 'ba.next': 'Next job',
       'sur.title': "Need something outside our usual services?",
       'sur.text': "Painting a room, helping with a move, watering your plants while you're away… Tell us what you need. Our team reviews every request and replies within 24 h to let you know whether we can take it on.",
       'sur.cta': "Make a custom request",
@@ -183,17 +199,28 @@
       'bk.dt.note': 'We bevestigen de gekozen datum tijdens het gesprek.',
       'bk.continuer': 'Doorgaan', 'bk.r.title': 'Uw offerte',
       'bk.r.note': 'Gratis en vrijblijvend. De exacte prijs krijgt u tijdens het gesprek, of schriftelijk binnen 24 u.',
-      'bk.call': 'Gesprek van 15 min', 'bk.canaux': 'Telefoon of Google Meet', 'bk.modifierDevis': 'Offerte wijzigen',
+      'bk.call': 'Gesprek van 15 min', 'bk.canaux': 'Telefonisch', 'bk.modifierDevis': 'Offerte wijzigen',
       'bk.prec': 'Vorige maand', 'bk.suiv': 'Volgende maand',
       'bk.c.nom': 'Uw naam', 'bk.c.err.nom': 'We hebben een naam nodig voor de uitnodiging.', 'bk.c.email': 'E-mailadres',
-      'bk.c.err.email': 'Dit adres lijkt niet te kloppen.', 'bk.c.canal': 'Hoe mogen we u bellen?', 'bk.c.tel': 'Telefonisch',
+      'bk.c.err.email': 'Dit adres lijkt niet te kloppen.',
       'bk.c.numero': 'Telefoonnummer', 'bk.c.err.tel': 'We hebben een nummer nodig om u te bellen.', 'bk.c.adresse': 'Adres van de opdracht',
-      'bk.c.facultatif': 'Optioneel', 'bk.retour': 'Terug', 'bk.confirmer': 'Bevestigen',
-      'bk.f.title': 'Uw aanvraag is klaar',
-      'bk.f.desc': 'U hoeft ze enkel nog te versturen: de e-mail is al opgesteld, met uw offerte en uw tijdstip. Wij bevestigen het gesprek nog dezelfde dag.',
+      'bk.c.facultatif': 'Optioneel', 'bk.retour': 'Terug', 'bk.c.envoyer': 'Mijn aanvraag versturen',
+      'bk.c.err.envoi': 'Het versturen is niet gelukt. Probeer het zo meteen opnieuw, of mail ons rechtstreeks:',
+      'bk.f.title': 'Uw aanvraag is verstuurd',
+      'bk.f.desc': 'We hebben uw offerte en uw tijdstip goed ontvangen. We bellen u op het opgegeven nummer, op het gekozen uur.',
       'bk.f.quoi': 'Wat', 'bk.f.quand': 'Wanneer', 'bk.f.qui': 'Wie', 'bk.f.ou': 'Waar', 'bk.f.devis': 'Offerte',
-      'bk.f.envoyer': 'Aanvraag versturen', 'bk.f.agenda': 'Toevoegen aan agenda', 'bk.f.changer': 'Iets wijzigen?',
+      'bk.f.agenda': 'Toevoegen aan agenda', 'bk.f.changer': 'Iets wijzigen?',
       'bk.f.creneau': 'Tijdstip wijzigen', 'bk.f.ou2': 'of', 'bk.f.devis2': 'de offerte',
+      'bk.s.title': 'Op maat, in één gesprek',
+      'bk.s.lead': 'Wat het ook is, beschrijf het: wij bekijken uw aanvraag en bellen u 15 minuten om erover te praten, gratis en vrijblijvend.',
+      'bk.s.step1': 'Uw aanvraag', 'bk.s.dtitle': 'Uw aanvraag op maat', 'bk.s.quoi': 'Wat kunnen we voor u doen?',
+      'bk.s.quoiPh': 'Bv. een slaapkamer schilderen, een kelder leegmaken, drie weken mijn planten water geven, een tuinhuis opzetten…',
+      'bk.s.aide': 'Alles wat niet in onze diensten past. Hoe meer details (wat, hoeveel, beperkingen), hoe nuttiger het gesprek.',
+      'bk.s.err': 'Beschrijf uw aanvraag in enkele woorden.',
+      'bk.s.note': 'Gratis en vrijblijvend. We bekijken elke aanvraag: tijdens het gesprek zeggen we u of we ze kunnen opnemen, en tegen welke prijs.',
+      'bk.s.modifier': 'Aanvraag wijzigen',
+      'bk.s.fdesc': 'We hebben uw aanvraag en uw tijdstip goed ontvangen. We bekijken ze en bellen u op het opgegeven nummer, op het gekozen uur.',
+      'bk.s.fdevis': 'Aanvraag', 'bk.s.fdevis2': 'de aanvraag',
       'title.home': 'HomeService BXL', 'title.about': 'Over ons – HomeService BXL',
       'title.services': 'Diensten – HomeService BXL', 'title.how': 'Werkwijze – HomeService BXL',
       'title.zone': 'Regio – HomeService BXL', 'title.contact': 'Contact – HomeService BXL',
@@ -211,7 +238,12 @@
       'svcd.desencombrement': 'Kelder, zolder of een hele woning: wij sorteren, pakken in, voeren af en recycleren wat kan.',
       'svcd.montage': 'Bouwpakketten, rekken, wandbevestigingen: wij monteren, bevestigen en stellen af, u hoeft niets te doen.',
       'svcd.livraison': 'Boodschappen, pakjes of grote aankopen: wij halen ze op en leveren ze aan huis, wanneer het u past.',
-      'ba.title': 'Zie het verschil', 'ba.before': 'Voor', 'ba.after': 'Na', 'ba.range': 'Vergelijk voor en na',
+      'ba.title': 'Zie het verschil', 'ba.before': 'Voor', 'ba.after': 'Na', 'ba.list': 'Onze klussen',
+      'ba.c1.before': 'De tuin ervoor', 'ba.c1.after': 'De tuin erna',
+      'ba.c2.before': 'De haag ervoor', 'ba.c2.after': 'De haag erna',
+      'ba.c3.before': 'De voortuin ervoor', 'ba.c3.after': 'De voortuin erna',
+      'ba.c4.before': 'De kelder ervoor', 'ba.c4.after': 'De kelder erna',
+      'ba.prev': 'Vorige klus', 'ba.next': 'Volgende klus',
       'sur.title': "Iets nodig buiten onze gewone diensten?",
       'sur.text': "Een kamer schilderen, helpen bij een verhuizing, uw planten water geven tijdens de vakantie… Vertel ons wat u nodig hebt. Ons team bekijkt elke aanvraag en antwoordt binnen 24 u of we die kunnen opnemen.",
       'sur.cta': "Een aanvraag op maat doen",
@@ -305,6 +337,7 @@
   const titleKey = root.dataset.i18nTitle;
   if (titleKey) FR[titleKey] = document.title;
   T.fr = FR;
+  window.hsFr = (k) => FR[k];   // le texte français d'une clé (js/reserver.js écrit la demande en français)
 
   const box = document.getElementById('lang');
   let lang = 'fr';
@@ -346,7 +379,9 @@
       url.searchParams.delete('lang');
       history.replaceState(null, '', url);
     }
-    // le voile monte ; à couvert, les textes changent, puis il se retire
-    if (!window.hsVeil?.cover(() => { apply(l); window.hsVeil.clear(); })) apply(l);
+    // le voile monte ; à couvert, les textes changent, puis il se retire. Depuis le menu du téléphone (js/veil.js),
+    // pas de voile : les textes changent sur place, le menu reste ouvert
+    if (root.classList.contains('menu-ouvert')) apply(l);
+    else if (!window.hsVeil?.cover(() => { apply(l); window.hsVeil.clear(); })) apply(l);
   });
 })();
