@@ -5,16 +5,17 @@
 //    pixels isolés en bordure de feuillage changent, à l'œil rien ;
 // 2. la texture du sol passe en WebP sans perte (blender/scripts/optimise_glb.py : pixels visibles identiques).
 // Usage, depuis ce dossier : npm run modele   — puis npm run build (la version du modèle change avec son contenu).
+// Un autre modèle en argument : npm run mondes (models/minimondes.glb, après blender/scripts/mondes_maj.py).
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, KHRDracoMeshCompression } from '@gltf-transform/extensions';
 import draco3d from 'draco3dgltf';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const site = join(dirname(fileURLToPath(import.meta.url)), '..');
-const model = join(site, 'models/ilot.glb');
+const model = resolve(site, process.argv[2] || 'models/ilot.glb');
 const before = statSync(model).size;
 
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
@@ -37,4 +38,5 @@ doc.createExtension(KHRDracoMeshCompression).setRequired(true).setEncoderOptions
 await io.write(model, doc);
 console.log(`géométrie réencodée : ${(before / 1024) | 0} Ko → ${(statSync(model).size / 1024) | 0} Ko`);
 
-execFileSync('python3', [join(site, 'blender/scripts/optimise_glb.py'), model], { stdio: 'inherit' });
+if (doc.getRoot().listTextures().length)            // la texture du sol (l'îlot) ; les mini-mondes n'en ont pas
+  execFileSync('python3', [join(site, 'blender/scripts/optimise_glb.py'), model], { stdio: 'inherit' });

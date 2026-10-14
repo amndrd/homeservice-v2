@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "modele": "node optimise_modele.mjs",
+    "mondes": "node optimise_modele.mjs models/minimondes.glb",
     "build": "node build.mjs"
   },
   "devDependencies": {
