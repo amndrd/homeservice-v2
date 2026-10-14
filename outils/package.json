@@ -13,6 +13,7 @@
     "@gltf-transform/extensions": "^4.5.1",
     "draco3dgltf": "^1.5.7",
     "esbuild": "^0.25.0",
+    "linkedom": "^0.18.12",
     "three": "0.170.0"
   }
 }

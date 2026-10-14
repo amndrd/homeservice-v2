@@ -14,6 +14,7 @@ import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { seo } from './seo.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const site = join(here, '..');
@@ -42,7 +43,10 @@ mkdirSync(join(site, 'js/draco'), { recursive: true });
 for (const f of ['draco_decoder.wasm', 'draco_wasm_wrapper.js'])
   copyFileSync(join(three, 'examples/jsm/libs/draco/gltf', f), join(site, 'js/draco', f));
 
-for (const f of ['veil', 'i18n', 'apropos', 'avantapres', 'surmesure', 'faq', 'cta', 'footer', 'reserver'])
+// la langue et ses traductions (js/langues.js) : un seul fichier
+await build({ entryPoints: [join(site, 'js/i18n.js')], outfile: join(site, 'js/i18n.min.js'), bundle: true, format: 'iife',
+  minify: true, target: 'es2020', legalComments: 'none', logLevel: 'info' });
+for (const f of ['veil', 'apropos', 'avantapres', 'surmesure', 'faq', 'cta', 'footer', 'reserver'])
   await build({ entryPoints: [join(site, `js/${f}.js`)], outfile: join(site, `js/${f}.min.js`), minify: true,
     target: 'es2020', legalComments: 'none', logLevel: 'info' });
 // la zone d'intervention et ses données (un seul fichier)
@@ -74,3 +78,6 @@ for (const [p, files] of Object.entries(pages)) {
   writeFileSync(page, html);
   console.log(`${p} : versions à jour`);
 }
+
+// le référencement : en-têtes des pages, pages néerlandaises, robots.txt, sitemap.xml (outils/seo.mjs)
+seo(site);
