@@ -1,17 +1,22 @@
 // Réserver un appel et préparer son devis (reserver.html). Le module de réservation de la page /contact du site
 // Harborview (Projets/Harborview/assets/booking.js, repris du booker de Cal.com), précédé d'un écran de devis.
 // Cinq écrans : le devis (services, lieu, surface, code postal, détails ; le résumé se compose à
-// droite), la ou les dates de l'intervention (un calendrier ; les 7 prochains jours sont l'urgence, avec des frais en
+// droite) — ou, avec ?demande=sur-mesure (bouton de la section « sur mesure » de l'accueil), une demande libre (un texte,
+// le lieu, le code postal) — la ou les dates de l'intervention (un calendrier ; les 7 prochains jours sont l'urgence, avec des frais en
 // plus), le jour et l'heure d'un appel de 15 min, les coordonnées, puis la demande complète.
 //
-// Le site est statique : rien ne part vers un serveur. Le dernier écran rédige donc l'e-mail de la demande (devis,
-// créneau, coordonnées) vers l'adresse de l'équipe, et fabrique les liens d'ajout à l'agenda. Le jour où une vraie
-// prise de rendez-vous existera (Cal.com, un formulaire en ligne…), c'est envoyer() qu'il faudra brancher.
+// Le site est statique : la demande (devis, créneau, coordonnées) part par FormSubmit (formsubmit.co), qui la remet
+// par e-mail à l'adresse de l'équipe — toujours en français, quelle que soit la langue du visiteur. Le premier envoi
+// déclenche chez FormSubmit un e-mail d'activation à cette adresse : tant qu'il n'est pas validé, rien n'arrive.
+// L'écran final ne s'affiche qu'une fois l'envoi accepté, avec les liens d'ajout à l'agenda.
 // Textes : ceux de la page passent par js/i18n.js ; ceux que ce script écrit (dates, résumé, e-mail) sont ici, et
 // tout se redessine au changement de langue (événement hs:lang).
 (() => {
   const el = document.getElementById('bk');
   if (!el) return;
+  // demande sur mesure : la CSS montre les textes .bk-seul-sur et cache les .bk-seul-devis
+  const SUR = new URLSearchParams(location.search).get('demande') === 'sur-mesure';
+  if (SUR) document.querySelector('.bk-page').dataset.mode = 'sur';
 
   const DISPO = {
     debut: 9,            // première heure d'appel
@@ -28,44 +33,40 @@
 
   const D = {
     fr: {
+      videSur: 'Décrivez votre demande : elle se résume ici.', titreSur: 'Demande sur mesure – HomeService BXL', sur: 'Sur mesure',
       locale: 'fr-BE', urg: 'urgence', aucune: "Aucune date pour l'instant.", retirer: 'Retirer', sep: ' : ', pick: 'Choisissez un jour pour voir les heures.', none: 'Plus aucun créneau ce jour-là.',
       call: (n) => `Appel de 15 min entre HomeService BXL et ${n}`, tel: 'Par téléphone', host: 'Hôte',
       vide: 'Choisissez vos services : votre devis se compose ici.',
-      k: { services: 'Services', lieu: 'Lieu', surface: 'Surface',
+      k: { sur: 'Demande', services: 'Services', lieu: 'Lieu', surface: 'Surface',
         commune: 'Code postal', dates: 'Dates', besoin: 'Détails' },
       sujet: (n) => `Réservation d'un appel – devis – ${n}`,
-      intro: "Bonjour,\n\nJe souhaite réserver un appel de 15 minutes pour préparer mon devis.",
-      appel: 'Appel', devis: 'Mon devis', moi: 'Mes coordonnées', nom: 'Nom', email: 'E-mail', telK: 'Téléphone',
-      adresse: 'Adresse', fin: 'Merci !', agenda: 'Réservé sur HomeService BXL',
+      agenda: 'Réservé sur HomeService BXL',
     },
     en: {
+      videSur: "Describe your request: it's summed up here.", titreSur: 'Custom request – HomeService BXL', sur: 'Custom',
       locale: 'en-GB', urg: 'urgent', aucune: 'No dates yet.', retirer: 'Remove', sep: ': ', pick: 'Pick a day to see the times.', none: 'Nothing left on this day.',
       call: (n) => `15 min call between HomeService BXL and ${n}`, tel: 'Phone call', host: 'Host',
       vide: 'Pick your services: your quote takes shape here.',
-      k: { services: 'Services', lieu: 'Place', surface: 'Size',
+      k: { sur: 'Request', services: 'Services', lieu: 'Place', surface: 'Size',
         commune: 'Postcode', dates: 'Dates', besoin: 'Details' },
       sujet: (n) => `Call booking – quote – ${n}`,
-      intro: "Hello,\n\nI'd like to book a 15-minute call to prepare my quote.",
-      appel: 'Call', devis: 'My quote', moi: 'My details', nom: 'Name', email: 'Email', telK: 'Phone',
-      adresse: 'Address', fin: 'Thank you!', agenda: 'Booked on HomeService BXL',
+      agenda: 'Booked on HomeService BXL',
     },
     nl: {
+      videSur: 'Beschrijf uw aanvraag: hier wordt ze samengevat.', titreSur: 'Aanvraag op maat – HomeService BXL', sur: 'Op maat',
       locale: 'nl-BE', urg: 'spoed', aucune: 'Nog geen data.', retirer: 'Verwijderen', sep: ': ', pick: 'Kies een dag om de uren te zien.', none: 'Geen tijdstippen meer op deze dag.',
       call: (n) => `Gesprek van 15 min tussen HomeService BXL en ${n}`, tel: 'Telefonisch', host: 'Gastheer',
       vide: 'Kies uw diensten: hier krijgt uw offerte vorm.',
-      k: { services: 'Diensten', lieu: 'Plaats', surface: 'Oppervlakte',
+      k: { sur: 'Aanvraag', services: 'Diensten', lieu: 'Plaats', surface: 'Oppervlakte',
         commune: 'Postcode', dates: 'Data', besoin: 'Details' },
       sujet: (n) => `Gesprek inplannen – offerte – ${n}`,
-      intro: 'Hallo,\n\nIk wil graag een gesprek van 15 minuten inplannen om mijn offerte voor te bereiden.',
-      appel: 'Gesprek', devis: 'Mijn offerte', moi: 'Mijn gegevens', nom: 'Naam', email: 'E-mail', telK: 'Telefoon',
-      adresse: 'Adres', fin: 'Bedankt!', agenda: 'Geboekt op HomeService BXL',
+      agenda: 'Geboekt op HomeService BXL',
     },
   };
   const lang = () => (document.documentElement.lang || 'fr').slice(0, 2);
   const t = () => D[lang()] || D.fr;
 
   const ICONES = {
-    video: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="M15 10.5l6-3.5v10l-6-3.5z"/></svg>',
     tel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 4h4l2 5-2.5 1.5a12 12 0 005 5L15 13l5 2v4a1 1 0 01-1 1A16 16 0 014 5a1 1 0 011-1z"/></svg>',
   };
 
@@ -79,12 +80,18 @@
 
   const etat = {
     services: new Set(), lieu: '', surface: '', dates: new Set(), dMois: minuit(new Date()),
-    jour: null, creneau: null, format24: true, canal: 'tel', moisVu: minuit(new Date()),
+    jour: null, creneau: null, format24: true, moisVu: minuit(new Date()),
   };
 
   // ------------------------------------------------------------ 1. le devis
   const GROUPES = ['services', 'lieu', 'surface'];
-  const libelle = (groupe, v) => q(`[data-groupe="${groupe}"] [data-v="${v}"]`)?.textContent.trim() || '';
+  // le libellé d'une pastille, dans la langue affichée ou, avec fr, dans celle de la page (pour l'e-mail de l'équipe)
+  function libelle(groupe, v, fr) {
+    const b = q(`[data-groupe="${groupe}"] [data-v="${v}"]`);
+    if (!b) return '';
+    const orig = fr && b.dataset.i18n && window.hsFr?.(b.dataset.i18n);
+    return (orig ? orig.replace(/<[^>]*>/g, '') : b.textContent).trim();
+  }
   function marqueFaute(champ, oui) {
     champ.closest('.bk-champ')?.classList.toggle('est-fautif', !!oui);
     return !oui;
@@ -105,7 +112,7 @@
     if (nom === 'services' && etat.services.size) marqueFaute(g, false);
     resume();
   }));
-  const commune = q('#bk-commune'), besoin = q('#bk-besoin');
+  const commune = q('#bk-commune'), besoin = q('#bk-besoin'), libre = q('#bk-sur');
   // le code postal : quatre chiffres (on ne garde que les chiffres tapés)
   const cpOk = () => /^\d{4}$/.test(commune.value);
   commune.addEventListener('input', () => {
@@ -115,10 +122,18 @@
     resume();
   });
   besoin.addEventListener('input', resume);
+  libre.addEventListener('input', () => { if (libre.value.trim()) marqueFaute(libre, false); resume(); });
 
   // les choix du devis, dans l'ordre de l'écran : [clé, libellé de la clé, valeur affichée]
   function lignesDevis() {
     const k = t().k, out = [];
+    if (SUR) {
+      if (libre.value.trim()) out.push(['sur', k.sur, libre.value.trim()]);
+      if (etat.lieu) out.push(['lieu', k.lieu, libelle('lieu', etat.lieu)]);
+      if (cpOk()) out.push(['commune', k.commune, commune.value]);
+      if (etat.dates.size) out.push(['dates', k.dates, datesTriees().map(dateCourte).join(', ')]);
+      return out;
+    }
     const svc = [...etat.services].map((v) => libelle('services', v));
     if (svc.length) out.push(['services', k.services, svc.join(', ')]);
     for (const g of GROUPES.slice(1)) if (etat[g]) out.push([g, k[g], libelle(g, etat[g])]);
@@ -131,13 +146,13 @@
     const l = lignesDevis();
     q('#bk-resume').innerHTML = l.length
       ? l.map(([c, k, v]) => `<div class="bk-resume__ligne bk-resume__ligne--${c}"><dt>${texte(k)}</dt><dd>${texte(v)}</dd></div>`).join('')
-      : `<p class="bk-resume__vide">${texte(t().vide)}</p>`;
-    const svc = [...etat.services].map((v) => libelle('services', v)).join(', ');
+      : `<p class="bk-resume__vide">${texte(SUR ? t().videSur : t().vide)}</p>`;
+    const svc = SUR ? t().sur : [...etat.services].map((v) => libelle('services', v)).join(', ');
     qa('.bk-services').forEach((s) => { s.textContent = svc; s.parentElement.hidden = !svc; });
   }
 
   q('#bk-suivant').addEventListener('click', () => {
-    let ok = marqueFaute(q('[data-groupe="services"]'), !etat.services.size);
+    let ok = SUR ? marqueFaute(libre, !libre.value.trim()) : marqueFaute(q('[data-groupe="services"]'), !etat.services.size);
     ok = marqueFaute(commune, !cpOk()) && ok;
     if (!ok) { q('.est-fautif')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     allerA('dates');
@@ -348,31 +363,19 @@
 
   // ------------------------------------------------------------ 4. coordonnées
   const fin = () => new Date(etat.creneau.getTime() + DISPO.duree * 60000);
-  const canalTexte = () => (etat.canal === 'tel' ? t().tel : 'Google Meet');
   function remplitRecap() {
     if (!etat.creneau) return;
     q('#bk-recap-date').textContent = dateLongue(etat.creneau);
     q('#bk-recap-heure').textContent = heure(etat.creneau) + ' – ' + heure(fin());
-    q('#bk-recap-canal').textContent = canalTexte();
-    q('#bk-recap-canal-ic').innerHTML = etat.canal === 'tel' ? ICONES.tel : ICONES.video;
+    q('#bk-recap-canal').textContent = t().tel;
   }
-  q('.bk-choix').addEventListener('click', (e) => {
-    const b = e.target.closest('.bk-option');
-    if (!b) return;
-    etat.canal = b.dataset.canal;
-    qa('.bk-option').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    q('#bk-champ-tel').querySelector('.bk-label > span:last-child').hidden = etat.canal !== 'tel';
-    marqueFaute(q('#bk-tel'), false);
-    remplitRecap();
-  });
   q('.bk-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const nom = q('#bk-nom'), email = q('#bk-email'), tel = q('#bk-tel');
     let ok = marqueFaute(nom, !nom.value.trim());
     ok = marqueFaute(email, !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.value.trim())) && ok;
-    if (etat.canal === 'tel') ok = marqueFaute(tel, tel.value.replace(/\D/g, '').length < 8) && ok;
-    if (!ok) return;
-    envoyer();
+    ok = marqueFaute(tel, tel.value.replace(/\D/g, '').length < 8) && ok;
+    if (ok) envoyer();
   });
 
   // ------------------------------------------------------------ 5. la demande
@@ -389,12 +392,72 @@
       ics: 'data:text/calendar;charset=utf-8,' + e(ics),
     };
   }
-  function envoyer() {
-    const T = t();
+  const datesFr = () => datesTriees().map((d) => d.toLocaleDateString(D.fr.locale, { weekday: 'short', day: 'numeric', month: 'short' })
+    + (urgent(d) ? ` (${D.fr.urg})` : '')).join(', ');
+  // la demande telle que l'équipe la reçoit (toujours en français) : FormSubmit en fait un tableau, dans cet ordre
+  function demande() {
+    const F = D.fr, L = lang();
     const nom = q('#bk-nom').value.trim(), email = q('#bk-email').value.trim();
     const tel = q('#bk-tel').value.trim(), adresse = q('#bk-adresse').value.trim();
+    const dl = (d) => d.toLocaleDateString(F.locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const hh = (d) => d.toLocaleTimeString(F.locale, { hour: '2-digit', minute: '2-digit' });
+    const champs = {
+      _subject: SUR ? `Demande sur mesure – ${nom}` : F.sujet(nom), _template: 'table', _captcha: 'false', _replyto: email, _honey: q('#bk-piege').value,
+      'Appel': `${dl(etat.creneau)}, ${hh(etat.creneau)} – ${hh(fin())} (${fuseau})`,
+      'Téléphone': tel, 'Nom': nom, 'E-mail': email,
+    };
+    if (adresse) champs['Adresse'] = adresse;
+    if (SUR) {
+      champs['Type'] = 'Demande sur mesure';
+      champs[F.k.sur] = libre.value.trim();
+      if (etat.lieu) champs[F.k.lieu] = libelle('lieu', etat.lieu, 'fr');
+      if (cpOk()) champs[F.k.commune] = commune.value;
+      if (etat.dates.size) champs[F.k.dates] = datesFr();
+      champs['Langue du site'] = { fr: 'français', en: 'anglais', nl: 'néerlandais' }[L] || L;
+      return champs;
+    }
+    // le devis, relu avec les libellés français
+    const svc = [...etat.services].map((v) => libelle('services', v, 'fr'));
+    if (svc.length) champs[F.k.services] = svc.join(', ');
+    for (const g of GROUPES.slice(1)) if (etat[g]) champs[F.k[g]] = libelle(g, etat[g], 'fr');
+    if (cpOk()) champs[F.k.commune] = commune.value;
+    if (etat.dates.size) champs[F.k.dates] = datesFr();
+    if (besoin.value.trim()) champs[F.k.besoin] = besoin.value.trim();
+    champs['Langue du site'] = { fr: 'français', en: 'anglais', nl: 'néerlandais' }[L] || L;
+    return champs;
+  }
+
+  let enCours = false;
+  async function envoyer() {
+    if (enCours) return;
+    enCours = true;
+    const bouton = q('#bk-confirmer'), erreur = q('#bk-envoi-erreur');
+    bouton.disabled = true;
+    bouton.classList.add('est-envoi');
+    erreur.hidden = true;
+    let ok = false;
+    try {
+      const r = await fetch(`https://formsubmit.co/ajax/${MAIL}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(demande()),
+      });
+      const j = await r.json().catch(() => ({}));
+      ok = r.ok && String(j.success) === 'true';
+    } catch {}
+    enCours = false;
+    bouton.disabled = false;
+    bouton.classList.remove('est-envoi');
+    if (!ok) { erreur.hidden = false; return; }
+    afficheFait();
+  }
+
+  // l'écran final : le récapitulatif de ce qui vient de partir
+  function afficheFait() {
+    const T = t();
+    const nom = q('#bk-nom').value.trim(), email = q('#bk-email').value.trim(), tel = q('#bk-tel').value.trim();
     const titre = T.call(nom);
-    const lieu = etat.canal === 'tel' ? `${T.tel} – ${tel}` : 'Google Meet';
+    const lieu = `${T.tel} – ${tel}`;
     const devis = lignesDevis();
 
     q('#bk-quoi').textContent = titre;
@@ -403,17 +466,9 @@
     q('#bk-quand-tz').textContent = '(' + fuseau + ')';
     q('#bk-qui').innerHTML = `HomeService BXL <span class="bk-jeton bk-jeton--hote">${texte(T.host)}</span>`
       + `<br><small class="bk-sec">${MAIL}</small><br><br>${texte(nom)}<br><small class="bk-sec">${texte(email)}`
-      + (tel ? ' · ' + texte(tel) : '') + '</small>';
+      + ' · ' + texte(tel) + '</small>';
     q('#bk-ou').textContent = lieu;
     q('#bk-devis').innerHTML = devis.map(([, k, v]) => `<span class="bk-sec">${texte(k + T.sep.trimEnd())}</span> ${texte(v)}`).join('<br>');
-
-    // l'e-mail de la demande, prêt à partir
-    const corps = [T.intro, '',
-      `— ${T.appel} —`, `${dateLongue(etat.creneau)}, ${heure(etat.creneau)} – ${heure(fin())} (${fuseau})`, lieu, '',
-      `— ${T.devis} —`, ...devis.map(([, k, v]) => k + T.sep + v), '',
-      `— ${T.moi} —`, T.nom + T.sep + nom, T.email + T.sep + email, ...(tel ? [T.telK + T.sep + tel] : []),
-      ...(adresse ? [T.adresse + T.sep + adresse] : []), '', T.fin].join('\n');
-    q('#bk-envoyer').href = `mailto:${MAIL}?subject=${encodeURIComponent(T.sujet(nom))}&body=${encodeURIComponent(corps)}`;
 
     const liens = liensAgenda(etat.creneau, fin(), titre, `${T.agenda}\n${devis.map(([, k, v]) => k + T.sep + v).join('\n')}`, lieu);
     q('#bk-cal-google').href = liens.google;
@@ -438,13 +493,15 @@
   qa('[data-aller]').forEach((b) => b.addEventListener('click', () => allerA(b.dataset.aller)));
 
   // la langue change : tout ce que ce script a écrit est récrit
+  const titrePage = () => { if (SUR) document.title = t().titreSur; };
   addEventListener('hs:lang', () => {
+    titrePage();
     resume();
     dessineDates();
     dessineMois();
     dessineCreneaux();
     remplitRecap();
-    if (el.dataset.step === 'fait') envoyer();
+    if (el.dataset.step === 'fait') afficheFait();
   });
 
   // premier jour libre présélectionné, comme sur la référence
@@ -458,10 +515,11 @@
   dessineMois();
   dessineCreneaux();
   q('#bk-recap-canal-ic').innerHTML = ICONES.tel;
-  q('#bk-recap-canal').textContent = canalTexte();
+  q('#bk-recap-canal').textContent = t().tel;
   allerA('devis', false);
   // arrivée depuis un bouton « Demander un devis » d'un service : ?service=nettoyage le présélectionne
-  const pre = new URLSearchParams(location.search).get('service');
+  titrePage();
+  const pre = !SUR && new URLSearchParams(location.search).get('service');
   if (pre) q(`[data-groupe="services"] [data-v="${CSS.escape(pre)}"]`)?.click();
   // arrivée depuis la zone d'intervention (js/zone.js) : ?cp=1050 remplit le code postal de la commune choisie
   const venue = new URLSearchParams(location.search).get('cp');
