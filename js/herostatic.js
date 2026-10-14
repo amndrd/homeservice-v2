@@ -36,7 +36,7 @@ export function staticHero(host) {
     box.setAttribute('aria-hidden', 'true');
     ITEMS.filter((it) => it[1] === layer).forEach(([src, , x, y, w], k) => {
       const img = new Image();
-      img.src = `images/hero-mobile/${src}`;
+      img.src = `images/hero-mobile/${src}?v=${__SPRITES__[src]}`;   // version posée par outils/build.mjs
       img.alt = '';
       img.decoding = 'async';
       img.style.cssText = `left:${(x * 100).toFixed(2)}%;top:${(y * 100).toFixed(2)}%;width:${(w * 100).toFixed(2)}%;`

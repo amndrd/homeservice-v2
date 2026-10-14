@@ -9,14 +9,13 @@
 // vertical (lâché, il revient à plat).
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { draco } from './draco.js';                 // le décodeur Draco partagé (js/draco.js)
 import { makeButterfly } from './papillons.js';
 import { makeBee } from './abeilles.js';
 import './stats.js';                                // les chiffres, sous l'À propos (texte et décompte)
 import './scroll.js';                               // le défilement, doux et contrôlé (ordinateur)
 import { statObjects } from './statsmur.js';       // leur modèle 3D, sur le mur
 import { renderSprites } from './herofloat.js';    // l'outil d'export des images du hero du téléphone (?sprites)
-import { staticHero } from './herostatic.js';      // sur téléphone : pas d'îlot, ses objets en images fixes
 import './services.js';                             // le diaporama des services et leurs mini-mondes
 
 const host = document.getElementById('hero-scene');
@@ -2066,15 +2065,7 @@ let objectsOnScreen = 0;                            // les objets encore visible
 const RISE = { rate: 6, max: 40, life: [4, 6.5], speed: [0.16, 0.32], petals: 0.6, seed: 0.1 };
 const risers = [];
 let riseAcc = 0;
-// la terre de la brouette : [mottes, taille (m), moments où elles partent (part du décollage), dispersion (m/s),
-//  temps pour s'enfoncer dans l'herbe (s)]
-const CRUMBS = { count: 18, size: [0.022, 0.045], at: [0.06, 0.75], spread: 0.18, sink: 1.4 };
-// les brins accrochés : [par objet, longueur (m), part qui se décroche, moment où ils se décrochent (part du
-//  décollage), vitesse de chute (m/s), temps pour s'enfoncer (s)]
-const BLADES = { per: [2, 4], length: [0.05, 0.13], drop: 0.45, at: [0.5, 1.0], fall: 0.45, sink: 1.6 };
-const GRAVITY = 9.8;
 const lifters = [];                                 // les objets, dans l'ordre : porteurs d'abord
-const crumbs = [], blades = [];
 let liftRoot = null;
 const easeLift = (u) => u * u * (3 - 2 * u);
 const _lp = new THREE.Vector3(), _lq = new THREE.Quaternion(), _lq2 = new THREE.Quaternion(), _lc = new THREE.Vector3();
@@ -2121,27 +2112,7 @@ function drawFootprints(root) {
   root.remove(cam);
 }
 
-// un brin d'herbe qui pend : bande effilée, un peu courbée, de sa racine (en haut, à l'origine) vers le bas
-function bladeGeometry(len, color) {
-  const seg = 5, pos = [], col = [], idx = [];
-  const tip = color.clone().offsetHSL(0, 0, 0.08);
-  for (let i = 0; i <= seg; i++) {
-    const s = i / seg, w = 0.0045 * (1 - s) + 0.0006;
-    const y = -len * s, x = 0.3 * len * s * s;
-    pos.push(x - w, y, 0, x + w, y, 0);
-    const c = color.clone().lerp(tip, s);
-    col.push(c.r, c.g, c.b, c.r, c.g, c.b);
-    if (i < seg) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  g.setIndex(idx);
-  g.computeVertexNormals();
-  return g;
-}
-
-function makeLevitation(root, floraMesh) {
+function makeLevitation(root) {
   liftRoot = root;
   const depthLift = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
   depthLift.userData.lifter = true;
@@ -2198,70 +2169,6 @@ function makeLevitation(root, floraMesh) {
   makeHover();
   lifters.sort((a, b) => (a.carrier ? 1 : 0) - (b.carrier ? 1 : 0));
   drawFootprints(root);
-
-  // la terre de la brouette : des mottes partent du bord de son chargement
-  const barrow = lifters.find((l) => /^Brouette/.test(l.obj.name));
-  const soil = barrow?.pts.filter((q) => /^(Terreau|Terre claire)/.test(q.mesh.material?.name || ''));
-  if (soil?.length) {
-    const top = Math.max(...soil.map((q) => q.p.y));
-    const surf = soil.filter((q) => q.p.y > top - 0.05);
-    const cx = surf.reduce((a, q) => a + q.p.x, 0) / surf.length, cz = surf.reduce((a, q) => a + q.p.z, 0) / surf.length;
-    surf.sort((a, b) => Math.hypot(b.p.x - cx, b.p.z - cz) - Math.hypot(a.p.x - cx, a.p.z - cz));
-    const rim = surf.slice(0, Math.max(1, Math.round(surf.length * 0.4)));
-    const geo = new THREE.IcosahedronGeometry(1, 0);
-    const soilMats = new Map();                     // la terre tombée retourne au vide avec l'îlot
-    const ats = Array.from({ length: CRUMBS.count }, () => rand(...CRUMBS.at)).sort((a, b) => a - b);
-    for (const at of ats) {
-      const q = rim[(Math.random() * rim.length) | 0];
-      if (!soilMats.has(q.mesh.material)) {
-        const c = q.mesh.material.clone();
-        c.userData = {};
-        soilMats.set(q.mesh.material, voidify(c));
-      }
-      const mesh = new THREE.Mesh(geo, soilMats.get(q.mesh.material));
-      mesh.visible = false;
-      root.add(mesh);
-      crumbs.push({ mesh, at, local: q.local, r: rand(...CRUMBS.size), state: 0, vel: new THREE.Vector3(), t0: 0,
-        spin: new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize(), turn: rand(4, 9), owner: barrow });
-    }
-  }
-
-  // les brins accrochés sous les objets posés dans l'herbe
-  const greens = [];
-  const col = floraMesh?.geometry.attributes.color;
-  if (col) {
-    const c = new THREE.Color();
-    for (let k = 0; k < 4000 && greens.length < 40; k++) {
-      c.fromBufferAttribute(col, (Math.random() * col.count) | 0);
-      if (c.g > c.r * 1.25 && c.g > c.b * 1.6) greens.push(c.clone());
-    }
-  }
-  if (!greens.length) return;
-  const bladeMat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide,
-    roughness: floraMesh.material.roughness ?? 0.8, metalness: 0 });
-  bladeMat.userData.lifter = true;                  // accrochés aux objets : ils restent avec eux
-  voidify(bladeMat);
-  for (const l of lifters) {
-    if (l.carrier || l.box.min.y > GROUND_Y + 0.06) continue;
-    const low = l.pts.filter((q) => q.p.y < l.box.min.y + 0.012);
-    if (!low.length) continue;
-    const n = Math.round(rand(...BLADES.per));
-    for (let i = 0; i < n; i++) {
-      const q = low[(Math.random() * low.length) | 0];
-      const len = rand(...BLADES.length);
-      const mesh = new THREE.Mesh(bladeGeometry(len, greens[(Math.random() * greens.length) | 0]), bladeMat);
-      // il pend vers le bas de l'îlot, tourné au hasard autour de la verticale
-      const hang = new THREE.Quaternion().copy(l.q0).invert()
-        .multiply(new THREE.Quaternion().setFromAxisAngle(UP, rand(0, Math.PI * 2)));
-      mesh.position.copy(q.local);
-      mesh.quaternion.copy(hang);
-      mesh.visible = false;
-      l.obj.add(mesh);
-      blades.push({ mesh, owner: l, local: q.local.clone(), hang, len, state: 0, t0: 0, sway: rand(1.6, 2.8),
-        ph: rand(0, 6.3), drop: Math.random() < BLADES.drop ? rand(...BLADES.at) : Infinity,
-        vel: new THREE.Vector3() });
-    }
-  }
 }
 
 // en l'air : la place de chacun (écartée des autres), son axe de rotation, son rythme
@@ -2422,75 +2329,17 @@ function updateLevitation(t, dt) {
     if (Math.abs(_gp.x) < 1 && Math.abs(_gp.y) < 1) objectsOnScreen++;
   }
   updateRisers(t, dt, smooth(0.05, 0.3, P) * (1 - smooth(0.6, 0.75, g)), smooth(0.6, 1, g) ** 2);
-
-  // la terre de la brouette
-  for (const c of crumbs) {
-    const m = c.mesh;
-    if (c.state === 0) {
-      if (c.owner.u < c.at) continue;
-      m.position.copy(c.local).applyMatrix4(c.owner.obj.matrix);
-      c.vel.set(rand(-1, 1) * CRUMBS.spread, rand(0, 0.12), rand(-1, 1) * CRUMBS.spread);
-      m.scale.setScalar(c.r);
-      m.visible = true;
-      c.state = 1;
-    } else if (c.state === 1) {                     // elle tombe en tournant
-      c.vel.y -= GRAVITY * dt;
-      m.position.addScaledVector(c.vel, dt);
-      m.rotateOnAxis(c.spin, c.turn * dt);
-      if (m.position.y <= GROUND_Y + c.r * 0.4) { m.position.y = GROUND_Y + c.r * 0.4; c.state = 2; c.t0 = t; }
-    } else if (c.state === 2) {                     // dans l'herbe, elle s'enfonce
-      const k = 1 - (t - c.t0) / CRUMBS.sink;
-      if (c.owner.u === 0) c.back = true;
-      if (k <= 0) { m.visible = false; c.state = c.back ? 0 : 3; c.back = false; }
-      else { m.scale.setScalar(c.r * k); m.position.y = GROUND_Y + c.r * (0.4 * k - (1 - k)); }
-    } else if (c.owner.u === 0) c.state = 0;        // la brouette est revenue au sol : sa terre aussi
-  }
-
-  // les brins accrochés : ils pendent et se balancent un peu ; certains se décrochent
-  for (const b of blades) {
-    const m = b.mesh, l = b.owner;
-    if (b.state === 0) {
-      m.visible = l.y > 0.002;
-      if (!m.visible) continue;
-      _lq.setFromAxisAngle(AX_X, 0.16 * Math.sin(t * b.sway + b.ph) * Math.min(1, l.y * 8));
-      m.quaternion.copy(b.hang).multiply(_lq);
-      if (l.u >= b.drop) {                          // il se décroche : il tombe dans le repère de l'îlot
-        liftRoot.attach(m);
-        b.vel.set(rand(-0.05, 0.05), -BLADES.fall, rand(-0.05, 0.05));
-        b.state = 1;
-      }
-    } else if (b.state === 1) {                     // il descend en voletant
-      m.position.addScaledVector(b.vel, dt);
-      m.position.x += Math.sin(t * 5 + b.ph) * 0.08 * dt;
-      m.rotateOnAxis(AX_Z, Math.sin(t * 3 + b.ph) * 1.5 * dt);
-      if (m.position.y <= GROUND_Y + 0.01) { b.state = 2; b.t0 = t; }
-    } else if (b.state === 2) {
-      const k = 1 - (t - b.t0) / BLADES.sink;
-      if (l.u === 0) b.back = true;
-      if (k <= 0) { m.visible = false; b.state = 3; } else m.position.y = GROUND_Y + 0.01 - (1 - k) * b.len;
-    } else if (l.u === 0 || b.back) {               // l'objet est revenu au sol : le brin reprend sa place dessous
-      b.back = false;
-      l.obj.add(m);
-      m.position.copy(b.local);
-      m.quaternion.copy(b.hang);
-      m.visible = false;
-      b.state = 0;
-    }
-  }
 }
 
 // ------------------------------------------------------------ chargement de l'îlot
-// le décodeur Draco, servi par le site (outils/build.mjs), chargé tout de suite : en même temps que le modèle
-const draco = new DRACOLoader().setDecoderPath('js/draco/');
-draco.preload();
+// le décodeur Draco (partagé, js/draco.js), servi par le site (outils/build.mjs) : sur ordinateur, chargé tout de
+// suite, en même temps que le modèle ; sur téléphone, seulement quand les mini-mondes des services arrivent
+if (desktop) draco.preload();
 const gltfLoader = new GLTFLoader().setDRACOLoader(draco);
 // sur téléphone : pas de 3D dans le hero (ni modèle téléchargé, ni rendu) ; ses objets en images fixes
 const sprites = location.search.includes('sprites');
 if (!desktop && !sprites) {
-  renderer.domElement.remove();
-  staticHero(host);
-  window.__heroReady = true;
-  queueMicrotask(() => window.dispatchEvent(new Event('hero:ready')));
+  renderer.domElement.remove();                     // (le hero en images fixes est déjà posé : js/entree.js)
 }
 if (desktop || sprites) gltfLoader.load(MODEL, (gltf) => {
   const root = gltf.scene;
@@ -2503,7 +2352,7 @@ if (desktop || sprites) gltfLoader.load(MODEL, (gltf) => {
     return;
   }
   statObjects(root);                                // les chiffres en prennent quelques objets, intacts (js/statsmur.js)
-  let seedTemplate = null, floraMesh = null;
+  let seedTemplate = null;
   const drop = [];
   root.traverse((o) => {
     if (o.name.startsWith('Gabarit')) {             // le modèle d'aigrette : il sert aux particules, pas à la scène
@@ -2521,7 +2370,6 @@ if (desktop || sprites) gltfLoader.load(MODEL, (gltf) => {
       o.material.map.anisotropy = renderer.capabilities.getMaxAnisotropy();
       blendIntoPage(o.material);
     } else if (wind) {
-      if (!floraMesh && o.geometry.attributes.color) floraMesh = { geometry: o.geometry, material: o.material };
       o.material = windy(o.material.clone());       // le vent ne touche que l'herbe, les fleurs et les fougères
     }
     voidify(o.material);                            // tout, sol compris, sort du vide
@@ -2577,7 +2425,7 @@ if (desktop || sprites) gltfLoader.load(MODEL, (gltf) => {
     });
     flowerHeads = flowerHeads.filter((h) => !hidden_(h));
     if (desktop && flowerHeads.length) makeBees();
-    if (desktop) makeLevitation(root, floraMesh);  // les objets qui décollent au défilement
+    if (desktop) makeLevitation(root);  // les objets qui décollent au défilement
   }
   animating = !reduced;
   window.__heroReady = true;
