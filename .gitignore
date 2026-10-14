@@ -9,3 +9,4 @@ __pycache__/
 # sources des médias avant / après (originaux du téléphone, lourds) : leurs versions web sont dans images/avant-apres/
 *.MOV
 *.HEIC
+team.jpeg
