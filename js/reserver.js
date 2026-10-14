@@ -517,7 +517,7 @@
   q('#bk-recap-canal-ic').innerHTML = ICONES.tel;
   q('#bk-recap-canal').textContent = t().tel;
   allerA('devis', false);
-  // arrivée depuis un bouton « Demander un devis » d'un service : ?service=nettoyage le présélectionne
+  // arrivée depuis le bouton « Réserver un appel » de la carte d’un service : ?service=nettoyage le présélectionne
   titrePage();
   const pre = !SUR && new URLSearchParams(location.search).get('service');
   if (pre) q(`[data-groupe="services"] [data-v="${CSS.escape(pre)}"]`)?.click();

@@ -366,7 +366,8 @@ function start(gltf) {
   }
   moreBtn?.addEventListener('click', openCard);
   closeBtn?.addEventListener('click', closeCard);
-  // « Demander un devis » : la carte se ferme pendant que le voile emmène vers le devis (js/veil.js)
+  // « Réserver un appel » : le voile emmène vers la page de réservation, le service déjà choisi (?service=) ; la carte
+  // se ferme sous lui (la page revient fermée si on fait « retour »)
   for (const a of card ? card.querySelectorAll('.svc-detail__cta') : []) a.addEventListener('click', () => setTimeout(closeCard, 950));
   document.addEventListener('keydown', (e) => {
     if (!paused) return;

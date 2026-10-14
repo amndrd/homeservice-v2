@@ -229,14 +229,4 @@
   groupe(q('.ft__main'), [...qa('.ft__main-line').map((e) => ['line', e]), ...ts('.ft__main .ft-label'), ...ts('.ft__main .ft-txt'),
     ...qa('.ft__main .ft-roll__t').map((e) => ['up', e]), ['up', q('.ft__zone .ft-arrow')], ['up', q('.ft__map')]], 20);
   groupe(q('.ft__bot'), [['line', q('.ft__bot .ft__line')], t('.ft__copy'), t('.ft__legal')]);
-  // la photo : découpée à 20 %, elle s'ouvre en grand pendant que l'image se pose (2 s, expo.out)
-  const img = q('.ft__thumb-img');
-  if (img) {
-    img.classList.add('ft-thumb-anim');
-    io(img, () => tween(2000, (v) => {
-      img.style.clipPath = `inset(${20 * (1 - v)}%)`;
-      img.firstElementChild.style.scale = 1.4 - 0.4 * v; img.firstElementChild.style.opacity = v;
-    }, ease.expo, () => { img.classList.remove('ft-thumb-anim'); img.style.clipPath = ''; img.firstElementChild.style.scale = ''; img.firstElementChild.style.opacity = ''; }),
-    '0px 0px -15% 0px');
-  }
 })();
