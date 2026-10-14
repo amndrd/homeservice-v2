@@ -113,7 +113,8 @@ import { KM, ZONE, REGION } from './zonedata.js';
   // la commune choisie (sans marque sur la carte) : « Réserver un appel » l'emmène
   function select(c) {
     selected = c;
-    cta.href = 'reserver.html' + (c ? `?cp=${c.pc[0]}` : '');
+    const page = root.dataset.langue === 'nl' ? '/afspraak' : 'reserver.html';   // la réservation, dans la langue de la page
+    cta.href = page + (c ? `?cp=${c.pc[0]}` : '');
   }
   // les communes par leur nom (celles du défilé du pied de page)
   const norm = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');

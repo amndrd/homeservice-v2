@@ -287,5 +287,5 @@
   }, { rootMargin: '120px 0px' });
   document.querySelectorAll('.hero, .cta, .ft, .bk-ondes').forEach((el) => pause.observe(el));
 
-  window.hsVeil = { cover, clear, busy: () => busy };
+  window.hsVeil = { cover, clear, go, busy: () => busy };
 })();
