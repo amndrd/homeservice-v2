@@ -95,6 +95,11 @@ html.loading .bk, html.veil-in .bk { animation-play-state: paused; }
 .bk-input, .bk-textarea { width: 100%; padding: 10px 13px; border: 1px solid var(--cal-border); border-radius: 12px; background: var(--cal-bg);
   color: var(--cal-text-emphasis); font: inherit; transition: border-color .15s, box-shadow .15s; }
 .bk-textarea { height: 96px; resize: none; }
+.bk-textarea--sur { height: 168px; }
+.bk-aide { margin: 6px 0 0; color: var(--cal-text-subtle); font-size: 12px; }
+/* demande sur mesure (data-mode="sur" sur .bk-page) : chaque texte propre à un mode n'apparaît que dans le sien */
+.bk-page:not([data-mode='sur']) .bk-seul-sur, .bk-page[data-mode='sur'] .bk-seul-devis { display: none; }
+.bk-page[data-mode='sur'] .bk-deux { grid-template-columns: minmax(0, 1fr); }
 .bk-cp { max-width: 160px; letter-spacing: .08em; }
 .bk-select { appearance: none; padding-right: 36px; cursor: pointer;
   background: var(--cal-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236a7382' stroke-width='1.8'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E") right 10px center / 18px no-repeat; }
@@ -110,7 +115,7 @@ html.loading .bk, html.veil-in .bk { animation-play-state: paused; }
   color: var(--cal-text); font: inherit; font-size: 13px; cursor: pointer; transition: background-color .15s, border-color .15s, color .15s; }
 .bk-pastille:hover { background: var(--cal-bg-subtle); color: var(--cal-text-emphasis); }
 .bk-pastille[aria-pressed='true'] { background: var(--green); border-color: var(--green); color: #fff; }
-.bk-pastille:focus-visible, .bk-btn:focus-visible, .bk-option:focus-visible, .bk-case:focus-visible, .bk-creneau:focus-visible {
+.bk-pastille:focus-visible, .bk-btn:focus-visible, .bk-case:focus-visible, .bk-creneau:focus-visible {
   outline: 2px solid var(--green); outline-offset: 2px; }
 .bk-deux { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
 
@@ -119,6 +124,10 @@ html.loading .bk, html.veil-in .bk { animation-play-state: paused; }
 .bk-btn { padding: 12px 20px; border: 1px solid var(--cal-brand); border-radius: 12px; background: var(--cal-brand); color: var(--cal-brand-text);
   font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: background-color .2s, border-color .2s; }
 .bk-btn:hover { background: var(--green); border-color: var(--green); }
+.bk-btn:disabled, .bk-btn:disabled:hover { background: var(--cal-brand); border-color: var(--cal-brand); opacity: .55; cursor: progress; }
+.bk-piege { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.bk-envoi-erreur { margin: 12px 0 0; color: #c8423b; font-size: 13px; font-weight: 600; text-align: right; }
+.bk-envoi-erreur a { color: inherit; }
 .bk-btn--fantome { border-color: transparent; background: none; color: var(--cal-text-subtle); }
 .bk-btn--fantome:hover { background: none; border-color: transparent; color: var(--cal-text-emphasis); }
 .bk-btn--large { display: inline-block; padding: 11px 24px; text-decoration: none; }
@@ -211,13 +220,6 @@ html.loading .bk, html.veil-in .bk { animation-play-state: paused; }
 /* ---------------------------------------------------------------- écran 4 : coordonnées */
 .bk-confirmer { display: grid; grid-template-columns: 240px minmax(0, 1fr); }
 .bk-form { padding: 24px; }
-.bk-choix { display: flex; flex-wrap: wrap; gap: 6px; }
-.bk-option { flex: 1 1 140px; display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--cal-border-subtle);
-  border-radius: 12px; background: var(--cal-bg-muted); color: var(--cal-text); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
-  transition: border-color .15s, color .15s; }
-.bk-option svg { flex: none; width: 16px; height: 16px; }
-.bk-option:hover { border-color: var(--cal-border); color: var(--cal-text-emphasis); }
-.bk-option[aria-pressed='true'] { border-color: var(--green); background: #fff; color: var(--green); }
 .bk-champ[hidden], .bk-label span[hidden] { display: none; }
 
 /* ---------------------------------------------------------------- écran 5 : la demande (page de confirmation de Cal.com) */
@@ -234,7 +236,6 @@ html.loading .bk, html.veil-in .bk { animation-play-state: paused; }
 .bk-sec { color: var(--cal-text-subtle); }
 .bk-jeton { margin-left: 6px; padding: 1px 5px; border-radius: 4px; font-size: 11px; font-weight: 500; }
 .bk-jeton--hote { background: #ffe8d2; color: #a04f05; }
-.bk-contact-lien { display: flex; justify-content: center; margin-top: 28px; }
 .bk-agenda { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-top: 24px; padding-top: 20px;
   border-top: 1px solid var(--cal-border-subtle); }
 .bk-agenda-label { margin-right: 4px; color: var(--cal-text-emphasis); font-size: 14px; }
