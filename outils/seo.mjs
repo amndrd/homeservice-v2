@@ -22,7 +22,7 @@ const ENTREPRISE = {
   autresNoms: ['Home Service Bruxelles', 'HomeService Bruxelles'],
   telephone: '+32471917014',
   email: 'homeservicebxl.contact@gmail.com',
-  fondateur: 'Amandin Dardenne',
+  fondateurs: ['Amandin Dardenne', 'André Campilho'],
   fiche: 'https://www.google.com/search?kgmid=/g/11nqxwy26l',   // la fiche Google Business Profile
   horaires: { ouvre: '09:00', ferme: '19:00' },                 // 7 j/7, jours fériés compris (les créneaux d'appel)
 };
@@ -34,6 +34,15 @@ const COMMUNES = [   // [français, néerlandais] : les 19 communes de la Régio
   ['Saint-Josse-ten-Noode', 'Sint-Joost-ten-Node'], ['Schaerbeek', 'Schaarbeek'], ['Uccle', 'Ukkel'],
   ['Watermael-Boitsfort', 'Watermaal-Bosvoorde'], ['Woluwe-Saint-Lambert', 'Sint-Lambrechts-Woluwe'],
   ['Woluwe-Saint-Pierre', 'Sint-Pieters-Woluwe'],
+];
+// les fourchettes indicatives de la section Tarifs (index.html, .tarifs), une par service (sa prestation principale) :
+// [prix min, prix max (null : « à partir de »), unité (fr), unité (nl)]
+const PRIX = [
+  [30, 38, 'par heure (ménage à domicile)', 'per uur (schoonmaak aan huis)'],
+  [0.35, 0.5, 'par m² (tonte de pelouse)', 'per m² (gazon maaien)'],
+  [100, 250, 'par camion, un trajet (débarras)', 'per bestelwagen, één rit (ontruiming)'],
+  [25, null, 'par meuble en kit', 'per bouwpakket'],
+  [15, null, 'par livraison', 'per levering'],
 ];
 const SERVICES = {
   fr: [
@@ -106,7 +115,7 @@ function entreprise(l) {
     image: `${SITE}/images/og-image.jpg`,
     telephone: ENTREPRISE.telephone,
     email: ENTREPRISE.email,
-    founder: { '@type': 'Person', name: ENTREPRISE.fondateur },
+    founder: ENTREPRISE.fondateurs.map((name) => ({ '@type': 'Person', name })),
     priceRange: '€€',
     currenciesAccepted: 'EUR',
     knowsLanguage: ['fr', 'nl', 'en'],
@@ -123,10 +132,17 @@ function entreprise(l) {
     hasOfferCatalog: {
       '@type': 'OfferCatalog',
       name: l === 'fr' ? 'Services à domicile' : 'Diensten aan huis',
-      itemListElement: S.map(([name, description]) => ({
-        '@type': 'Offer',
-        itemOffered: { '@type': 'Service', name, description, areaServed: { '@id': `${SITE}/#zone` } },
-      })),
+      itemListElement: S.map(([name, description], i) => {
+        const [min, max, uFr, uNl] = PRIX[i];
+        return {
+          '@type': 'Offer',
+          itemOffered: { '@type': 'Service', name, description, areaServed: { '@id': `${SITE}/#zone` } },
+          priceSpecification: { '@type': 'PriceSpecification', priceCurrency: 'EUR', minPrice: min,
+            ...(max ? { maxPrice: max } : {}), unitText: l === 'fr' ? uFr : uNl,
+            description: l === 'fr' ? 'Prix indicatif, hors frais de déplacement ; le prix exact est fixé pendant l’appel.'
+              : 'Richtprijs, zonder verplaatsingskosten; de exacte prijs wordt tijdens het gesprek vastgelegd.' },
+        };
+      }),
     },
   };
 }
