@@ -11,7 +11,7 @@
 // le glissé sur la fiche changent de service. Sans animations (réglage système), le vide fait la relève.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { draco } from './draco.js';                 // le décodeur Draco partagé (js/draco.js)
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { MINI_ASM, MINI_CHOREO, MINI_EXIT, asmBuild, asmApply, exitApply, exitReset } from './assemblage.js';
 
@@ -403,14 +403,16 @@ function start(gltf) {
 }
 
 if (section) {
-  const draco = new DRACOLoader().setDecoderPath('js/draco/');
-  // chargé quand la section approche (pas avant : la page reste légère à l'ouverture)
+  // chargé quand la section approche, à un écran près, et jamais avant que la page ait fini de se charger (sur
+  // téléphone, le hero est court : la section est proche dès l'ouverture, et ce modèle disputait le réseau à la page)
+  const charge = () => new GLTFLoader().setDRACOLoader(draco).loadAsync(__MONDES__).then((gltf) => {
+    try { start(gltf); } catch (err) { console.error(err); }
+  }).catch(() => {});
   const io = new IntersectionObserver(([e]) => {
     if (!e.isIntersecting) return;
     io.disconnect();
-    new GLTFLoader().setDRACOLoader(draco).loadAsync(__MONDES__).then((gltf) => {
-      try { start(gltf); } catch (err) { console.error(err); }
-    }).catch(() => {});
-  }, { rootMargin: '150% 0px' });
+    if (document.readyState === 'complete') charge();
+    else addEventListener('load', charge, { once: true });
+  }, { rootMargin: '100% 0px' });
   io.observe(section);
 }

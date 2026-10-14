@@ -9,7 +9,7 @@
 // Sur ordinateur seulement (comme l'îlot) ; ailleurs, ou sans mouvement, les chiffres sont simplement affichés.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { draco } from './draco.js';                 // le décodeur Draco partagé (js/draco.js)
 
 const box = document.querySelector('.stats');
 const root = document.documentElement;
@@ -335,7 +335,6 @@ if (box && rows.length) {
     new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible && watch()) wake(); }).observe(box);
   }
   if (desktop && SCENES) {
-    const draco = new DRACOLoader().setDecoderPath('js/draco/');
     new GLTFLoader().setDRACOLoader(draco).loadAsync(__STATS__).then((gltf) => {
       try { initScenes(gltf); } catch { /* sans WebGL : les chiffres seuls */ }
       watch(); wake();
